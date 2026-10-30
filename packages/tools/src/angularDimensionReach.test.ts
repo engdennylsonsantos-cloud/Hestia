@@ -97,6 +97,28 @@ describe('Cota angular: arco sobre as retas de referência (modelo Revit)', () =
     expectOnLine(wallLine(moved, resolved.angular!.refB), g.end);
   });
 
+  it('marcas nas pontas são "/" a 45° da linha de referência, centradas na ponta', () => {
+    const store = new ProjectStore(createEmptyProject());
+    store.exec({ type: 'addWall', wall: makeWall({ id: 'wa', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
+    store.exec({ type: 'addWall', wall: makeWall({ id: 'wb', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 0, y: 4 } }) });
+    const { env } = makeEnv(store);
+    const tool = createTool('angularDimension', env);
+    tool.start();
+    clickAt(tool, 2, 0.01);
+    clickAt(tool, 0.01, 2);
+    clickAt(tool, 1, 1);
+    const dim = levelDimensions(store.project, 'lv_0')[0]!;
+    const g = angularDimensionGeometry(dim)!;
+    const [startTick, endTick] = g.ticks;
+    const dirOf = ([p, q]: [Vec2Like, Vec2Like]) => ({ x: (q.x - p.x) / Math.hypot(q.x - p.x, q.y - p.y), y: (q.y - p.y) / Math.hypot(q.x - p.x, q.y - p.y) });
+    const cosStart = Math.abs(dirOf(startTick).x * dim.angular!.from.x + dirOf(startTick).y * dim.angular!.from.y);
+    const cosEnd = Math.abs(dirOf(endTick).x * dim.angular!.to.x + dirOf(endTick).y * dim.angular!.to.y);
+    expect(cosStart).toBeCloseTo(Math.SQRT1_2, 3);
+    expect(cosEnd).toBeCloseTo(Math.SQRT1_2, 3);
+    const mid = { x: (startTick[0].x + startTick[1].x) / 2, y: (startTick[0].y + startTick[1].y) / 2 };
+    expect(Math.hypot(mid.x - g.start.x, mid.y - g.start.y)).toBeLessThan(1e-9);
+  });
+
   it('grades: pontas sobre as retas das grades', () => {
     const store = new ProjectStore(createEmptyProject());
     store.exec({ type: 'addGrid', grid: { id: 'g1', name: '1', typeId: 'gt_6mm', points: [{ x: 1, y: 0 }, { x: 6, y: 0 }], sag: 0, bubbleStart: true, bubbleEnd: true } });

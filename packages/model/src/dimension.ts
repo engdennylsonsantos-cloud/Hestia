@@ -115,9 +115,14 @@ export function angularDimensionGeometry(d: Dimension, segments = 24): AngularDi
   const start = arc[0]!;
   const end = arc[arc.length - 1]!;
   const tick = Math.max(0.04, a.radius * 0.05);
+  // Marca "/" a 45° da linha de referência (radial), centrada na ponta: é a mesma marca arquitetônica das cotas lineares.
   const tickAt = (angle: number, point: Vec2): [Vec2, Vec2] => {
-    const p = { x: -Math.sin(angle), y: Math.cos(angle) };
-    return [{ x: point.x - p.x * tick, y: point.y - p.y * tick }, { x: point.x + p.x * tick, y: point.y + p.y * tick }];
+    const radial = { x: Math.cos(angle), y: Math.sin(angle) };
+    const tangent = { x: -Math.sin(angle), y: Math.cos(angle) };
+    const sum = { x: radial.x + tangent.x, y: radial.y + tangent.y };
+    const k = Math.hypot(sum.x, sum.y);
+    const u = { x: sum.x / k, y: sum.y / k };
+    return [{ x: point.x - u.x * tick, y: point.y - u.y * tick }, { x: point.x + u.x * tick, y: point.y + u.y * tick }];
   };
   const mid = angleA + delta / 2;
   const textAt = d.textAt ?? pointAt(mid, a.radius + Math.max(0.12, a.radius * 0.12));

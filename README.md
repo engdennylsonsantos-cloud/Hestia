@@ -45,4 +45,6 @@ estão em [CONTRIBUTING.md](CONTRIBUTING.md), [LICENSING.md](LICENSING.md) e
 
 A `main` recebe mudanças por pull request. Rode `npm run check` antes de abrir o
 PR. Para falar de segurança, use o canal privado descrito em
-[SECURITY.md](SECURITY.md).
+[SECURITY.md](SECURITY.md). O código de conduta está em
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md); relatos são recebidos pelo formulário
+privado indicado nele.

@@ -45,5 +45,6 @@ resto do projeto. Veja [LICENSING.md](LICENSING.md) e [NOTICE](NOTICE).
 
 ## Código de conduta
 
-Seja direto e respeitoso. Discussão técnica é bem-vinda; ataques pessoais,
-assédio e discriminação não são.
+Siga o [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Relatos de violação são recebidos
+pelo formulário privado indicado no documento. Para vulnerabilidades, use
+**Security → Report a vulnerability**.

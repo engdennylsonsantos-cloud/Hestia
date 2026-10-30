@@ -14,13 +14,15 @@ function sala(withRoom = true): Project {
 /** Nome de camada como aparece no DXF (código de grupo 8 seguido do nome). */
 const onLayer = (dxf: string, layer: string): boolean => new RegExp(`\\s8\\s*\\r?\\n${layer}\\r?\\n`).test(dxf);
 
-describe('ambientes no DXF da planta (decisão 0018, camadas AMBIENTES e AMBIENTES_TEXTO)', () => {
-  it('contorno fechado na camada AMBIENTES e nome, número e área na AMBIENTES_TEXTO', () => {
+describe('ambientes no DXF da planta (decisão 0018/0037, camadas AMBIENTES e AMBIENTES_TEXTO)', () => {
+  it('contorno fechado na camada AMBIENTES e só o nome na AMBIENTES_TEXTO', () => {
     const dxf = planDxf(sala(), 'lv_0');
     expect(onLayer(dxf, 'AMBIENTES')).toBe(true);
     expect(onLayer(dxf, 'AMBIENTES_TEXTO')).toBe(true);
-    expect(dxf).toContain('Sala (101)');
-    expect(dxf).toMatch(/Sala \(101\) · \d+,\d\d m²/);
+    expect(dxf).toContain('Sala');
+    // Decisão 0037: a planta de piso não mostra número nem área no rótulo do ambiente.
+    expect(dxf).not.toContain('(101)');
+    expect(dxf).not.toContain('m²');
   });
 
   it('categoria "ambiente" oculta na vista: nada sai', () => {

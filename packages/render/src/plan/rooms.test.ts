@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { defaultUnits } from '@hestia/model';
 import { resolverZoom } from './zoomOps.ts';
 import { resolveLevel, resolveRooms, type ResolvedRoom } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, makeRoom, makeWall, type Project } from '@hestia/model';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
-import { belowRoomOps, roomLabelText, roomOps, roomSelectionOps } from './rooms.ts';
+import { belowRoomOps, roomNameText, roomOps, roomSelectionOps } from './rooms.ts';
 import { DARK, LIGHT } from './types.ts';
 import { defaultPaint } from './style.ts';
 import type { Viewport } from '../viewport.ts';
@@ -40,31 +39,27 @@ function input(p: Project, over: Partial<PlanInput> = {}): PlanInput {
 }
 
 describe('ambiente na planta (D1, E3)', () => {
-  it('etiqueta segue as unidades do projeto (área em ft²)', () => {
-    const r = { name: 'Sala', number: '101', area: 20 } as ResolvedRoom;
-    const u = { ...defaultUnits(), area: { unit: 'ft2' as const, decimals: 2, suppressZeros: false, denominator: 16 as const } };
-    expect(roomLabelText(r, 'fine', u)).toBe('Sala (101) · 215,28 ft²');
+  it('etiqueta da planta de piso mostra só o nome (decisão 0037)', () => {
+    expect(roomNameText({ name: 'Sala', number: '101', area: 20 } as ResolvedRoom)).toBe('Sala');
+    expect(roomNameText({ name: '', number: '7', area: 1.5 } as ResolvedRoom)).toBe('Ambiente 7');
+    expect(roomNameText({ name: '', area: 1.5 } as ResolvedRoom)).toBe('Ambiente');
   });
 
-  it('etiqueta: nome, número entre parênteses e área com 2 casas; no grosso, só o nome', () => {
-    const r = { name: 'Sala', number: '101', area: 20 } as ResolvedRoom;
-    expect(roomLabelText(r, 'fine', defaultUnits())).toBe('Sala (101) · 20,00 m²');
-    expect(roomLabelText(r, 'medium', defaultUnits())).toBe('Sala (101) · 20,00 m²');
-    expect(roomLabelText(r, 'coarse', defaultUnits())).toBe('Sala');
-    expect(roomLabelText({ name: '', number: '7', area: 1.5 } as ResolvedRoom, 'fine', defaultUnits())).toBe('Ambiente 7 (7) · 1,50 m²');
-  });
-
-  it('desenha o preenchimento e a etiqueta do ambiente, com a área do circuito (4 × 6 menos as paredes)', () => {
+  it('desenha o preenchimento e a etiqueta do ambiente, sem número nem área', () => {
     const p = sala();
     const ops = resolverZoom(roomOps(p, 'lv_0', LIGHT, false, 'fine', 100, undefined, defaultPaint('room', 100)), 50);
     expect(ops.fills).toHaveLength(1);
     expect(ops.labels).toHaveLength(1);
     expect(ops.labels[0]!.fontPx).toBeGreaterThan(0);
-    const text = ops.labels[0]!.text;
-    expect(text).toMatch(/^Sala \(101\) · \d+,\d\d m²$/);
-    const area = Number(text.match(/· (\d+),(\d\d) m²/)!.slice(1).join('.'));
-    expect(area).toBeGreaterThan(19);
-    expect(area).toBeLessThan(24);
+    expect(ops.labels[0]!.text).toBe('Sala');
+  });
+
+  it('a etiqueta não muda com o detalhe: fino, médio e grosso mostram o nome', () => {
+    const p = sala();
+    const paint = defaultPaint('room', 100);
+    for (const detail of ['fine', 'medium', 'coarse'] as const) {
+      expect(roomOps(p, 'lv_0', LIGHT, false, detail, 100, undefined, paint).labels[0]!.text).toBe('Sala');
+    }
   });
 
   it('ambiente oculto ou sem circuito não é desenhado', () => {
@@ -96,7 +91,8 @@ describe('ambiente na planta (D1, E3)', () => {
   it('entra na lista de desenho da planta, com a etiqueta', () => {
     const p = sala();
     const dl = buildPlanDrawList(input(p));
-    expect(dl.labels.some((l) => /^Sala \(101\) · /.test(l.text))).toBe(true);
+    expect(dl.labels.some((l) => l.text === 'Sala')).toBe(true);
+    expect(dl.labels.some((l) => l.text.includes('101'))).toBe(false);
     expect(resolveRooms(p, 'lv_0')).toHaveLength(1);
   });
 });
@@ -128,7 +124,7 @@ describe('ambientes do subpavimento (D3)', () => {
     const contorno = JSON.stringify([resolveRooms(p, 'lv_0')[0]!.polygon]);
     const dl = buildPlanDrawList(acima(p));
     expect(dl.fills.some((f) => JSON.stringify(f.polygons) === contorno)).toBe(false);
-    expect(dl.labels.some((l) => /^Sala \(101\)/.test(l.text))).toBe(false);
+    expect(dl.labels.some((l) => l.text === 'Sala')).toBe(false);
   });
 
   it('com belowRooms, o ambiente de baixo aparece apagado e sem etiqueta', () => {
@@ -137,6 +133,6 @@ describe('ambientes do subpavimento (D3)', () => {
     const dl = buildPlanDrawList(acima(p, rooms));
     const i = dl.fills.findIndex((f) => f.color === LIGHT.underlay && f.alpha === 0.22 && JSON.stringify(f.polygons) === JSON.stringify([rooms[0]!.polygon]));
     expect(i).toBeGreaterThanOrEqual(0);
-    expect(dl.labels.some((l) => /^Sala \(101\)/.test(l.text))).toBe(false);
+    expect(dl.labels.some((l) => l.text === 'Sala')).toBe(false);
   });
 });

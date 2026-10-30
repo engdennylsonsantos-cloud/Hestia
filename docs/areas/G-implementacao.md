@@ -19,14 +19,13 @@ Estado da entrega da planta de área. Para o desenho e as decisões, ver
 6. **Anote como numa planta de piso**: Cota, Texto, Etiqueta, Linha/Região de detalhe, Medir e **Cotas automáticas…**
    funcionam na planta de área. As anotações ficam **presas a esta vista** (`AreaPlan.annotations`) e não vazam para a
    planta de piso. Ao criar a planta, as anotações do nível são copiadas; “Copiar anotações do nível” refaz a cópia.
-7. Em **Cor (opcional)**, escolha **Por categoria**, **Por nível** ou **Por faixa**. Aí entram
+7. Com um ambiente selecionado, edite **Etiqueta nesta planta de área** no painel: campos
+   (nome, número, área, categoria, nível, perímetro, volume e texto livre), orientação, chamada e visibilidade.
+   Esses ajustes ficam em `AreaPlan.tags` e não mudam o rótulo compartilhado das outras vistas.
+8. Em **Cor (opcional)**, escolha **Por categoria**, **Por nível** ou **Por faixa**. Aí entram
    preenchimento, legenda e quadro. A cor de área aparece só na planta de área; a planta de piso usa o
    preenchimento neutro do tema.
-5. Clique no rótulo (sem arrastar) para selecionar o ambiente e configurar **posição, rotação e chamada**
-   no painel de propriedades.
-6. Em **Cor (opcional)**, escolha **Por categoria**, **Por nível** ou **Por faixa**. Aí entram
-   preenchimento, legenda e quadro.
-7. Botão direito em **Plantas de área** → **Criar prancha geral**: uma vista por pavimento + quadro geral.
+9. **Botão direito em Plantas de área → Criar prancha geral**: uma vista por pavimento + quadro geral.
 
 ## Onde está
 
@@ -56,14 +55,27 @@ Estado da entrega da planta de área. Para o desenho e as decisões, ver
 
 ## Limitações conhecidas (próxima etapa)
 
-- A colisão entre rótulos automáticos é resolvida subindo em degraus; ela não faz um layout global ótimo e pode
-  empurrar um rótulo para fora de ambientes muito pequenos (com chamada). O usuário pode arrastar para ajustar.
-- A planta de piso mostra nome + número + área; a decisão de mostrar só o nome não foi aplicada.
-- `RoomTag` por vista existe no modelo, mas a UI ainda não expõe campos diferentes por planta (usa o padrão
-  da planta).
+- O posicionamento automático do rótulo usa um leque de candidatos ao redor da referência e prefere uma caixa
+  inteira dentro do ambiente; em ambientes muito pequenos, quando nenhum candidato cabe, ele fica no candidato
+  mais próximo (com chamada) e pode exigir ajuste manual. Não é um layout global ótimo.
 - PDF da prancha de área é gerado pelo caminho existente de pranchas, mas não tem teste visual próprio.
 - `ouroZoom.test.ts` tem 72 falhas de hash **pré-existentes**, iguais às do estado anterior; não são desta
   entrega.
+
+## Rótulos, RoomTag por vista e planta de piso (29/10/2026)
+
+- **Planta de piso mostra só o nome** (`roomNameText`): o número e a área ficaram na planta de área, onde os
+  campos da etiqueta são configuráveis. O DXF da planta de piso segue a mesma regra.
+- **Rótulo automático da planta de área**: leque determinístico de candidatos (centro, acima/abaixo,
+  esquerda/direita e diagonais), com margem de papel; prefere caixa inteira dentro do polígono (furos/L/U) e
+  sem colisão. Se nenhum candidato couber, usa o mais próximo da referência, em vez de subir degraus e sair do
+  ambiente. Posição explícita do modelo ou `RoomTag` existente nunca é sobrescrita.
+- **`RoomTag` por vista na UI**: com um ambiente selecionado na planta de área, o painel **Etiqueta nesta
+  planta de área** edita campos, texto livre, orientação, chamada e visibilidade em `AreaPlan.tags`. O grupo
+  **Rótulo (todas as vistas)** continua separado e não é alterado.
+- **Seleção e caixa de texto**: a validação visual no navegador confirmou hover, seleção por clique, caixa de
+  seleção, alça de arraste, `Delete`, propriedades, `TextDialog` multilinha e seleção por janela na planta de
+  área (41/41 verificações).
 
 ## Seleção, texto e exclusão na planta de área (29/10/2026)
 

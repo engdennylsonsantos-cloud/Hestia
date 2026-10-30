@@ -104,6 +104,56 @@ export function autoTag(p: Project, plan: Pick<AreaPlan, 'scale' | 'graphics'>, 
   return { ...draft, at: { x: at.x, y: minY - box.h / 2 - 0.25 }, leader: leader ?? 'crossed' };
 }
 
+/** Ajustes da etiqueta que a vista aceita: campos, orientação, chamada, texto livre e visibilidade. */
+export type RoomTagPatch = Partial<Omit<RoomTag, 'id' | 'planId' | 'roomId'>>;
+
+/**
+ * Etiqueta do ambiente nesta planta, criando-a a partir do padrão da planta quando a vista ainda usa a
+ * automática. É idempotente: com etiqueta, não executa comando nenhum. Devolve `null` quando o ambiente não
+ * tem circuito fechado (sem rótulo na vista).
+ */
+export function ensureRoomTagAction(store: ProjectStore, planId: Id, roomId: Id): RoomTag | null {
+  const plan = areaPlanOf(store.project, planId);
+  if (!plan) return null;
+  const existing = plan.tags.find((t) => t.roomId === roomId);
+  if (existing) return existing;
+  const room = store.project.elements[roomId];
+  if (!room || room.kind !== 'room') return null;
+  const r = resolveRooms(store.project, plan.levelId).find((x) => x.roomId === roomId);
+  if (!r) return null;
+  const tag = autoTag(store.project, plan, room, r);
+  if (!tag) return null;
+  const created: RoomTag = { ...tag, planId, visible: true };
+  store.exec({ type: 'addRoomTag', planId, tag: created });
+  return areaPlanOf(store.project, planId)?.tags.find((t) => t.id === created.id) ?? created;
+}
+
+/**
+ * Altera a etiqueta do ambiente nesta planta, materializando-a antes quando preciso (um só passo de desfazer).
+ * Os campos vazios são recusados: `roomTagIssue` exige ao menos um campo. Não toca em `Room.labelPosition`.
+ */
+export function updateRoomTagAction(store: ProjectStore, planId: Id, roomId: Id, patch: RoomTagPatch): RoomTag | null {
+  if (patch.fields !== undefined && patch.fields.length === 0) throw new Error('A etiqueta precisa de ao menos um campo.');
+  if (!areaPlanOf(store.project, planId)) return null;
+  let updated: RoomTag | null = null;
+  store.transaction('Editar etiqueta da planta de área', () => {
+    const tag = ensureRoomTagAction(store, planId, roomId);
+    if (!tag) return;
+    store.exec({ type: 'updateRoomTag', planId, id: tag.id, patch });
+    updated = areaPlanOf(store.project, planId)?.tags.find((t) => t.id === tag.id) ?? null;
+  });
+  return updated;
+}
+
+/** Remove a etiqueta da vista: o ambiente volta ao padrão automático da planta. Devolve se havia etiqueta. */
+export function removeRoomTagAction(store: ProjectStore, planId: Id, roomId: Id): boolean {
+  const plan = areaPlanOf(store.project, planId);
+  const tag = plan?.tags.find((t) => t.roomId === roomId);
+  if (!plan || !tag) return false;
+  store.exec({ type: 'removeRoomTag', planId, id: tag.id }, 'Voltar etiqueta ao padrão da planta');
+  return true;
+}
+
 /** Etiquetas que faltam numa planta (uma por ambiente com circuito fechado). */
 export function missingTags(p: Project, plan: AreaPlan): RoomTag[] {
   const rooms = Object.values(p.elements).filter((e): e is Room => e.kind === 'room' && e.levelId === plan.levelId);

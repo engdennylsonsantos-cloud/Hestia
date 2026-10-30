@@ -41,7 +41,8 @@ import { changesWallEnds, clampOffset, rehostOpenings, wallEndsPatchOf, type Wal
 import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLevel.ts';
 import { transformStair } from './stairTransform.ts';
 import { transformRamp } from './rampTransform.ts';
-import { transformCeiling, transformFloor, transformRoof, transformSlab } from './transformPlanar.ts';
+import { transformCad, transformCeiling, transformFloor, transformRoof, transformSlab } from './transformPlanar.ts';
+import { isCad, type CadDrawing } from './cad.ts';
 import { stairTypeIssue } from './stair.ts';
 import { rampTypeIssue } from './ramp.ts';
 import { openingTypeIssue, toggleFavoriteIn } from './opening.ts';
@@ -73,6 +74,8 @@ import type { AreaPlan, ColorScheme, RoomCategory, RoomTag } from './areaPlan.ts
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
 export type Command =
   | { type: 'addWall'; wall: Omit<Wall, 'order'> }
+  | { type: 'addCadDrawing'; cad: Omit<CadDrawing, 'order'> }
+  | { type: 'updateCadDrawing'; id: Id; patch: Partial<Pick<CadDrawing, 'name' | 'visible' | 'offsetZ'>> }
   | { type: 'addOpening'; opening: Opening }
   | { type: 'addFloor'; floor: Omit<Floor, 'order'> }
   | { type: 'addSlab'; slab: Omit<Slab, 'order'> }
@@ -181,6 +184,7 @@ function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }
   transformEach(p, c, isStair, transformStair);
   transformEach(p, c, isRamp, transformRamp);
   transformEach(p, c, isSlab, (s, t) => transformSlab(s, t, !!c.copy?.idMap));
+  transformEach(p, c, isCad, (cad, t) => transformCad(cad, t, !!c.copy?.idMap));
   transformEach(p, c, isFloor, (f, t) => transformFloor(f, t, !!c.copy?.idMap));
   transformEach(p, c, isCeiling, (f, t) => transformCeiling(f, t, !!c.copy?.idMap));
   transformEach(p, c, isRoom, (r, t) => ({
@@ -224,6 +228,15 @@ export function applyCommand(p: Project, c: Command): void {
     case 'addWall':
       p.elements[c.wall.id] = { ...c.wall, order: p.nextOrder++ };
       break;
+    case 'addCadDrawing':
+      p.elements[c.cad.id] = { ...c.cad, order: p.nextOrder++ };
+      break;
+    case 'updateCadDrawing': {
+      const e = p.elements[c.id];
+      if (!isCad(e)) throw new Error('Elemento não é CAD: ' + c.id);
+      p.elements[c.id] = { ...e, ...c.patch };
+      break;
+    }
     case 'addFloor': {
       if (c.floor.boundary.length < 3) throw new Error('O contorno do piso precisa de ao menos 3 pontos');
       if (!p.floorTypes[c.floor.typeId]) throw new Error('Tipo de piso inexistente');

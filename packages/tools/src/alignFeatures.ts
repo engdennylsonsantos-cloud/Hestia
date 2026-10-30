@@ -1,13 +1,17 @@
 import { closestOnSegment, dist, norm, sub, type SketchDraft, type Vec2 } from '@hestia/geom';
 import { ceilingOutline, frameOfWall, normalAt, pointAt, tangentAt, toLocal, type WallFrame } from '@hestia/engine';
 import {
+  areaPlanOf,
   coreSpan,
   isCeiling,
   isFloor,
   isRoof,
   isSlab,
+  levelRoomSeparators,
   openingsOfWall,
   openingType,
+  planAnnotationsOf,
+  projectGrids,
   stairsOnLevel,
   wallsOnLevel,
   type Id,
@@ -15,6 +19,7 @@ import {
 } from '@hestia/model';
 import type { EdgeRef } from './ringEdge.ts';
 import { stairPolylines } from './stairPick.ts';
+import { gridPath } from './gridGeom.ts';
 import type { AlignPrefer } from './types.ts';
 
 /** Feições que o Alinhar reconhece sob o cursor. */
@@ -28,7 +33,9 @@ export type AlignKind =
   | 'arestaAnel'
   | 'linhaEsboco'
   | 'arestaEscada'
-  | 'linhaGrade';
+  | 'linhaGrade'
+  | 'linhaDetalhe'
+  | 'separador';
 
 /** Reta de referência: um ponto e uma direção (unitária). */
 export interface AlignLine {
@@ -72,6 +79,10 @@ export interface AlignQuery {
   metersPerPixel: number;
   prefer?: AlignPrefer;
   hidden?: ReadonlySet<Id>;
+  /** Só linhas que servem como referência de cota (grade, detalhe, separador), sem política de movimento. */
+  referenceOnly?: boolean;
+  /** Planta de área da vista, para enxergar linhas de detalhe/separadores da vista. */
+  planId?: Id;
   /** Esboço do perímetro em edição (opcional): as linhas entram como feições alinháveis. */
   draft?: SketchDraft;
 }
@@ -296,6 +307,37 @@ function draftFeatures(draft: SketchDraft | undefined, at: Vec2, mpp: number): A
  * a opção "Preferir" decide qual dessas é a inicial (as demais continuam no Tab). Aberturas, extremidades, arestas de
  * anel, linhas do esboço e escadas entram junto, permitindo misturar tipos no mesmo alinhamento.
  */
+/** Linhas de referência para cotas: grades, detalhes e separadores. */
+function referenceLineFeatures(p: Project, levelId: Id, at: Vec2, mpp: number, planId?: Id): AlignFeature[] {
+  const tol = TOL_PX * mpp;
+  const out: AlignFeature[] = [];
+  for (const g of projectGrids(p)) {
+    const path = gridPath(g);
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1]!;
+      const b = path[i]!;
+      if (degenerate(a, b)) continue;
+      const d = segmentDistance(at, a, b);
+      if (d > tol) continue;
+      out.push(feature(`${g.id}:grade:${i - 1}`, 'linhaGrade', `grade ${g.name}`, g.id, line(a, sub(b, a)), { policy: 'nenhum' }, d, { a, b }));
+    }
+  }
+  const level = p.levels.find((l) => l.id === levelId);
+  const plan = planId ? areaPlanOf(p, planId) : undefined;
+  const details = plan ? planAnnotationsOf(plan).detailLines : (level?.detailLines ?? []);
+  for (const l of details) {
+    const d = segmentDistance(at, l.a, l.b);
+    if (d > tol) continue;
+    out.push(feature(`${l.id}:detalhe`, 'linhaDetalhe', 'linha de detalhe', l.id, line(l.a, sub(l.b, l.a)), { policy: 'nenhum' }, d, { a: l.a, b: l.b }));
+  }
+  for (const r of levelRoomSeparators(p, levelId)) {
+    const d = segmentDistance(at, r.a, r.b);
+    if (d > tol) continue;
+    out.push(feature(`${r.id}:separador`, 'separador', 'separador de ambiente', r.id, line(r.a, sub(r.b, r.a)), { policy: 'nenhum' }, d, { a: r.a, b: r.b }));
+  }
+  return out;
+}
+
 export function alignFeaturesAt(q: AlignQuery): AlignFeature[] {
   const prefer = q.prefer ?? 'faces';
   const out: AlignFeature[] = [];
@@ -308,6 +350,7 @@ export function alignFeaturesAt(q: AlignQuery): AlignFeature[] {
   }
   out.push(...ringFeatures(q.project, q.levelId, q.at, q.metersPerPixel, q.hidden));
   out.push(...stairFeatures(q.project, q.levelId, q.at, q.metersPerPixel, q.hidden));
+  if (q.referenceOnly) out.push(...referenceLineFeatures(q.project, q.levelId, q.at, q.metersPerPixel, q.planId));
   out.push(...draftFeatures(q.draft, q.at, q.metersPerPixel));
   return out.sort((a, b) => a.distance - b.distance);
 }

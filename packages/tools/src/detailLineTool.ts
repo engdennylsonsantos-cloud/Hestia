@@ -1,6 +1,7 @@
 import { dist, type Vec2 } from '@hestia/geom';
-import { newId } from '@hestia/model';
+import { newId, unitsOf } from '@hestia/model';
 import { ToolBase, viewPlanId } from './base.ts';
+import { draftAngleItemsForConnection } from './anglePreview.ts';
 import { detailLinePreviewDim } from './dims/providers/line.ts';
 import type { DimRef, TempDim } from './dims/types.ts';
 import type { PointerInfo } from './types.ts';
@@ -18,6 +19,7 @@ export class DetailLineTool extends ToolBase {
     const q = this.snap(p).point;
     this.last = q;
     this.items = this.a ? [{ kind: 'line', a: this.a, b: q, dashed: true }] : [];
+    if (this.a) this.items.push(...draftAngleItemsForConnection(this.env.project(), this.env.levelId(), viewPlanId(this.env), this.a, q, this.env.metersPerPixel(), unitsOf(this.env.project())));
   }
   /** Comprimento do traço em desenho, pelo sistema único de cotas. */
   tempDims(_overrides: Readonly<Record<string, DimRef>> = {}): TempDim[] {

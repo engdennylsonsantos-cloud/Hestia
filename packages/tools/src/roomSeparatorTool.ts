@@ -1,6 +1,7 @@
 import { dist, type Vec2 } from '@hestia/geom';
 import { formatQuantity, unitsOf, type ResolvedUnits } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
+import { draftAngleItemsForConnection } from './anglePreview.ts';
 import type { PointerInfo } from './types.ts';
 
 const fmt = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
@@ -33,6 +34,7 @@ export class RoomSeparatorTool extends ToolBase {
       { kind: 'point', at: this.a },
       { kind: 'line', a: this.a, b, dashed: true },
       { kind: 'label', at: { x: (this.a.x + b.x) / 2, y: (this.a.y + b.y) / 2 }, text: fmt(unitsOf(this.env.project()), dist(this.a, b)) },
+      ...draftAngleItemsForConnection(this.env.project(), this.env.levelId(), null, this.a, b, this.env.metersPerPixel(), unitsOf(this.env.project())),
     ];
   }
 

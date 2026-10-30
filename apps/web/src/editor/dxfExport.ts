@@ -358,7 +358,7 @@ function areaOpsToRecords(ops: PlanOps, zoom: number): { records: string[]; laye
     }
   }
   for (const l of ops.labels) {
-    if (l.maskBoundary || !l.text) continue;
+    if (!l.text) continue;
     const h = (l.fontPx ?? 12) / zoom;
     rec(0, 'TEXT'); rec(8, 'AMBIENTES_TEXTO'); rec(10, l.at.x); rec(20, l.at.y); rec(30, 0); rec(40, h); rec(1, dxfEscapeText(l.text)); rec(50, l.rotation ?? 0);
   }

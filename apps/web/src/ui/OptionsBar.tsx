@@ -154,16 +154,6 @@ export function OptionsBar(): ReactElement {
           <label>Altura do texto<NumField id="opt-dimheight" value={(o.dimensionTextHeight ?? 2.5) / 1000} quantity="smallLength" min={0.0005} onCommit={(v) => set({ dimensionTextHeight: v * 1000 })} /></label>
         </>
       )}
-      {tool === 'angularDimension' && (
-        <label>Ângulo
-          <select id="opt-angside" className="select" value={o.angularDimensionSide ?? 'auto'} onChange={(e) => set({ angularDimensionSide: e.target.value as 'auto' | 'minor' | 'major' | 'reflex' })}>
-            <option value="auto">Automático (cursor)</option>
-            <option value="minor">Menor</option>
-            <option value="major">Maior</option>
-            <option value="reflex">Volta (360° − ângulo)</option>
-          </select>
-        </label>
-      )}
       {tool === 'text' && (
         <>
           <label>Altura<NumField id="opt-textheight" value={(o.textHeight ?? 2.5) / 1000} quantity="smallLength" min={0.0005} onCommit={(v) => set({ textHeight: v * 1000 })} /></label>

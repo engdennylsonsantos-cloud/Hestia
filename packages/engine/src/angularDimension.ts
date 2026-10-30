@@ -1,5 +1,5 @@
-import { add, dot, mul, sub, type Vec2 } from '@hestia/geom';
-import { angularDimensionData, coreSpan, type Dimension, type Id, type Project } from '@hestia/model';
+import { add, dot, mul, norm, sub, type Vec2 } from '@hestia/geom';
+import { angularDimensionData, coreSpan, levelRoomSeparators, projectGrids, type Dimension, type Id, type Project } from '@hestia/model';
 import { frameOfWall } from './resolve.ts';
 import { pointAt, tangentAt } from './frame.ts';
 
@@ -30,6 +30,36 @@ function wallRefLine(p: Project, key: string): WallRefLine | null {
   };
 }
 
+const segmentRef = (a: Vec2, b: Vec2): WallRefLine | null => {
+  const d = sub(b, a);
+  if (Math.hypot(d.x, d.y) < 1e-9) return null;
+  return { p: a, d: norm(d), anchor: mul(add(a, b), 0.5) };
+};
+
+/** Resolve também grades, linhas de detalhe e separadores; desconhecidas mantêm a geometria gravada. */
+function refLine(p: Project, levelId: Id, key: string): WallRefLine | null {
+  const wall = wallRefLine(p, key);
+  if (wall) return wall;
+  const grid = /^(.+):grade:(\d+)$/.exec(key);
+  if (grid) {
+    const g = projectGrids(p).find((x) => x.id === grid[1]);
+    const i = Number(grid[2]);
+    if (!g || !g.points[i] || !g.points[i + 1]) return null;
+    return segmentRef(g.points[i]!, g.points[i + 1]!);
+  }
+  const detail = /^(.+):detalhe$/.exec(key);
+  if (detail) {
+    const l = p.levels.find((x) => x.id === levelId)?.detailLines?.find((x) => x.id === detail[1]);
+    return l ? segmentRef(l.a, l.b) : null;
+  }
+  const sep = /^(.+):separador$/.exec(key);
+  if (sep) {
+    const r = levelRoomSeparators(p, levelId).find((x) => x.id === sep[1]);
+    return r ? segmentRef(r.a, r.b) : null;
+  }
+  return null;
+}
+
 function intersection(a: Vec2, da: Vec2, b: Vec2, db: Vec2): Vec2 | null {
   const det = da.x * db.y - da.y * db.x;
   if (Math.abs(det) < 1e-9) return null;
@@ -44,11 +74,11 @@ const orient = (line: WallRefLine, center: Vec2): Vec2 =>
  * Recalcula a cota angular a partir das chaves do Alinhar. Assim as faces/eixos/núcleos continuam valendo depois que a
  * parede se move; referências que não são paredes (ou chaves antigas) mantêm a geometria gravada.
  */
-export function resolveAngularDimension(p: Project, _levelId: Id, d: Dimension): Dimension {
+export function resolveAngularDimension(p: Project, levelId: Id, d: Dimension): Dimension {
   const a = d.angular;
   if (!a) return d;
-  const ra = wallRefLine(p, a.refA);
-  const rb = wallRefLine(p, a.refB);
+  const ra = refLine(p, levelId, a.refA);
+  const rb = refLine(p, levelId, a.refB);
   if (!ra || !rb) return d;
   const center = intersection(ra.p, ra.d, rb.p, rb.d);
   if (!center) return d;

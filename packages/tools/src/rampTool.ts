@@ -1,9 +1,10 @@
 import { dist, len, sub, type Vec2 } from '@hestia/geom';
-import { formatRampPercent, formatRampSlope, rampMaxSlope, rampTopLevel, type RampInputMode, type RampType } from '@hestia/model';
+import { formatRampPercent, formatRampSlope, rampMaxSlope, rampTopLevel, unitsOf, type RampInputMode, type RampType } from '@hestia/model';
 import { liveRemaining, optimizeRamp, planRamp, planRampFree, rampIssuesOf, rebuildPathFromSegments, type RampPlan } from '@hestia/engine';
 import { ToolBase } from './base.ts';
 import { parseNumber } from './numeric.ts';
 import { createRampFromPlan, draftRamp, rampRise, rampTypeId, type RampCommandResult } from './rampCommands.ts';
+import { connectedLineAt, draftAngleItems } from './anglePreview.ts';
 import { rotuloInclinacao, textoResultaInclinacao } from './rampLiveMessages.ts';
 import { DEFAULT_RAMP_OPTIONS, type RampToolOptions } from './rampOptions.ts';
 import { RampLiveSession, type LiveEvent, type RampLiveConfig } from './rampLiveSession.ts';
@@ -166,6 +167,8 @@ export class RampTool extends ToolBase {
       text: this.labelText(plan, len(dir)),
     };
     this.items = [...rampPartsPreview(plan), label];
+    const previous = connectedLineAt(this.env.project(), this.env.levelId(), this.origin, this.env.metersPerPixel(), this.env.areaPlanId?.());
+    this.items.push(...draftAngleItems({ previous, joint: this.origin, current: inf.point, mpp: this.env.metersPerPixel(), units: unitsOf(this.env.project()), avoid: [inf.point] }));
   }
 
   /**

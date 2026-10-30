@@ -26,6 +26,7 @@ import { clearActive, closeCurrent, cloneParts, drawPoint, partPoints, pickInto,
 import { chainAt, leftSide, nearestPickLine, offsetChain, PICK_PX, pickLinesOf } from './stairPickLines.ts';
 import { discardSpiralOnEdit } from './stairSpiralRun.ts';
 import { activeTone, buildItems, hintText, warningText } from './stairView.ts';
+import { connectedLineAt, draftAngleItemsForConnection, draftAngleItemsForPrevious } from './anglePreview.ts';
 import { DEFAULT_SNAP, type PointerInfo, type PreviewItem, type Tool } from './types.ts';
 
 const HINT = 'Escada: desenhe o limite esquerdo; Enter passa ao direito e outro Enter vai a Espelhos. Esc cancela a cadeia; outro Esc descarta o croqui.';
@@ -211,6 +212,14 @@ export class StairTool extends ToolBase {
       this.pickItems = [];
     }
     this.items = buildItems(this.st, this.cursor, this.treads, this.report, this.pickItems);
+    const last = this.st.stroke.chain[this.st.stroke.chain.length - 1];
+    const joint = this.st.stroke.last;
+    if (!this.st.pick && this.st.stroke.prim === 'line' && joint) {
+      const prev = last ? { a: last.a, b: last.b } : connectedLineAt(this.env.project(), this.env.levelId(), joint, this.env.metersPerPixel(), null);
+      this.items.push(...(last
+        ? draftAngleItemsForPrevious(prev, joint, this.cursor, this.env.metersPerPixel(), unitsOf(this.env.project()))
+        : draftAngleItemsForConnection(this.env.project(), this.env.levelId(), null, joint, this.cursor, this.env.metersPerPixel(), unitsOf(this.env.project()))));
+    }
   }
 
   override click(p: PointerInfo): void {

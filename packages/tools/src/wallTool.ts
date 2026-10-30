@@ -1,7 +1,8 @@
-import { add, arcFromSagitta, cross, dist, dot, len, mul, norm, sagFromThreePoints, sub, v2, type Vec2 } from '@hestia/geom';
+import { add, arcFromSagitta, cross, dist, len, mul, norm, sagFromThreePoints, sub, v2, type Vec2 } from '@hestia/geom';
 import { exteriorOffset } from '@hestia/engine';
-import { formatQuantity, makeWall, totalThickness, unitsOf, wallsOnLevel, type ResolvedUnits, type Wall } from '@hestia/model';
+import { formatQuantity, makeWall, totalThickness, unitsOf, type ResolvedUnits, type Wall } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
+import { draftAngleItemsForConnection } from './anglePreview.ts';
 import { segmentLengthDim } from './dims/providers/wall.ts';
 import type { DimRef, TempDim } from './dims/types.ts';
 import type { InferContext } from './infer.ts';
@@ -145,37 +146,6 @@ export class WallTool extends ToolBase {
     return [segmentLengthDim(this.startPt, this.lastPoint)];
   }
 
-  private draftAngleItems(a: Vec2, b: Vec2): void {
-    const tol = Math.max(0.02, this.env.metersPerPixel() * 10);
-    let dir: Vec2 | null = null;
-    for (const w of wallsOnLevel(this.env.project(), this.env.levelId())) {
-      const da = dist(w.a, a);
-      const db = dist(w.b, a);
-      if (da > tol && db > tol) continue;
-      const other = da <= db ? w.b : w.a;
-      const d = sub(other, a);
-      if (len(d) > 1e-6) { dir = norm(d); break; }
-    }
-    if (!dir) return;
-    const draft = norm(sub(b, a));
-    if (len(draft) < 1e-9) return;
-    const value = Math.acos(Math.max(-1, Math.min(1, dot(dir, draft))));
-    if (value < 1e-4 || value > Math.PI - 1e-4) return;
-    const radius = Math.min(1.1, Math.max(0.28, dist(a, b) * 0.35));
-    const sign = cross(dir, draft) >= 0 ? 1 : -1;
-    const start = Math.atan2(dir.y, dir.x);
-    let prev = add(a, mul(dir, radius));
-    const steps = 16;
-    for (let i = 1; i <= steps; i++) {
-      const ang = start + (sign * value * i) / steps;
-      const q = add(a, v2(Math.cos(ang) * radius, Math.sin(ang) * radius));
-      this.items.push({ kind: 'line', a: prev, b: q });
-      prev = q;
-    }
-    const mid = start + (sign * value) / 2;
-    this.items.push({ kind: 'label', at: add(a, v2(Math.cos(mid) * (radius + 0.12), Math.sin(mid) * (radius + 0.12))), text: formatQuantity(unitsOf(this.env.project()), 'angle', value) });
-  }
-
   override move(p: PointerInfo): void {
     this.lastPointer = p;
     if (this.isRect()) {
@@ -205,7 +175,7 @@ export class WallTool extends ToolBase {
     const l = dist(a, b);
     if (l < 1e-6) return;
     this.items.push({ kind: 'wallBand', a, b, thickness, sMid });
-    this.draftAngleItems(a, b);
+    this.items.push(...draftAngleItemsForConnection(this.env.project(), this.env.levelId(), this.env.areaPlanId?.(), a, b, this.env.metersPerPixel(), unitsOf(this.env.project())));
     // Trecho reto: a cota dinâmica (`tempDims`) é a única leitura, só comprimento — sem rótulo duplicado nem ângulo.
     this.env.say(this.isArc() ? 'Clique no ponto final da corda.' : 'Clique para terminar a parede, ou digite o comprimento e Enter.');
   }

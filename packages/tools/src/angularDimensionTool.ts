@@ -16,6 +16,7 @@ import type { PointerInfo, PreviewItem } from './types.ts';
 
 const LABEL_HALF = 1.2;
 const MIN_RADIUS = 0.05;
+const LINE_REFERENCE_KINDS = new Set(['faceParede', 'eixoParede', 'nucleoParede', 'arestaAnel', 'linhaEsboco', 'arestaEscada', 'linhaGrade', 'linhaDetalhe', 'separador']);
 
 /** Direção de uma referência: a reta, orientada para o lado do elemento (para o arco sair no encontro certo). */
 interface RefLine {
@@ -60,7 +61,7 @@ function intersection(a: Vec2, da: Vec2, b: Vec2, db: Vec2): Vec2 | null {
 export class AngularDimensionTool extends ToolBase {
   readonly id = 'angularDimension';
   readonly label = 'Cota angular';
-  readonly hint = 'Cota angular: clique na primeira referência, depois na segunda. Mova o cursor para escolher o lado e o raio do arco e clique. A opção Ângulo permite medir a volta (360° − ângulo). Tab alterna a referência.';
+  readonly hint = 'Cota angular: clique na primeira referência, depois na segunda. Mova o cursor para escolher o lado (interno = menor, externo = maior) e o raio do arco; clique para criar. Tab alterna a referência.';
   private refA: AlignFeature | null = null;
   private refB: AlignFeature | null = null;
   private hover: AlignFeature[] = [];
@@ -91,7 +92,9 @@ export class AngularDimensionTool extends ToolBase {
       metersPerPixel: this.env.metersPerPixel(),
       prefer: this.env.options().alignPrefer ?? 'faces',
       hidden: this.env.hiddenInView?.(),
-    }).filter((f) => f.kind !== 'extremidadeParede');
+      referenceOnly: true,
+      planId: this.env.areaPlanId?.() ?? undefined,
+    }).filter((f) => LINE_REFERENCE_KINDS.has(f.kind));
   }
 
   private updateHover(at: Vec2): void {
@@ -146,12 +149,10 @@ export class AngularDimensionTool extends ToolBase {
     return Math.abs(wrapPi(cursorAngle - angleOf(from))) <= minor ? 'minor' : 'major';
   }
 
-  /** Dados da cota no lado escolhido: `auto` segue o cursor; `reflex` complementa o lado sob o cursor. */
+  /** Dados da cota no lado escolhido pelo cursor: interno = menor; externo = maior. */
   private angularData(g: { center: Vec2; a: RefLine; b: RefLine }, radius: number, cursor: Vec2): AngularDimension {
-    const base = this.sideAt(g.center, g.a.to, g.b.to, cursor);
-    const chosen = this.env.options().angularDimensionSide ?? 'auto';
-    const side: AngularDimensionSide = chosen === 'auto' ? base : chosen;
-    return angularDimensionData(g.center, g.a.to, g.b.to, radius, side, this.refA!.key, this.refB!.key, base);
+    const side: AngularDimensionSide = this.sideAt(g.center, g.a.to, g.b.to, cursor);
+    return angularDimensionData(g.center, g.a.to, g.b.to, radius, side, this.refA!.key, this.refB!.key);
   }
 
   private makePreview(cursor: Vec2): void {

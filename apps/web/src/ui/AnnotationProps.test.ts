@@ -141,7 +141,7 @@ describe('cota angular: lado Volta', () => {
     expect(patch.value).toBeCloseTo(287.3 * deg, 9);
   });
 
-  it('o seletor Lado oferece a Volta (360° − ângulo)', () => {
+  it('o seletor Lado oferece apenas Menor e Maior', () => {
     const dim: Dimension = {
       id: 'dang',
       a: { x: 0, y: 0 },
@@ -150,7 +150,9 @@ describe('cota angular: lado Volta', () => {
       angular: angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, 2, 'minor', 'a', 'b'),
     };
     const html = renderToStaticMarkup(createElement(AnnotationProps, { dim }));
-    expect(html).toContain('Volta (360° − ângulo)');
+    expect(html).toContain('Menor');
+    expect(html).toContain('Maior');
+    expect(html).not.toContain('Volta (360° − ângulo)');
     expect(html).toContain('value="minor" selected=""');
   });
 });

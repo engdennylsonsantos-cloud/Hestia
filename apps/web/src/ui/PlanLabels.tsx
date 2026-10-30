@@ -99,7 +99,7 @@ export const PlanLabels = forwardRef<PlanLabelsHandle, { labels: LabelOp[]; v: V
       ) : null}
       {v
         ? labels.map((l, i) => {
-            if (l.maskBoundary) return null;
+            if (l.maskBoundary && !l.text) return null;
             const sp = worldToScreen(v, l.at);
             // Anotação (cota ou texto, decisão 0019): fonte e rotação do papel, centrada no ponto.
             if (l.fontPx !== undefined && l.center) {

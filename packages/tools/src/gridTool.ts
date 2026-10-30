@@ -1,6 +1,7 @@
 import { add, dist, mul, norm, sub, v2, type Vec2 } from '@hestia/geom';
 import { DEFAULT_GRID_TYPE_ID, GRID_MIN_SEGMENT, formatQuantity, isWall, nextGridName, newId, unitsOf, type Grid, type ResolvedUnits } from '@hestia/model';
 import { ToolBase } from './base.ts';
+import { draftAngleItemsForConnection, draftAngleItemsForPrevious } from './anglePreview.ts';
 import { gridPreviewDim } from './dims/providers/grid.ts';
 import type { DimRef, TempDim } from './dims/types.ts';
 import { clampSag, gridPreviewItems } from './gridGeom.ts';
@@ -113,6 +114,10 @@ export class GridTool extends ToolBase {
     if (dist(last, at) < 1e-6) return;
     const fixed = mode === 'multi' ? this.pts : [last];
     this.items.push(...gridPreviewItems({ points: [...fixed, at], sag: 0 }));
+    const prev = mode === 'multi' && this.pts.length >= 2 ? { a: this.pts[this.pts.length - 2]!, b: last } : null;
+    this.items.push(...(prev
+      ? draftAngleItemsForPrevious(prev, last, at, this.env.metersPerPixel(), unitsOf(this.env.project()))
+      : draftAngleItemsForConnection(this.env.project(), this.env.levelId(), null, last, at, this.env.metersPerPixel(), unitsOf(this.env.project()))));
   }
 
   /**

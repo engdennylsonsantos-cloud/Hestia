@@ -202,7 +202,12 @@ export function noteOps(p: Project, levelId: Id, pt: PlanPaint, look: NoteLook, 
       out.strokes.push({ pts: g.arc, closed: false, ...corte, color: c, alpha: 1 });
       for (const seg of g.extensions) out.strokes.push({ pts: [...seg], closed: false, ...projecao, color: c, alpha: 1 });
       for (const seg of g.ticks) out.strokes.push({ pts: [...seg], closed: false, ...corte, color: c, alpha: 1 });
-      out.labels.push({ ...noteLabel(g.textAt, dimensionText(p, rd, unitsOf(p)), textMm, scale, g.textRotation), ...(picked(d.id) ? { color: c } : {}) });
+      const label = noteLabel(g.textAt, dimensionText(p, rd, unitsOf(p)), textMm, scale, g.textRotation);
+      const bloco = textBlockModel({ text: label.text, height: textMm }, scale);
+      label.maskBoundary = blocoEm(g.textAt, bloco.w, bloco.h, g.textRotation, 0.45 * mPerMm);
+      label.maskColor = look.paper ?? '#fbfbfa';
+      label.maskBorderColor = 'none';
+      out.labels.push({ ...label, ...(picked(d.id) ? { color: c } : {}) });
       continue;
     }
     const { a, b } = dimensionPoints(p, d);
@@ -214,6 +219,12 @@ export function noteOps(p: Project, levelId: Id, pt: PlanPaint, look: NoteLook, 
     const lab = dimensionLabelOps(g, d.offset, dimensionText(p, d, unitsOf(p)), textMm, scale, mPerMm, lane, c, corte, v);
     if (lab.short) lane++;
     out.labels.push(...lab.labels);
+    for (const label of lab.labels) {
+      const bloco = textBlockModel({ text: label.text, height: textMm }, scale);
+      label.maskBoundary = blocoEm(label.at, bloco.w, bloco.h, label.rotation ?? 0, 0.45 * mPerMm);
+      label.maskColor = look.paper ?? '#fbfbfa';
+      label.maskBorderColor = 'none';
+    }
     out.strokes.push(...lab.strokes);
   }
   for (const t of texts) {

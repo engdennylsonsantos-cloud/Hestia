@@ -408,7 +408,7 @@ function areaAnnotationRecords(p: Project, plan: AreaPlan, ops: PlanOps): string
   return out;
 }
 
-/** DXF da planta de área, com as camadas AMBIENTES, AMBIENTES_REFERENCIA, AMBIENTES_CHAMADA e AMBIENTES_TEXTO. */
+/** DXF da planta de área: modelo nas camadas da planta + AMBIENTES, AMBIENTES_REFERENCIA, AMBIENTES_CHAMADA e AMBIENTES_TEXTO. */
 export function areaPlanDxf(p: Project, planId: Id): string {
   const plan = areaPlanOf(p, planId);
   if (!plan) throw new Error('Planta de área inexistente');

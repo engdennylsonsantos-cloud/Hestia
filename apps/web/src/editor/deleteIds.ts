@@ -1,11 +1,12 @@
-import { annotationRemovals, areaPlanOf, levelRoomSeparators, planAnnotationsOf, projectGrids, viewRemovals, type Id, type ProjectStore } from '@hestia/model';
+import { annotationRemovals, areaPlanOf, isRoom, levelRoomSeparators, planAnnotationsOf, projectGrids, viewRemovals, type Id, type ProjectStore } from '@hestia/model';
 import { useUi } from './state.ts';
 
 /**
- * Na planta de área, a exclusão só alcança as anotações da vista (cotas, textos, detalhes e etiquetas). O modelo
- * (paredes, portas, pisos...) continua bloqueado nela; selecionar um ambiente e excluir não o apaga do projeto.
+ * Na planta de área, a exclusão alcança as anotações da vista (cotas, textos, detalhes e etiquetas), os ambientes
+ * (áreas) e as linhas de separação de ambiente/área. Paredes, portas, pisos e demais elementos de modelo continuam
+ * bloqueados nela.
  */
-function deletePlanAnnotationsIn(store: ProjectStore, planId: Id, ids: Id[]): void {
+function deletePlanSelectionIn(store: ProjectStore, planId: Id, ids: Id[]): void {
   const plan = areaPlanOf(store.project, planId);
   if (!plan) return;
   const want = new Set(ids);
@@ -17,14 +18,26 @@ function deletePlanAnnotationsIn(store: ProjectStore, planId: Id, ids: Id[]): vo
     detailRegions: a.detailRegions.filter((x) => !want.has(x.id)),
     tags: a.tags.filter((x) => !want.has(x.id)),
   };
-  const removed = (a.dimensions.length + a.texts.length + a.detailLines.length + a.detailRegions.length + a.tags.length)
-    - (next.dimensions.length + next.texts.length + next.detailLines.length + next.detailRegions.length + next.tags.length);
-  if (removed === 0) {
-    useUi.setState({ status: 'Na planta de área só as anotações podem ser excluídas; o modelo continua bloqueado.' });
+  const annotationIds = new Set<Id>([
+    ...a.dimensions.map((x) => x.id),
+    ...a.texts.map((x) => x.id),
+    ...a.detailLines.map((x) => x.id),
+    ...a.detailRegions.map((x) => x.id),
+    ...a.tags.map((x) => x.id),
+  ]);
+  const removedAnnotations = annotationIds.size - (next.dimensions.length + next.texts.length + next.detailLines.length + next.detailRegions.length + next.tags.length);
+  const rooms = ids.filter((id) => isRoom(store.project.elements[id]));
+  const separators = levelRoomSeparators(store.project, plan.levelId).filter((r) => want.has(r.id)).map((r) => r.id);
+  if (removedAnnotations === 0 && rooms.length === 0 && separators.length === 0) {
+    useUi.setState({ status: 'Na planta de área dá para excluir ambientes, separadores e anotações; paredes e demais elementos de modelo continuam bloqueados.' });
     return;
   }
-  store.exec({ type: 'updateAreaPlan', id: planId, patch: { annotations: next } }, 'Excluir anotações da planta de área');
-  useUi.setState({ selection: [], status: 'Anotações excluídas da planta de área.' });
+  store.transaction('Excluir', () => {
+    if (removedAnnotations > 0) store.exec({ type: 'updateAreaPlan', id: planId, patch: { annotations: next } }, 'Excluir anotações da planta de área');
+    if (rooms.length > 0) store.exec({ type: 'deleteElements', ids: rooms });
+    for (const id of separators) store.exec({ type: 'removeRoomSeparator', levelId: plan.levelId, id });
+  });
+  useUi.setState({ selection: [], status: rooms.length > 0 ? 'Ambiente excluído.' : separators.length > 0 ? 'Separador excluído.' : 'Anotações excluídas da planta de área.' });
 }
 
 /**
@@ -35,7 +48,7 @@ export function deleteSelectionIn(store: ProjectStore): void {
   const { selection: ids, levelId, view, planKind, areaPlanId } = useUi.getState();
   if (!ids.length) return;
   if (view === 'plan' && planKind === 'area' && areaPlanId) {
-    deletePlanAnnotationsIn(store, areaPlanId, ids);
+    deletePlanSelectionIn(store, areaPlanId, ids);
     return;
   }
   const notes = annotationRemovals(store.project, levelId, ids);

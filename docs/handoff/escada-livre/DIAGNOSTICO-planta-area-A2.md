@@ -34,6 +34,7 @@ A F0 foi integrada junto: na planta de área, `select` não move elemento de mod
 - Grades, marcas de corte e anotações da vista (`plan.annotations`) com fallback para as do nível.
 - Ambientes com diagonais, etiqueta configurável, esquema de cor, legenda e quadro, por cima do modelo.
 - Ferramentas de área habilitadas: **Ambiente** (`room`) cria novas áreas e **Separador de ambiente/área** (`roomsep`) fecha/divide circuitos, inclusive na planta de área.
+- **Delete** na planta de área apaga ambiente (área), separador de ambiente/área e anotações da vista; paredes e demais elementos de modelo continuam bloqueados.
 - Seleção/hover/caixa/fantasmas iguais aos da planta de piso; sem alças de modelo.
 
 ## DXF
@@ -49,11 +50,11 @@ Antes, `opsToDxf` mandava **todo** traço para `AMBIENTES` por heurística de co
 
 - `areaPlanGeometry.test.ts`: 7 testes.
 - `areaPlanDxf.test.ts`: 4 testes; `dxfCad.test.ts`: 9 testes (R12 nos templates).
-- `areaPlanOverlay.test.ts`: 9; `areaPlanSelect.test.ts`: 9; `areaPlan.test.ts`: 19; `planFrame.test.ts`: 21; `areaPlanSheet.test.ts`: 3; `areaPlanAnotacao.test.ts`: 8 (ambiente/separador na área).
+- `areaPlanOverlay.test.ts`: 9; `areaPlanSelect.test.ts`: 9; `areaPlan.test.ts`: 19; `planFrame.test.ts`: 21; `areaPlanSheet.test.ts`: 3; `areaPlanAnotacao.test.ts`: 8 (ambiente/separador na área); `areaPlanDelete.test.ts`: 4.
 - `ouroZoom.test.ts`: 88 testes, **sem diff de hash** — a planta de piso não mudou.
 - `npx tsc --noEmit`: limpo.
 - `npx eslint packages apps/web/src`: 0 erros; 1 warning pré-existente em `OpeningFlipGrips.tsx:70`.
-- Suíte completa: **691 arquivos, 7.867 testes, todos passando** (416,67 s), incluindo `ouroZoom.test.ts` (88).
+- Suíte completa: **691 arquivos, 7.871 testes, todos passando** (298,03 s), incluindo `ouroZoom.test.ts` (88).
 
 ## Limitações conhecidas
 

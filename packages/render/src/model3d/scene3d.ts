@@ -15,6 +15,8 @@ import { BITS_PROFUNDIDADE, diagnosticarOrigem, diagnosticarProfundidade, type D
 import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
 import { buildGenericSolids } from './genericSolids.ts';
+import { buildCadLines } from './cad3d.ts';
+import { ALTURA_ROTULO, buildLevelLines, caixaDoNivel, levelMarkersOf, type LevelMarker } from './levels3d.ts';
 import { buildRampSolids } from './rampSolids.ts';
 import { RealcesDaCena } from './realceDaCena3d.ts';
 import { buildLevelSolidsComCaixas } from './paredesInstanciadas3d.ts';
@@ -82,6 +84,8 @@ export class ModelScene {
   private realces = new RealcesDaCena(this.scene);
   /** Malhas só de picking no wireframe (fora do modelo; ver `buildPickLayer`). */
   private pickLayer = new THREE.Object3D();
+  /** Linhas de nível e rótulos: um grupo só, fora dos níveis (o picking lê `userData.levelId` de cada peça). */
+  private niveis3d = new THREE.Group();
   /** Peças de picking do nível que se monta agora (no wireframe a malha não entra na cena: vai para cá). */
   private picks: PickSource[] = [];
   private caixaUnitaria = criarCaixaUnitaria();
@@ -152,6 +156,8 @@ export class ModelScene {
     this.orbit.obstacle = (origin, dir) => firstSurfaceDistance(this.model, origin, dir);
     this.scene.add(this.model);
     this.scene.add(this.pickLayer);
+    this.niveis3d.userData = { levels: true };
+    this.scene.add(this.niveis3d);
     this.scene.add(this.realces.camada);
     // Gancho de quadro do three (antes da lista de desenho e antes do passe de sombra): é onde o orçamento de sombra e o
     // enquadramento do sol acontecem, com a câmera do quadro. Sem ele, a vista teria de chamar a cena a cada rAF.
@@ -300,6 +306,8 @@ export class ModelScene {
       }));
     }
     this.buildPickLayer();
+    // Linhas de nível e rótulos: uma vez para o projeto (não por nível), fora dos grupos de nível.
+    this.atualizarNiveis(p, view);
     // Níveis que saíram da cena e não estão mais no cache: liberados (os que ficaram no cache seguem para o reuso).
     const saiu = new Set([...antes, ...sobras, ...expulsas]);
     for (const e of atuais) saiu.delete(e);
@@ -354,6 +362,61 @@ export class ModelScene {
       teto: this.sombraMaxTriangulos,
       tamanhoTela: this.tamanhoTela,
     });
+  }
+
+  /**
+   * Refaz as linhas de nível e os rótulos (uma vez por atualização, fora dos grupos de nível). `showLevels` desligado
+   * esvazia o grupo; o picking e o toggle acham o grupo por `userData.levels`.
+   */
+  private atualizarNiveis(p: Project, view: View3DSettings): void {
+    this.limparNiveis();
+    if (view.showLevels === false) return;
+    const linhas = buildLevelLines(p);
+    if (linhas) this.niveis3d.add(linhas);
+    for (const m of levelMarkersOf(p)) {
+      const rotulo = this.rotuloDoNivel(p, m);
+      if (rotulo) this.niveis3d.add(rotulo);
+    }
+  }
+
+  /** Libera geometrias e texturas das linhas/rótulos anteriores (o material das linhas é compartilhado: não se libera). */
+  private limparNiveis(): void {
+    this.niveis3d.traverse((o) => {
+      (o as { geometry?: THREE.BufferGeometry }).geometry?.dispose();
+      if ((o as THREE.Sprite).isSprite) {
+        const mat = (o as THREE.Sprite).material;
+        mat.map?.dispose();
+        mat.dispose();
+      }
+    });
+    this.niveis3d.clear();
+    this.niveis3d.userData = { levels: true };
+  }
+
+  /** Rótulo do nível (sprite com o texto num canvas) no canto da caixa, um pouco acima da cota. */
+  private rotuloDoNivel(p: Project, m: LevelMarker): THREE.Sprite | null {
+    if (typeof document === 'undefined') return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#9a7b00';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = 'bold 56px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(m.text, canvas.width / 2, canvas.height / 2);
+    const textura = new THREE.CanvasTexture(canvas);
+    textura.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: textura, transparent: true, depthWrite: false }));
+    const altura = ALTURA_ROTULO;
+    sprite.scale.set(altura * (canvas.width / canvas.height), altura, 1);
+    const caixa = caixaDoNivel(p, m.levelId);
+    sprite.position.set(caixa.minX - 0.3, caixa.minY - 0.3, m.elevation + altura / 2);
+    sprite.userData = { levelId: m.levelId, levels: true };
+    return sprite;
   }
 
   /** Faixas verticais da cena (culling por frustum) e quantas existem agora. */
@@ -477,6 +540,13 @@ export class ModelScene {
         grupo.add(m.grupo);
       }
     }
+    // Linhas do CAD importado do nível (categoria "genérica"): segmentos com a cor ACI da entidade/camada, na cota do
+    // nível mais o deslocamento do desenho. São linhas: não entram nas sombras nem nas arestas dos sólidos.
+    if (shown('generic')) {
+      const cota = p.levels.find((l) => l.id === lv0.levelId)?.elevation ?? 0;
+      const cad = buildCadLines(p, lv0.levelId, cota);
+      if (cad) grupo.add(cad);
+    }
     // Malhas de picking (invisíveis) e arestas das caixas: no grupo do nível, para o cache, o picking e o realce as acharem.
     const montadas = caixas?.montar(grupo, this.mats.cached('pick', () => new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })));
     let arestasSolidas: Float32Array | undefined;
@@ -567,6 +637,7 @@ export class ModelScene {
 
   dispose(): void {
     this.detach();
+    this.limparNiveis();
     this.faixasDeSombra = [];
     this.lotes.dispose();
     this.caixaUnitaria.dispose();

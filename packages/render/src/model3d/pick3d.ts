@@ -24,6 +24,16 @@ export interface ElementHit {
   kind: GraphicsCategory;
 }
 
+/** Nível atingido nas linhas de nível (nome/cota) da vista 3D: o id e o ponto (m) do traço. */
+export interface LevelHit {
+  kind: 'level';
+  levelId: Id;
+  point: { x: number; y: number; z: number };
+}
+
+/** Tolerância (m) do raio às linhas de nível: o clique não precisa acertar o fio exato. */
+const LIMIAR_LINHA_NIVEL = 0.15;
+
 /**
  * Picking na GPU (ID buffer). `ler` devolve um resultado **já lido** para este pixel e câmera (cache do leitor); `pedir`
  * agenda a leitura assíncrona do pixel para o próximo quadro. Enquanto a leitura não chega, `pickElement` responde pelo
@@ -119,6 +129,40 @@ export function pickElement(
     gpu.pedir(ndc, camera);
   }
   return pickElementNoBvh(root, camera, ndc);
+}
+
+/**
+ * Nível atingido pelo raio do cursor nas linhas de nível da vista 3D (o retângulo e o rótulo de cada nível). Só os
+ * objetos com `userData.levelId` do grupo `userData.levels` entram: as linhas do CAD e as malhas do modelo não têm esse
+ * campo (o `pickElement` continua devolvendo só elementos). A tolerância de linha é a de um clique confortável.
+ */
+export function pickLevel(scene: THREE.Object3D, camera: THREE.Camera, ndc: { x: number; y: number }): LevelHit | null {
+  scene.updateMatrixWorld(true);
+  const alvos = new Set<THREE.Object3D>();
+  scene.traverse((o) => {
+    if (o.userData.levels === true) {
+      o.traverse((c) => {
+        if (c.userData.levelId) alvos.add(c);
+      });
+    } else if (o.userData.levelId && ((o as THREE.Line).isLine || (o as THREE.Sprite).isSprite)) {
+      alvos.add(o);
+    }
+  });
+  if (!alvos.size) return null;
+
+  rc.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), camera);
+  const limiarAnt = rc.params.Line.threshold;
+  rc.params.Line.threshold = LIMIAR_LINHA_NIVEL;
+  try {
+    for (const h of rc.intersectObjects([...alvos], false)) {
+      const levelId = h.object.userData.levelId as Id | undefined;
+      if (!levelId) continue;
+      return { kind: 'level', levelId, point: { x: h.point.x, y: h.point.y, z: h.point.z } };
+    }
+  } finally {
+    rc.params.Line.threshold = limiarAnt;
+  }
+  return null;
 }
 
 /** O caminho de sempre: BVH por malha, faixa do triângulo atingido → id. */

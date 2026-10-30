@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '@hestia/geom';
 import { ProjectStore, createEmptyProject, makeRoom, makeWall, type AreaPlan, type AreaPlanAnnotations } from '@hestia/model';
-import { resolveRooms, resolveLevel } from '@hestia/engine';
+import { resolveRooms, resolveLevel, type ResolvedRoom } from '@hestia/engine';
 import { buildPlanGeometry, planGeometrySelection, type PlanInput } from './build.ts';
 import { DEFAULT_AREA_GRAPHICS, DEFAULT_TAG_FIELDS } from '@hestia/model';
 import { defaultPaint } from './style.ts';
@@ -30,6 +30,35 @@ const plan = (over: Partial<AreaPlan> = {}): AreaPlan => ({
   tags: [],
   ...over,
 });
+
+/**
+ * Nível de teste com ambientes de polígono exato (retângulos), sem depender da resolução de paredes: o mesmo
+ * formato que `resolveRooms` devolve, para exercitar só o posicionamento da etiqueta automática.
+ */
+function ambientes(cells: Array<{ id: string; name: string; number: string; x0: number; x1: number; y0: number; y1: number }>): { s: ProjectStore; resolved: ResolvedRoom[] } {
+  const s = new ProjectStore(createEmptyProject());
+  const resolved = cells.map((c) => {
+    const point = { x: (c.x0 + c.x1) / 2, y: (c.y0 + c.y1) / 2 };
+    s.exec({ type: 'addRoom', room: makeRoom({ id: c.id, levelId: 'lv_0', name: c.name, number: c.number, point }) });
+    return {
+      roomId: c.id,
+      levelId: 'lv_0',
+      name: c.name,
+      number: c.number,
+      point,
+      problem: null,
+      polygon: [ring([[c.x0, c.y0], [c.x0, c.y1], [c.x1, c.y1], [c.x1, c.y0]])],
+      area: (c.x1 - c.x0) * (c.y1 - c.y0),
+      perimeter: 2 * (c.x1 - c.x0 + c.y1 - c.y0),
+      ceilingHeight: 2.7,
+      volume: (c.x1 - c.x0) * (c.y1 - c.y0) * 2.7,
+      floorFinish: '',
+      wallFinish: '',
+      ceilingFinish: '',
+    } as ResolvedRoom;
+  });
+  return { s, resolved };
+}
 
 /** Anotações de uma vista: cota, texto, linha de detalhe e etiqueta de elemento da parede w0. */
 const anotacoes = (sufixo: string): AreaPlanAnnotations => ({
@@ -118,6 +147,49 @@ describe('planta de área · desenho', () => {
 
   it('caixa do texto cresce com o número de linhas', () => {
     expect(tagBoxModel(['Sala'], 50).h).toBeLessThan(tagBoxModel(['Sala', '101 · 20,00 m²'], 50).h);
+  });
+
+  it('ambiente normal: a etiqueta automática fica centralizada e sem chamada', () => {
+    const { s, resolved } = ambientes([{ id: 'r1', name: 'Sala', number: '101', x0: 0, x1: 4, y0: 0, y1: 5 }]);
+    const ops = areaPlanTagOps(s.project, plan({ tags: [] }), 50, undefined, resolved);
+    const at = ops.labels.find((l) => l.text === 'Sala')!.at;
+    expect(Math.hypot(at.x - 2, at.y - 2.5)).toBeLessThan(1e-6);
+    expect(ops.strokes).toHaveLength(0);
+  });
+
+  it('ambiente pequeno: a etiqueta automática fica no centro, no candidato mais próximo (não sobe em degraus)', () => {
+    // 1,1 × 1,0 m: a caixa de duas linhas não cabe inteira no polígono. O rótulo fica na referência, dentro.
+    const { s, resolved } = ambientes([{ id: 'r1', name: 'Sala', number: '101', x0: 0, x1: 1.1, y0: 0, y1: 1 }]);
+    const ops = areaPlanTagOps(s.project, plan({ tags: [] }), 50, undefined, resolved);
+    const at = ops.labels.find((l) => l.text === 'Sala')!.at;
+    expect(Math.hypot(at.x - 0.55, at.y - 0.5)).toBeLessThan(1e-6);
+    expect(at.y).toBeGreaterThan(0);
+    expect(at.y).toBeLessThan(1);
+    expect(ops.strokes).toHaveLength(0);
+  });
+
+  it('ambiente pequeno com colisão: procura um candidato inteiro dentro do ambiente (não sobe e sai)', () => {
+    // Sala A com o rótulo arrastado para dentro da sala B (3 × 1 m). A etiqueta automática de B colide de frente e
+    // precisa achar um candidato dentro de B, em vez de subir um degrau de 0,68 m e sair com chamada.
+    const { s, resolved } = ambientes([
+      { id: 'r1', name: 'A', number: '101', x0: 0, x1: 4, y0: 0, y1: 5 },
+      { id: 'r2', name: 'B', number: '102', x0: 4, x1: 7, y0: 0, y1: 1 },
+    ]);
+    s.exec({ type: 'setRoomLabel', id: 'r1', position: { x: 6, y: 0.5 } });
+    const ops = areaPlanTagOps(s.project, plan({ tags: [] }), 50, undefined, resolved);
+    expect(ops.labels.find((l) => l.text === 'A')!.at).toEqual({ x: 6, y: 0.5 });
+    const b = ops.labels.find((l) => l.text === 'B')!.at;
+    expect(b.y).toBeGreaterThan(0);
+    expect(b.y).toBeLessThan(1);
+    expect(Math.hypot(b.x - 5.5, b.y - 0.5)).toBeLessThan(0.7);
+  });
+
+  it('posição explícita do modelo manda: o rótulo do usuário não é reposicionado', () => {
+    const { s, resolved } = ambientes([{ id: 'r1', name: 'Sala', number: '101', x0: 0, x1: 4, y0: 0, y1: 5 }]);
+    s.exec({ type: 'setRoomLabel', id: 'r1', position: { x: 2, y: 4.9 } });
+    const ops = areaPlanTagOps(s.project, plan({ tags: [] }), 50, undefined, resolved);
+    const at = ops.labels.find((l) => l.text === 'Sala')!.at;
+    expect(at).toEqual({ x: 2, y: 4.9 });
   });
 
   it('seleção destaca o ambiente com preenchimento e contorno', () => {

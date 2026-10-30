@@ -1,4 +1,4 @@
-import { pointInPolygon, type Vec2 } from '@hestia/geom';
+import { pointInPolygon, type Polygon, type Vec2 } from '@hestia/geom';
 import type { ResolvedRoom } from '@hestia/engine';
 import { areaLegendRows, areaTableRows, referenceDiagonals, resolveRooms, roomReferencePoint, schemeColor, schemeOf } from '@hestia/engine';
 import { categoryById, unitsOf, type AreaPlan, type Id, type Project, type Room, type RoomTag } from '@hestia/model';
@@ -20,6 +20,10 @@ const LEGEND_ROW_MM = 5.2;
 const TABLE_W_MM = 88;
 const TABLE_ROW_MM = 4.6;
 const TABLE_FONT_MM = 2.0;
+/** Folga entre a caixa do rótulo automático e o perímetro do ambiente (mm de papel). */
+const LABEL_MARGIN_MM = 1.2;
+/** Folga mínima entre dois rótulos automáticos (mm de papel). */
+const LABEL_GAP_MM = 1.0;
 
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
 const mm = (v: number, scale: number): number => (v * scale) / 1000;
@@ -90,6 +94,92 @@ function tagMaskRect(at: Vec2, box: { w: number; h: number }): Vec2[] {
   const y0 = at.y - box.h / 2;
   const y1 = at.y + box.h / 2;
   return [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
+}
+
+/** Retângulo eixo-alinhado, no modelo (colisão entre rótulos). */
+interface Rect {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/** Caixa da etiqueta em volta do ponto, com folga opcional (modelo). */
+const rectAt = (at: Vec2, box: { w: number; h: number }, pad = 0): Rect => ({
+  x0: at.x - box.w / 2 - pad,
+  y0: at.y - box.h / 2 - pad,
+  x1: at.x + box.w / 2 + pad,
+  y1: at.y + box.h / 2 + pad,
+});
+
+const overlaps = (a: Rect, b: Rect): boolean => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+/**
+ * A caixa cabe inteira no ambiente? Os quatro cantos, o centro e o meio das bordas passam por `pointInPolygon`
+ * (o polígono pode ter furos); as bordas pegam reentrâncias em L/U que passam entre dois cantos.
+ */
+function boxInPolygon(at: Vec2, box: { w: number; h: number }, polygon: Polygon): boolean {
+  const hw = box.w / 2;
+  const hh = box.h / 2;
+  const samples: Vec2[] = [
+    { x: at.x - hw, y: at.y - hh },
+    { x: at.x + hw, y: at.y - hh },
+    { x: at.x + hw, y: at.y + hh },
+    { x: at.x - hw, y: at.y + hh },
+    at,
+    { x: at.x, y: at.y - hh },
+    { x: at.x, y: at.y + hh },
+    { x: at.x - hw, y: at.y },
+    { x: at.x + hw, y: at.y },
+  ];
+  return samples.every((q) => pointInPolygon(q, polygon));
+}
+
+/** Deslocamentos do rótulo automático em leque: centro, acima, abaixo, esquerda, direita e as diagonais. */
+function labelOffsets(box: { w: number; h: number }, scale: number): Vec2[] {
+  const gap = mm(LABEL_MARGIN_MM, scale);
+  const dx = box.w / 2 + gap;
+  const dy = box.h / 2 + gap;
+  return [
+    { x: 0, y: 0 },
+    { x: 0, y: dy },
+    { x: 0, y: -dy },
+    { x: -dx, y: 0 },
+    { x: dx, y: 0 },
+    { x: -dx, y: dy },
+    { x: dx, y: dy },
+    { x: -dx, y: -dy },
+    { x: dx, y: -dy },
+  ];
+}
+
+/**
+ * Posição do rótulo automático: centro/referência e o leque ao redor. Prefere o primeiro candidato cuja caixa fica
+ * **inteira dentro** do ambiente (furos incluídos) e não colide com um rótulo já colocado. Se nenhum couber
+ * (ambiente pequeno), fica o candidato mais próximo da referência — não o mais alto —; a chamada continua
+ * aparecendo quando a caixa sai do polígono.
+ */
+function autoTagAt(ref: Vec2, box: { w: number; h: number }, scale: number, polygon: Polygon, placed: readonly Rect[]): Vec2 {
+  const gap = mm(LABEL_GAP_MM, scale);
+  const tested = labelOffsets(box, scale).map((off) => {
+    const at = { x: ref.x + off.x, y: ref.y + off.y };
+    return { at, inside: boxInPolygon(at, box, polygon), clear: !placed.some((q) => overlaps(rectAt(at, box, gap), q)) };
+  });
+  const fitting = tested.find((c) => c.inside && c.clear);
+  if (fitting) return fitting.at;
+  // Nenhum candidato cabe inteiro: o mais próximo da referência, de preferência sem sobrepor outro rótulo.
+  const free = tested.filter((c) => c.clear);
+  const pool = free.length > 0 ? free : tested;
+  let best = pool[0]!.at;
+  let bestDist = Infinity;
+  for (const c of pool) {
+    const d = Math.hypot(c.at.x - ref.x, c.at.y - ref.y);
+    if (d < bestDist) {
+      bestDist = d;
+      best = c.at;
+    }
+  }
+  return best;
 }
 
 /** Linha de chamada: reta ou com ombro horizontal (Revit: Leader com cotovelo). */
@@ -180,13 +270,14 @@ export function areaPlanTagOps(p: Project, plan: AreaPlan, scale: number, hidden
   const out = empty();
   const ink = dark ? '#f3f4f6' : '#111827';
   const rooms = new Map(Object.values(p.elements).filter((e): e is Room => e.kind === 'room').map((r) => [r.id, r] as const));
-  const placed: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
+  const placed: Rect[] = [];
   for (const r of resolved) {
     const room = rooms.get(r.roomId);
     if (!room || !r.polygon || hidden?.has(room.id) || room.id === hideRoomId) continue;
     const tag = plan.tags.find((t) => t.roomId === room.id);
     if (tag && !tag.visible) continue;
-    let at = room.labelPosition ?? tag?.at ?? referenceAt(room, r);
+    const ref = referenceAt(room, r);
+    let at = room.labelPosition ?? tag?.at ?? ref;
     const rotation = room.labelRotation ?? (tag?.orientation === 'vertical' ? 90 : 0);
     const draft: RoomTag = tag ?? {
       id: `auto:${room.id}`,
@@ -201,20 +292,14 @@ export function areaPlanTagOps(p: Project, plan: AreaPlan, scale: number, hidden
     const lines = roomTagLines(p, room, r, draft);
     if (lines.length === 0) continue;
     const box = tagBoxModel(lines, scale);
-    // Etiqueta automática: se a caixa encostar em outra já colocada, sobe em degraus (o usuário pode arrastar depois).
-    if (!room.labelPosition && !tag) {
-      for (let k = 0; k < 12; k++) {
-        const b = { x0: at.x - box.w / 2 - 0.1, y0: at.y - box.h / 2 - 0.1, x1: at.x + box.w / 2 + 0.1, y1: at.y + box.h / 2 + 0.1 };
-        if (!placed.some((q) => b.x0 < q.x1 && q.x0 < b.x1 && b.y0 < q.y1 && q.y0 < b.y1)) break;
-        at = { x: at.x, y: at.y + box.h + 0.25 };
-      }
-    }
-    placed.push({ x0: at.x - box.w / 2, y0: at.y - box.h / 2, x1: at.x + box.w / 2, y1: at.y + box.h / 2 });
-    const anchor = referenceAt(room, r);
+    // Etiqueta automática: leque ao redor da referência, preferindo a caixa inteira dentro do ambiente e sem
+    // colidir com outra etiqueta (o usuário pode arrastar depois). Posição explícita do modelo/`RoomTag` manda.
+    if (!room.labelPosition && !tag) at = autoTagAt(ref, box, scale, r.polygon, placed);
+    placed.push(rectAt(at, box));
     const inside = pointInPolygon(at, r.polygon);
     const explicit = room.labelLeader && room.labelLeader !== 'auto' ? room.labelLeader : null;
     const style = explicit ?? (room.labelPosition ? (inside ? 'none' : 'crossed') : tag ? tag.leader : inside ? 'none' : 'crossed');
-    for (const pts of leaderLines(at, anchor, box, style, scale)) {
+    for (const pts of leaderLines(at, ref, box, style, scale)) {
       out.strokes.push({ pts, closed: false, widthPx: 1, papel: { mm: LEADER_MM, escala: scale }, color: ink, alpha: 0.95 });
     }
     const gap = lines.length > 1 ? (NAME_MM + TAG_GAP_MM) / 2 : 0;

@@ -1,19 +1,20 @@
-import type { Camera, Object3D } from 'three';
-import { pickLevel } from '@hestia/render';
-import { useUi } from '../editor/state.ts';
+import { pickLevel, type ModelScene } from '@hestia/render';
+import { editor } from '../editor/controller.ts';
+import { selectLevel } from '../editor/state.ts';
 
 /**
- * Clique numa linha de nível no 3D: abre o diálogo de níveis com aquele destacado (como no Revit) e devolve `true`. Fora de
- * uma linha, devolve `false` e o chamador segue com a seleção normal de elemento. `rect` é o retângulo do canvas em px.
+ * Clique no datum do nível no 3D (linha, bolha, texto ou plano de seleção): seleciona o nível e reaplica o datum à cena,
+ * sem abrir diálogo. Devolve `false` quando o clique não atingiu um nível; aí o chamador segue com a seleção de elemento.
+ * `rect` é o retângulo do canvas em px e `at` o ponto do ponteiro dentro dele.
  */
-export function abrirNivelNoClique(
-  scene: Object3D,
-  camera: Camera,
+export function selecionarNivelNoClique(
+  scene: ModelScene,
   rect: { width: number; height: number },
   at: { x: number; y: number },
 ): boolean {
-  const level = pickLevel(scene, camera, { x: (at.x / rect.width) * 2 - 1, y: 1 - (at.y / rect.height) * 2 });
+  const level = pickLevel(scene.scene, scene.orbit.camera, { x: (at.x / rect.width) * 2 - 1, y: 1 - (at.y / rect.height) * 2 });
   if (!level) return false;
-  useUi.setState({ dialog: 'levels', dialogArg: level.levelId });
+  selectLevel(level.levelId);
+  scene.selecionarNivel(editor.project, level.levelId);
   return true;
 }

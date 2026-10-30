@@ -132,9 +132,10 @@ export function pickElement(
 }
 
 /**
- * Nível atingido pelo raio do cursor nas linhas de nível da vista 3D (o retângulo e o rótulo de cada nível). Só os
- * objetos com `userData.levelId` do grupo `userData.levels` entram: as linhas do CAD e as malhas do modelo não têm esse
- * campo (o `pickElement` continua devolvendo só elementos). A tolerância de linha é a de um clique confortável.
+ * Nível atingido pelo raio do cursor no datum da vista 3D (linha tracejada, bolha, texto e o plano do nível selecionado).
+ * Só os objetos com `userData.levelId` do grupo `userData.levels` (ou o plano com `userData.levelsPlane`) entram: as
+ * linhas do CAD e as malhas do modelo não têm esse campo (o `pickElement` continua devolvendo só elementos). A tolerância
+ * de linha é a de um clique confortável.
  */
 export function pickLevel(scene: THREE.Object3D, camera: THREE.Camera, ndc: { x: number; y: number }): LevelHit | null {
   scene.updateMatrixWorld(true);
@@ -144,7 +145,8 @@ export function pickLevel(scene: THREE.Object3D, camera: THREE.Camera, ndc: { x:
       o.traverse((c) => {
         if (c.userData.levelId) alvos.add(c);
       });
-    } else if (o.userData.levelId && ((o as THREE.Line).isLine || (o as THREE.Sprite).isSprite)) {
+    } else if (o.userData.levelId && (o.userData.levelsPlane === true || (o as THREE.Line).isLine || (o as THREE.Sprite).isSprite || (o as THREE.Mesh).isMesh)) {
+      // Plano de seleção (e datum fora do grupo): a malha também é alvo, para o clique manter o nível selecionado.
       alvos.add(o);
     }
   });

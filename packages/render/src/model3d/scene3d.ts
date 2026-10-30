@@ -16,7 +16,8 @@ import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
 import { buildGenericSolids } from './genericSolids.ts';
 import { buildCadLines } from './cad3d.ts';
-import { ALTURA_ROTULO, buildLevelLines, caixaDoNivel, levelMarkersOf, type LevelMarker } from './levels3d.ts';
+import { buildLevels, disposeLevels } from './levels3d.ts';
+import { levelProjectBox } from './levelsData.ts';
 import { buildRampSolids } from './rampSolids.ts';
 import { RealcesDaCena } from './realceDaCena3d.ts';
 import { buildLevelSolidsComCaixas } from './paredesInstanciadas3d.ts';
@@ -47,6 +48,13 @@ export interface Scene3DOptions {
 
 /** Ângulo (graus) acima do qual uma aresta da malha é desenhada. */
 const EDGE_ANGLE = 28;
+/**
+ * Margem (m) em X somada à caixa do datum no "Enquadrar": a bolha e o texto do nível ficam além da obra e não podem
+ * sair da vista. Vale para os dois lados (o texto cresce para a esquerda da bolha).
+ */
+const MARGEM_ENQUADRAMENTO_NIVEIS = 10;
+/** Margem (m) em Y no enquadramento: o texto do nível pode ficar um pouco à frente da linha. */
+const MARGEM_ENQUADRAMENTO_NIVEIS_Y = 2;
 /** Fundo do tema, quando `view3d.background` é null. */
 const BACKGROUND = { light: '#dfe7ee', dark: '#14171b' };
 /** Distância da luz em raios do modelo: |(0,7; −0,5; 1,1)|, a posição do sol antes da vista 3D configurável. */
@@ -86,6 +94,14 @@ export class ModelScene {
   private pickLayer = new THREE.Object3D();
   /** Linhas de nível e rótulos: um grupo só, fora dos níveis (o picking lê `userData.levelId` de cada peça). */
   private niveis3d = new THREE.Group();
+  /** Grupo devolvido por `buildLevels` (o que `disposeLevels` libera); null quando a vista esconde os níveis. */
+  private niveis: THREE.Group | null = null;
+  /** Nível selecionado no 3D (o plano azul do datum); preservado quando o projeto é remontado. */
+  private selectedLevel: Id | null = null;
+  /** Projeto e nível com que o grupo de níveis foi montado: evita refazer o datum a cada quadro. */
+  private niveisChave: { projeto: Project; levelId: Id | null } | null = null;
+  /** Caixa do "Enquadrar": modelo + datum dos níveis (com a margem do texto/bolha em X). */
+  private caixaEnquadramento = new THREE.Box3();
   /** Peças de picking do nível que se monta agora (no wireframe a malha não entra na cena: vai para cá). */
   private picks: PickSource[] = [];
   private caixaUnitaria = criarCaixaUnitaria();
@@ -306,14 +322,27 @@ export class ModelScene {
       }));
     }
     this.buildPickLayer();
-    // Linhas de nível e rótulos: uma vez para o projeto (não por nível), fora dos grupos de nível.
-    this.atualizarNiveis(p, view);
+    // Datum dos níveis: uma vez para o projeto (não por nível), fora dos grupos de nível. O nível selecionado é o
+    // guardado, então a remontagem do projeto mantém a seleção.
+    this.reconstruirNiveis(p);
     // Níveis que saíram da cena e não estão mais no cache: liberados (os que ficaram no cache seguem para o reuso).
     const saiu = new Set([...antes, ...sobras, ...expulsas]);
     for (const e of atuais) saiu.delete(e);
     for (const e of saiu) if (!this.cache.contem(e)) disposeNivel(e);
     this.boxCache = new THREE.Box3().setFromObject(this.model);
     this.orbit.sceneRadius = this.boxCache.isEmpty() ? 0 : this.boxCache.getSize(new THREE.Vector3()).length() / 2;
+    // "Enquadrar": o modelo mais o datum dos níveis, com folga em X para a bolha e o texto não ficarem fora da vista.
+    this.caixaEnquadramento.copy(this.boxCache);
+    if (view.showLevels !== false && p.levels.length) {
+      const b = levelProjectBox(p);
+      const cotas = p.levels.map((l) => l.elevation);
+      this.caixaEnquadramento.union(
+        new THREE.Box3(
+          new THREE.Vector3(b.minX - 3, b.minY - MARGEM_ENQUADRAMENTO_NIVEIS_Y, Math.min(...cotas)),
+          new THREE.Vector3(b.maxX + MARGEM_ENQUADRAMENTO_NIVEIS, b.maxY + MARGEM_ENQUADRAMENTO_NIVEIS_Y, Math.max(...cotas)),
+        ),
+      );
+    }
     this.orbit.apply();
     const bg = new THREE.Color(view.background ?? (opt.dark ? BACKGROUND.dark : BACKGROUND.light));
     this.ground.visible = view.style !== 'wireframe';
@@ -365,58 +394,36 @@ export class ModelScene {
   }
 
   /**
-   * Refaz as linhas de nível e os rótulos (uma vez por atualização, fora dos grupos de nível). `showLevels` desligado
-   * esvazia o grupo; o picking e o toggle acham o grupo por `userData.levels`.
+   * Seleciona um nível no 3D (o plano azul do datum) ou limpa (`null`). Libera o grupo anterior e reconstrói o datum com
+   * `buildLevels(p, levelId)`. É chamado no clique do 3D e também a cada montagem/atualização do projeto, para a seleção
+   * sobreviver à remontagem. Sem mudança de projeto nem de nível, não refaz nada.
    */
-  private atualizarNiveis(p: Project, view: View3DSettings): void {
-    this.limparNiveis();
-    if (view.showLevels === false) return;
-    const linhas = buildLevelLines(p);
-    if (linhas) this.niveis3d.add(linhas);
-    for (const m of levelMarkersOf(p)) {
-      const rotulo = this.rotuloDoNivel(p, m);
-      if (rotulo) this.niveis3d.add(rotulo);
-    }
+  selecionarNivel(p: Project, levelId: Id | null): void {
+    if (this.niveisChave?.projeto === p && this.niveisChave.levelId === levelId) return;
+    this.selectedLevel = levelId;
+    this.reconstruirNiveis(p);
   }
 
-  /** Libera geometrias e texturas das linhas/rótulos anteriores (o material das linhas é compartilhado: não se libera). */
-  private limparNiveis(): void {
-    this.niveis3d.traverse((o) => {
-      (o as { geometry?: THREE.BufferGeometry }).geometry?.dispose();
-      if ((o as THREE.Sprite).isSprite) {
-        const mat = (o as THREE.Sprite).material;
-        mat.map?.dispose();
-        mat.dispose();
-      }
-    });
+  /**
+   * Refaz o datum dos níveis para o projeto e o nível selecionado guardados. `showLevels` desligado deixa o grupo vazio
+   * (nada é adicionado); o picking e o toggle acham o grupo por `userData.levels`.
+   */
+  private reconstruirNiveis(p: Project): void {
+    this.liberarNiveis();
+    this.niveisChave = { projeto: p, levelId: this.selectedLevel };
+    if (this.frame.view.showLevels === false) return;
+    const grupo = buildLevels(p, this.selectedLevel);
+    grupo.userData = { ...grupo.userData, levels: true };
+    this.niveis3d.add(grupo);
+    this.niveis = grupo;
+  }
+
+  /** Libera geometrias, materiais e texturas do datum anterior; o grupo contêiner continua na cena (vazio). */
+  private liberarNiveis(): void {
+    if (this.niveis) disposeLevels(this.niveis);
+    this.niveis = null;
     this.niveis3d.clear();
     this.niveis3d.userData = { levels: true };
-  }
-
-  /** Rótulo do nível (sprite com o texto num canvas) no canto da caixa, um pouco acima da cota. */
-  private rotuloDoNivel(p: Project, m: LevelMarker): THREE.Sprite | null {
-    if (typeof document === 'undefined') return null;
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.fillStyle = '#9a7b00';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.font = 'bold 56px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(m.text, canvas.width / 2, canvas.height / 2);
-    const textura = new THREE.CanvasTexture(canvas);
-    textura.colorSpace = THREE.SRGBColorSpace;
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: textura, transparent: true, depthWrite: false }));
-    const altura = ALTURA_ROTULO;
-    sprite.scale.set(altura * (canvas.width / canvas.height), altura, 1);
-    const caixa = caixaDoNivel(p, m.levelId);
-    sprite.position.set(caixa.minX - 0.3, caixa.minY - 0.3, m.elevation + altura / 2);
-    sprite.userData = { levelId: m.levelId, levels: true };
-    return sprite;
   }
 
   /** Faixas verticais da cena (culling por frustum) e quantas existem agora. */
@@ -628,16 +635,17 @@ export class ModelScene {
   }
 
   fit(): void {
-    if (this.boxCache.isEmpty()) {
+    if (this.caixaEnquadramento.isEmpty()) {
       this.orbit.target.set(0, 0, 1);
       this.orbit.distance = 14;
       this.orbit.apply();
-    } else this.orbit.fit(this.boxCache);
+    } else this.orbit.fit(this.caixaEnquadramento);
   }
 
   dispose(): void {
     this.detach();
-    this.limparNiveis();
+    this.liberarNiveis();
+    this.niveisChave = null;
     this.faixasDeSombra = [];
     this.lotes.dispose();
     this.caixaUnitaria.dispose();

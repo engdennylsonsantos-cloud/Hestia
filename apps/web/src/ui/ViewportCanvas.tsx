@@ -8,11 +8,11 @@ import { hoverSectionAt, sectionPickAt } from '../editor/sectionPick.ts';
 import { clickSelect3d, useUi } from '../editor/state.ts';
 import { thinLinesOn } from '../editor/graphicsActions.ts';
 import { buildSectionFrame } from './SectionCanvas.tsx';
+import { selecionarNivelNoClique } from './nivelPick3d.ts';
 import { PlanLabels, type PlanLabelsHandle } from './PlanLabels';
 import { ViewportOverlays } from './ViewportOverlays.tsx';
 import { abrirMenuDeContexto, viewDoMenu } from './useCanvasContextMenu.ts';
 import { useDark } from './useDark.ts';
-import { abrirNivelNoClique } from './nivelPick3d.ts';
 import { criarMontagemVista3d, type Montagem3dProgressiva } from './montagem3dProgressiva.ts';
 import { QuadroPlanta } from './quadroPlanta.ts';
 import { medirQuadro, useContarCommitPerf, usePerfDaUrl } from '../debug/perf/index.ts';
@@ -171,6 +171,8 @@ export function ViewportCanvas(): ReactElement {
         montagem.current.iniciar(p, { edges: v3.edges, shadows: v3.shadows, dark }, st.levelId);
         picker?.invalidar();
       }
+      // O nível selecionado no datum (clique no 3D) é aplicado à cena a cada quadro; sem mudança, não refaz nada.
+      m.selecionarNivel(p, st.selectedLevel);
       // Realce da seleção e do elemento sob o cursor: só a sobreposição muda, o modelo não é refeito (decisão 0016 §4).
       m.highlight(st.selection, st.hover);
       g.gpu.renderer.shadowMap.enabled = v3.shadows;
@@ -429,8 +431,8 @@ export function ViewportCanvas(): ReactElement {
           useUi.setState({ status: 'Modo de seleção ativado.' });
         }
       } else {
-        // Clicar na linha de nível abre os níveis com aquele destacado (como no Revit); senão, seleciona o elemento.
-        if (!abrirNivelNoClique(model.current.scene, model.current.orbit.camera, host.current!.getBoundingClientRect(), s)) clickSelect3d(el?.id ?? null, e.shiftKey || e.ctrlKey || e.metaKey);
+        // Clique no datum do nível (linha/bolha/texto/plano) seleciona o nível, sem diálogo; no resto, seleciona o elemento.
+        if (!selecionarNivelNoClique(model.current, host.current!.getBoundingClientRect(), s)) clickSelect3d(el?.id ?? null, e.shiftKey || e.ctrlKey || e.metaKey);
       }
     }
     // Clique sem arrasto no corte ou na elevação: o mesmo caminho da 3D (clickSelect3d, que usa selectionAfterClick).

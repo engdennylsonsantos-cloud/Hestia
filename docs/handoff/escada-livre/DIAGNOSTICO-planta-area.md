@@ -8,7 +8,7 @@ Escopo: diagnóstico. Nenhum código de produção foi alterado.
 
 1. A hipótese se confirma: `buildPlanGeometry` desvia para `buildAreaPlanGeometry` em `packages/render/src/plan/build.ts:205`, e o app também troca a camada de sobreposição em `planFrame.ts:113`.
 2. A seleção por clique funciona na planta de área (a ferramenta `select` é permitida); o que não existe é o **desenho** do destaque: `areaPlanHighlightOps` só destaca ambientes (`areaPlan.ts:354-367`).
-3. Além do destaque da parede, o caminho próprio perde hover, portas/janelas, pisos/lajes, escadas/rampas, telhados, contornos fora do corte, fantasmas de seleção, prévia/guides e obedece só parcialmente às categorias e sobrescritas gráficas.
+3. Além do destaque da parede, o caminho próprio perde hover, portas/janelas, pisos/lajes, escadas/rampas, telhados, contornos fora do corte, fantasmas de seleção, **caixa de seleção em arraste**, prévia/guides e obedece só parcialmente às categorias e sobrescritas gráficas.
 4. Não é regressão da integração: `origin/feat/plantas-area-2` e `origin/main` são idênticos nesses arquivos (só `ouroZoom.json` difere); o desvio nasceu no commit `4b632627` (feature de plantas de área) e foi apenas mergeado em `7b95114e`.
 5. A decisão 0037 só exigia o destaque do ambiente (item 13); o restante nunca foi especificado nem implementado — é lacuna de projeto, não efeito do merge.
 
@@ -35,8 +35,9 @@ Legenda: **DEFEITO** = comportamento errado/incompleto em relação à planta de
 | 15 | **Telhados** | Desenha, projeta e destaca | Nunca: `areaPlanProfile` fixa `roofProjection: false` | `build.ts:366-394`; `types.ts:226` | **LACUNA/INTENCIONAL não documentada** |
 | 16 | **Nível de baixo** | Inclui pisos, lajes, ambientes, escadas, rampas e telhados | Inclui só clusters, pisos, lajes e ambientes | `build.ts:254-298`; `build.ts:458-478` | **LACUNA** |
 | 17 | **Camada viva** (prévia, guias, captura, inferência) | `buildPlanLiveOverlay` | Só o fantasma do rótulo em arraste | `planOverlay.ts:137-158`; `planFrame.ts:115-119` | **LACUNA** |
-| 18 | Seleção do **ambiente** | `roomSelectionOps`: preenchimento + contorno | `areaPlanHighlightOps`: preenchimento + contorno (hover só preenchimento) | `rooms.ts:78-91`; `areaPlan.ts:354-367` | **INTENCIONAL** (0037 §13) / OK |
-| 19 | Etiqueta por ambiente, legenda e quadro | Só o nome do ambiente no piso | Etiqueta configurável, legenda e quadro | decisão 0037 §1, §3, §8, §11 | **INTENCIONAL** |
+| 18 | **Caixa de seleção em arraste** (janela) | Retângulo tracejado/preenchido durante o arraste; o mesmo canal desenha fantasmas de mover, alças de cota/texto e guias | Nada: o clique seleciona, mas a caixa não é desenhada | `selectTool.ts:288-292`; `overlay.ts:136-153`; `planOverlay.ts:137-144`; `planFrame.ts:115-119` | **DEFEITO** |
+| 19 | Seleção do **ambiente** | `roomSelectionOps`: preenchimento + contorno | `areaPlanHighlightOps`: preenchimento + contorno (hover só preenchimento) | `rooms.ts:78-91`; `areaPlan.ts:354-367` | **INTENCIONAL** (0037 §13) / OK |
+| 20 | Etiqueta por ambiente, legenda e quadro | Só o nome do ambiente no piso | Etiqueta configurável, legenda e quadro | decisão 0037 §1, §3, §8, §11 | **INTENCIONAL** |
 
 Observações de leitura que completam a tabela:
 
@@ -103,6 +104,17 @@ O que cada linha prova:
 - **Prévia:** piso 1 traço; área 0.
 - **Escada:** piso 13 preenchimentos/37 traços; área 0/0.
 
+### 1b. Caixa de seleção em arraste (teste dedicado)
+
+O mesmo teste temporário foi refeito com `preview: [{ kind: 'polygon', dashed: true, ring: [...] }]`, que é exatamente o item que `selectTool.ts:288-292` empurra durante o arraste de janela:
+
+```text
+caixa · piso { fills: 1, strokes: 1, dash: [ 7, 5 ] }
+caixa · área { fills: 0, strokes: 0 }
+```
+
+O retângulo é um `PreviewItem`; `previewOverlay` o desenha (`overlay.ts:136-153`) e `buildPlanLiveOverlay` o consome (`planOverlay.ts:137-144`). Como o ramo da área (`planFrame.ts:115-119`) só devolve `labelGhostOps`, a caixa não chega à tela — a seleção acontece, mas sem feedback visual. O mesmo canal perdido desenha os fantasmas de mover, as alças de cota/texto e as guias de inferência.
+
 ### 2. Git — não é regressão da integração
 
 ```text
@@ -148,7 +160,7 @@ A decisão 0037 item 13 (“selecionar o ambiente destaca preenchimento e contor
 
 **Ideia:** eliminar o desvio de `build.ts:205`. `buildPlanGeometry` passa a receber um `PlanProfile` (já existe em `types.ts:143-228`) e aplica os mesmos passos da planta de piso, apenas com as escolhas da vista de área: paredes claras, sem pisos/cotas por padrão, diagonais e etiquetas de ambiente, legenda/quadro. As anotações continuam vindo de `plan.annotations` quando existirem. A sobreposição passa a ser sempre a compartilhada (`buildPlanScreenOverlay`, `buildPlanHoverOverlay`, `buildPlanLiveOverlay`), que já sabe lidar com `areaPlan` para as anotações.
 
-**Passo A1 (correção mínima e imediata do relato):** em `planFrame.ts`, remover o ramo `area ? ... : ...` das linhas 113-119 e chamar sempre `buildPlanScreenOverlay` / `buildPlanHoverOverlay` / `buildPlanLiveOverlay`; apagar `areaPlanHighlightOps` (ou deixá-la só como legado sem uso). Isso restaura parede, porta/janela, piso/laje, escada/rampa, telhado, alças, hover, fantasmas e prévia **sem tocar na geometria**. O destaque do ambiente continua correto via `roomSelectionOps`. É a maior parte do ganho com o menor risco.
+**Passo A1 (correção mínima e imediata do relato):** em `planFrame.ts`, remover o ramo `area ? ... : ...` das linhas 113-119 e chamar sempre `buildPlanScreenOverlay` / `buildPlanHoverOverlay` / `buildPlanLiveOverlay`; apagar `areaPlanHighlightOps` (ou deixá-la só como legado sem uso). Isso restaura parede, porta/janela, piso/laje, escada/rampa, telhado, alças, hover, fantasmas, **caixa de seleção em arraste** e prévia **sem tocar na geometria**. O destaque do ambiente continua correto via `roomSelectionOps`. É a maior parte do ganho com o menor risco.
 
 **Passo A2 (unificação da geometria):** transformar `buildAreaPlanGeometry` em configuração do caminho normal, com `profile` decidindo paredes (clara/normal/oculta), aberturas, pisos, escadas/rampas, telhados, anotações e legenda/quadro; manter em `areaPlan.ts` só o que é exclusivo da área (diagonais, etiqueta, legenda, quadro). Remover a duplicação de ~130 linhas.
 
@@ -173,6 +185,14 @@ A decisão 0037 item 13 (“selecionar o ambiente destaca preenchimento e contor
 | Desvantagem | Duplicação permanente; foi exatamente essa duplicação que produziu o defeito; cada item novo (escada, rampa, DXF, view range) precisa ser lembrado duas vezes |
 
 **Recomendação:** fazer **A1 agora** (resolve o relato e os sintomas de sobreposição com risco baixo) e agendar **A2** para eliminar a causa estrutural. A opção B só se justifica se houver uma razão forte para a planta de área não compartilhar a geometria; hoje ela já compartilha `planContext`, `planViewOf`, `floorAndSlabOps`, `noteOps`, `gridOps` e `openingSymbolStrokes`, então a duplicação é parcial e inconsistente — o pior dos dois mundos.
+
+### O que cada etapa devolve, na prática
+
+| Camada | A1 (reuso da sobreposição/viva) | A2 (unificação da geometria) | Continua intencional na área |
+|---|---|---|---|
+| Interação | Destaque de parede/porta/janela/piso/laje/escada/telhado, alças, hover, **caixa de seleção em arraste**, fantasmas de mover, destaque de abertura ao deslizar, alças de cota/texto, guias/captura/inferência, seleção de anotação | — | Ferramentas de modelo (parede, porta, piso, escada…) continuam bloqueadas (`AREA_PLAN_TOOLS`) |
+| Geometria | — | Escada/rampa, contornos fora do corte, aberturas acima/abaixo do corte, hachura/camadas de parede, sobrescritas de cor/arame/meio-tom/peso, nível de detalhe, etiquetas de elemento, telhados, nível de baixo completo | Paredes claras, sem pisos/cotas por padrão, diagonais e etiqueta de ambiente |
+| Exclusivo da área | — | — | Cor por esquema, diagonais de referência, etiqueta configurável, legenda e quadro |
 
 ## Resumo curto
 

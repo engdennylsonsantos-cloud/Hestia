@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildOpeningModel, generateSpiralRun, generateStraightRun, levelFrames, openingGeometry, resolveStairsOnLevel } from '@hestia/engine';
-import { DXF_LAYER_CORTES, DXF_LAYER_ELEVACOES, dxfLayerOfFloor, dxfLayerOfMaterial, dxfLayerOfSlab, dxfLineWeight, type DxfLevelGeometry, type DxfSymbolPath } from '@hestia/io';
+import { DXF_LAYER_CORTES, DXF_LAYER_ELEVACOES, DXF_LINE_WEIGHT_DEFAULT, dxfLayerOfFloor, dxfLayerOfMaterial, dxfLayerOfSlab, dxfLayersOf, dxfLineWeight, dxfSectionLayersOf, type DxfLevelGeometry, type DxfSymbolPath } from '@hestia/io';
 import {
   ProjectStore,
   buildTemplate,
@@ -28,7 +28,7 @@ import {
   type ViewRange,
 } from '@hestia/model';
 import { climbWalk, openingPlanWorldPaths, planViewOf, risersInClimbOrder } from '@hestia/render';
-import { arrowOfPath, lineWeightsOf, planDxf, sectionDxf, sectionDxfGeometryOf, sectionLineWeightsOf, stairArrow } from './dxfExport.ts';
+import { arrowOfPath, dxfGeometryOf, lineWeightsOf, planDxf, sectionDxf, sectionDxfGeometryOf, sectionLineWeightsOf, stairArrow } from './dxfExport.ts';
 
 /** Duas paredes em L no térreo, com uma porta na primeira. Passa pelo engine real, como no app. */
 function lPlan(): ProjectStore {
@@ -473,26 +473,20 @@ describe('arrowOfPath (seta sobre a caminhada)', () => {
   });
 });
 
-/** Tabela LAYER do texto DXF: camada e código 370 (`undefined` = a entrada não tem 370). */
-function layerTable(text: string): Map<string, number | undefined> {
-  const recs: Array<{ type: string; fields: Array<[string, string]> }> = [];
-  const lines = text.split('\r\n');
-  for (let i = 0; i + 1 < lines.length; i += 2) {
-    const code = lines[i]!.trim();
-    const value = lines[i + 1]!.trim();
-    if (code === '0') recs.push({ type: value, fields: [] });
-    else recs.at(-1)?.fields.push([code, value]);
-  }
-  const out = new Map<string, number | undefined>();
-  for (const r of recs) {
-    if (r.type !== 'LAYER') continue;
-    const field = (code: string): string | undefined => r.fields.find(([c]) => c === code)?.[1];
-    const name = field('2');
-    if (name === undefined) continue;
-    const w = field('370');
-    out.set(name, w === undefined ? undefined : Number(w));
-  }
-  return out;
+/**
+ * Larguras de linha (centésimos de mm) por camada da planta, como o app as monta (`geo.lineWeights`). O DXF R12 não as
+ * leva (o código 370 é do R2000; o AutoCAD recusa o arquivo), então o teste lê a geometria. Camada da tabela sem entrada
+ * fica com o padrão (-3).
+ */
+function planWeights(p: Project, levelId: string): Map<string, number | undefined> {
+  const geo = dxfGeometryOf(p, levelId);
+  return new Map(dxfLayersOf(p, geo).map((l): [string, number] => [l, geo.lineWeights?.[l] ?? DXF_LINE_WEIGHT_DEFAULT]));
+}
+
+/** O mesmo para o corte e a elevação (`sectionDxfGeometryOf`). */
+function sectionWeights(p: Project, sectionId: string): Map<string, number | undefined> {
+  const geo = sectionDxfGeometryOf(p, sectionId);
+  return new Map(dxfSectionLayersOf(geo).map((l): [string, number] => [l, geo.lineWeights?.[l] ?? DXF_LINE_WEIGHT_DEFAULT]));
 }
 
 /** Gráficos salvos de uma vista, parciais como no projeto (o leitor completa com o padrão). */
@@ -510,7 +504,7 @@ const wallMaterialLayers = (p: Project): string[] =>
   p.wallTypes[p.defaults.wallTypeId]!.layers.map((l) => dxfLayerOfMaterial(p.materials[l.materialId]!.name));
 
 describe('larguras de linha no DXF (decisão 0015 §2 item 7)', () => {
-  it('a escala muda o 370 da parede cortada: 1:50 = 0,7 mm (70), 1:100 = 0,5 (50), 1:200 = 0,35 (35)', () => {
+  it('a escala muda a largura de linha da parede cortada: 1:50 = 0,7 mm (70), 1:100 = 0,5 (50), 1:200 = 0,35 (35)', () => {
     const p = lPlan().project;
     const layers = wallMaterialLayers(p);
     expect(layers.length).toBeGreaterThan(0);
@@ -519,33 +513,33 @@ describe('larguras de linha no DXF (decisão 0015 §2 item 7)', () => {
       [100, 50],
       [200, 35],
     ] as const) {
-      const table = layerTable(planDxf(withLevelGraphics(p, 'lv_0', { scale }), 'lv_0'));
+      const table = planWeights(withLevelGraphics(p, 'lv_0', { scale }), 'lv_0');
       for (const layer of layers) expect(table.get(layer)).toBe(want);
     }
   });
 
   it('ABERTURA_SIMBOLO (portas e janelas juntas) leva o peso de corte da janela, 3: 0,35 / 0,25 / 0,18 mm', () => {
     const p = lPlan().project;
-    const weights = [50, 100, 200].map((scale) => layerTable(planDxf(withLevelGraphics(p, 'lv_0', { scale }), 'lv_0')).get('ABERTURA_SIMBOLO'));
+    const weights = [50, 100, 200].map((scale) => planWeights(withLevelGraphics(p, 'lv_0', { scale }), 'lv_0').get('ABERTURA_SIMBOLO'));
     expect(weights).toEqual([35, 25, 18]);
   });
 
   it('projeção da parede a 1:200 (0,10 mm) sai com 9, o valor DXF válido mais próximo', () => {
     const p = withLevelGraphics(vistaPlan().project, 'lv_0', { scale: 200 });
-    expect(layerTable(planDxf(p, 'lv_0')).get('PAREDE_PROJECAO_ACIMA')).toBe(9);
+    expect(planWeights(p, 'lv_0').get('PAREDE_PROJECAO_ACIMA')).toBe(9);
   });
 
   it('piso (peso de corte 3: 0,25 mm) e laje (peso de corte 4: 0,35 mm) a 1:100', () => {
     const p = vistaPlan().project;
     const floor = dxfLayerOfFloor(p.floorTypes['ft_ceram']!.code);
     const slab = dxfLayerOfSlab(p.slabTypes['ls_mac12']!.code);
-    expect(layerTable(planDxf(p, 'lv_0')).get(floor)).toBe(25);
-    expect(layerTable(planDxf(p, 'lv_1')).get(slab)).toBe(35);
+    expect(planWeights(p, 'lv_0').get(floor)).toBe(25);
+    expect(planWeights(p, 'lv_1').get(slab)).toBe(35);
   });
 
   it('substituição da vista vale sobre o peso do projeto: parede de corte 9 (2,0 mm a 1:100) e janela de projeção 8 (1,4 mm)', () => {
     const p = withLevelGraphics(vistaPlan().project, 'lv_0', { overrides: { wall: { cutWeight: 9 }, window: { projectionWeight: 8 } } });
-    const table = layerTable(planDxf(p, 'lv_0'));
+    const table = planWeights(p, 'lv_0');
     for (const layer of wallMaterialLayers(p)) expect(table.get(layer)).toBe(200);
     expect(table.get('ABERTURA_ACIMA')).toBe(140);
     // O corte da janela não foi substituído: segue 3 (0,25 mm a 1:100).
@@ -553,21 +547,21 @@ describe('larguras de linha no DXF (decisão 0015 §2 item 7)', () => {
   });
 
   it('categoria oculta na vista não sai: parede, porta e piso somem; as janelas (outra categoria) ficam', () => {
-    const walls = layerTable(planDxf(withLevelGraphics(vistaPlan().project, 'lv_0', { overrides: { wall: { visible: false } } }), 'lv_0'));
+    const walls = planWeights(withLevelGraphics(vistaPlan().project, 'lv_0', { overrides: { wall: { visible: false } } }), 'lv_0');
     expect([...walls.keys()].some((n) => n.startsWith('PAREDE_'))).toBe(false);
     expect(walls.has('ABERTURA_ACIMA')).toBe(true);
 
-    const doors = layerTable(planDxf(withLevelGraphics(lPlan().project, 'lv_0', { overrides: { door: { visible: false } } }), 'lv_0'));
+    const doors = planWeights(withLevelGraphics(lPlan().project, 'lv_0', { overrides: { door: { visible: false } } }), 'lv_0');
     expect(doors.has('ABERTURA_SIMBOLO')).toBe(false);
     expect(wallMaterialLayers(lPlan().project).every((l) => doors.has(l))).toBe(true);
 
     const vista = vistaPlan().project;
-    const floors = layerTable(planDxf(withLevelGraphics(vista, 'lv_0', { overrides: { floor: { visible: false } } }), 'lv_0'));
+    const floors = planWeights(withLevelGraphics(vista, 'lv_0', { overrides: { floor: { visible: false } } }), 'lv_0');
     expect(floors.has(dxfLayerOfFloor(vista.floorTypes['ft_ceram']!.code))).toBe(false);
   });
 
-  it('camada sem categoria ("0") sai com 370 -3, e toda entrada da tabela tem 370', () => {
-    const table = layerTable(planDxf(lPlan().project, 'lv_0'));
+  it('camada sem categoria ("0") fica com a largura padrão (-3), e toda camada da tabela tem largura', () => {
+    const table = planWeights(lPlan().project, 'lv_0');
     expect(table.get('0')).toBe(-3);
     for (const [, w] of table) expect(w).toBeDefined();
   });
@@ -610,11 +604,11 @@ function sectionPlan(): ProjectStore {
 }
 
 describe('corte e elevação no DXF (decisão 0015 §2.7)', () => {
-  it('a escala muda o 370 da projeção da parede no corte: 1:50 e 1:100 saem com larguras diferentes', () => {
+  it('a escala muda a largura da projeção da parede no corte: 1:50 e 1:100 saem com larguras diferentes', () => {
     const store = sectionPlan();
     const at = (scale: number): Map<string, number | undefined> => {
       store.exec({ type: 'setSectionGraphics', patch: { scale } });
-      return layerTable(sectionDxf(store.project, 'corte_a'));
+      return sectionWeights(store.project, 'corte_a');
     };
     const w50 = at(50).get('CORTE_PAREDE_PROJECAO');
     const w100 = at(100).get('CORTE_PAREDE_PROJECAO');
@@ -623,11 +617,11 @@ describe('corte e elevação no DXF (decisão 0015 §2.7)', () => {
     expect(w50).not.toBe(w100);
   });
 
-  it('sem gráficos salvos, o 370 segue a tabela do projeto na escala padrão (1:100, peso de projeção da parede)', () => {
+  it('sem gráficos salvos, a largura segue a tabela do projeto na escala padrão (1:100, peso de projeção da parede)', () => {
     const p = sectionPlan().project;
     const g = graphicsOf(p);
     const want = dxfLineWeight(lineWeightMm(g.lineWeights, g.categories.wall.projectionWeight, 100) * 100);
-    expect(layerTable(sectionDxf(p, 'corte_a')).get('CORTE_PAREDE_PROJECAO')).toBe(want);
+    expect(sectionWeights(p, 'corte_a').get('CORTE_PAREDE_PROJECAO')).toBe(want);
   });
 
   it('categoria oculta na vista não sai no DXF: sem paredes, a camada de projeção da parede não existe', () => {
@@ -650,11 +644,11 @@ describe('corte e elevação no DXF (decisão 0015 §2.7)', () => {
 });
 
 describe('linhas finas não mudam o DXF (decisão 0015, só na tela)', () => {
-  it('um nível com linhas finas sai igual ao sem o modo, com o 370 real de cada camada de parede', () => {
+  it('um nível com linhas finas sai igual ao sem o modo, com a largura real de cada camada de parede', () => {
     const p = lPlan().project;
     const fina = withLevelGraphics(p, 'lv_0', { thinLines: true } as SavedLevelGraphics);
     expect(planDxf(fina, 'lv_0')).toBe(planDxf(p, 'lv_0'));
-    const table = layerTable(planDxf(fina, 'lv_0'));
+    const table = planWeights(fina, 'lv_0');
     for (const layer of wallMaterialLayers(p)) expect(table.get(layer)).toBe(50);
   });
 });

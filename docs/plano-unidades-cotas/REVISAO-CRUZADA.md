@@ -18,8 +18,8 @@ Escopo: diff `f89a049a..claude/fervent-newton-rfgz3y` (unidades, esquadrias/bate
 | A01 | `packages/render/src/model3d/scene3d.ts:1` | média | 438 linhas efetivas (> 420) sustentadas por `eslint-disable max-lines`. A regra do plano pede divisão; a extração é uma refatoração do port GPU, não uma correção pontual. | aberto |
 | A02 | `packages/render/src/gpu/contexto.ts:272`, `packages/render/src/gpu/controlador.ts:135` | baixa | `wrap`, `tryWebGpu` e o ciclo `criarControladorGpu` não têm teste unitário (exigem GPU real); ficam cobertos só pelos e2e/baselines. | aberto |
 | A03 | `packages/tools/src/dims/providers/outline.ts:29` | baixa | Cotas de piso/laje/telhado/forro são só de leitura. O D10 permite isso enquanto `outlineEdit.ts` não tiver operação pura por lado; hoje ele só grava o contorno inteiro. | aberto |
-| A04 | `packages/tools/src/dims/providers/displacement.ts:19` | baixa | O D10.5 pede distância **e ângulo** no mover/copiar; o provedor exibe só a distância. | aberto |
-| A05 | `packages/model/src/grid.ts:154` | baixa | `gridIssue` (modelo) fixa "5 cm" sem receber unidades; o ramo da ferramenta já foi corrigido, o do modelo não tem `Project` à mão. | aberto |
+| A04 | `packages/tools/src/dims/providers/displacement.ts:19` | baixa | O D10.5 pede distância **e ângulo** no mover/copiar; o provedor exibe só a distância. | corrigido em `7414c321` (distância + ângulo) |
+| A05 | `packages/model/src/grid.ts:154` | baixa | `gridIssue` (modelo) fixa "5 cm" sem receber unidades; o ramo da ferramenta já foi corrigido, o do modelo não tem `Project` à mão. | corrigido em `41678265` (mensagens nas unidades do projeto) |
 
 ## Decisões para o dono
 

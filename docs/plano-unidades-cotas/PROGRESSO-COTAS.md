@@ -67,7 +67,9 @@ confirmação "Excluir elementos e continuar"** das operações de aparar/redime
 **não é regressão** (é o comportamento anterior).
 
 **Aberturas.** A01 aberto (decidir divisão ou exceção); A02 aberto (teste de GPU real); A03 pendente e por ora
-somente leitura (cotas de piso/laje/telhado/forro); A04/A05 em implementação por outro agente.
+somente leitura (cotas de piso/laje/telhado/forro); A04/A05 concluídos em `7414c321`/`41678265`.
+
+**Correções da F2 integradas.** Undo atômico da esquadria (`1846adb1`), temporárias suspensas após o "I" (`b8e63122`, `179faad5`) e cota unificada na criação de eixo (`f32bd49a`). A linha de base de unidades foi reduzida de 104 para 102 ocorrências.
 
 **Fora do escopo.** D10.6 (escadas, ambientes e seções) — não implementado por decisão do dono.
 
@@ -80,4 +82,4 @@ _(nenhum)_
 - Regravar baselines de imagem (`tests/e2e/baseline*`) se a regressão visual indicar diferença esperada — conferir
   antes a etiqueta de nível ausente no corte (`capturas/LEIAME.md`).
 - Validar em GPU real (capturas/e2e usam SwiftShader).
-- Acompanhar A04/A05 e decidir A03.
+- Decidir A03 (edição por lado ou manter leitura).

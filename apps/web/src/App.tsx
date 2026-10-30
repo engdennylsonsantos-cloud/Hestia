@@ -46,7 +46,7 @@ import { RampScheduleDialog } from './ui/dialogs/RampScheduleDialog.tsx';
 import { OpeningScheduleDialog } from './ui/dialogs/OpeningScheduleDialog.tsx';
 import { GraphicsVisibilityDialog } from './ui/dialogs/GraphicsVisibilityDialog.tsx';
 import { LineWeightsDialog } from './ui/dialogs/LineWeightsDialog.tsx';
-import { DxfLayersDialog } from './ui/dialogs/DxfLayersDialog.tsx';
+import { DxfExportDialog } from './ui/dialogs/DxfExportDialog.tsx';
 import { MoveLevelDialog } from './ui/MoveLevel.tsx';
 import { GridTypeDialog } from './ui/dialogs/GridTypeDialog.tsx';
 import { TextDialog, useCaixaDeTextoAberta } from './ui/dialogs/TextDialog.tsx';
@@ -118,7 +118,7 @@ function Dialogs(): ReactElement | null {
     case 'lineWeights':
       return <LineWeightsDialog />;
     case 'dxfLayers':
-      return <DxfLayersDialog />;
+      return <DxfExportDialog />;
     case 'moveLevel':
       return <MoveLevelDialog onClose={() => useUi.setState({ dialog: null })} />;
     case 'cotasAuto':

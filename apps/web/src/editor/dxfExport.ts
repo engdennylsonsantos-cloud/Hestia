@@ -25,10 +25,10 @@ import {
   type DxfSectionGeometry,
   type DxfSectionItem,
   type DxfSymbolPath,
+  type DxfUnit,
   type DxfViewState,
 } from '@hestia/io';
-import { areaPlanOf, openingTypeById, GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, sectionTitleOf, type DxfLayerStyle, type GraphicsCategory, type Id, type Project } from '@hestia/model';
-import { saveText } from './saveText.ts';
+import { areaPlanOf, openingTypeById, GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, type DxfLayerStyle, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { AREA_LAYER_NAMES, areaLayerStyleOf } from './dxfAreaPlan.ts';
 
 /**
@@ -219,7 +219,7 @@ export function lineWeightsOf(p: Project, levelId: Id, geo: DxfLevelGeometry): R
  * sai. Cada camada leva a largura de linha da categoria na escala da vista (`lineWeightsOf`). O io não importa o engine,
  * então a montagem fica aqui, no web.
  */
-export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true): DxfLevelGeometry {
+export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true, units?: DxfUnit): DxfLevelGeometry {
   const view: PlanView = planViewOf(p, levelId);
   const { hidden } = view;
   const vg = levelGraphicsOf(p, levelId);
@@ -315,16 +315,16 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
   const layerStyles = Object.fromEntries(
     dxfLayersOf(p, withNotes).map((layer): [string, DxfLayerStyle] => [layer, p.dxfLayers?.[layer] ?? dxfLayerStyleOf(layer, lineWeights[layer] ?? DXF_LINE_WEIGHT_DEFAULT)]),
   );
-  return { ...withNotes, lineWeights, layerStyles };
+  return { ...withNotes, lineWeights, layerStyles, ...(units === undefined ? {} : { units }) };
 }
 
 /** Altura (m de desenho) do texto do ambiente no DXF. */
 const ROOM_TEXT_HEIGHT_M = 0.2;
 
-export { areaPlanDxf, saveAreaPlanDxf } from './dxfAreaPlan.ts';
+export { areaPlanDxf } from './dxfAreaPlan.ts';
 
-export function planDxf(p: Project, levelId: Id, showRoofProjection = true): string {
-  const doc = dxfDocOf(p, levelId, dxfGeometryOf(p, levelId, showRoofProjection));
+export function planDxf(p: Project, levelId: Id, showRoofProjection = true, units?: DxfUnit): string {
+  const doc = dxfDocOf(p, levelId, dxfGeometryOf(p, levelId, showRoofProjection, units));
   const shown = levelGraphicsOf(p, levelId).overrides.generic.visible !== false;
   const generics = shown ? dxfGenericEntities(p, levelId) : [];
   // A camada dos importados entra com a cor da categoria (cinza), como as do nível.
@@ -371,13 +371,6 @@ export function dxfLayerTableOf(p: Project, target: DxfExportTarget): DxfLayerRo
   return ['0', ...AREA_LAYER_NAMES].sort().map((name) => ({ name, style: areaLayerStyleOf(p, name) }));
 }
 
-/** Entrega o DXF pelo mesmo caminho do CSV (`saveText`) e devolve a frase de status. */
-export function savePlanDxf(p: Project, levelId: Id, showRoofProjection = true): Promise<string> {
-  const base = p.name.trim() || 'projeto';
-  const level = (p.levels.find((l) => l.id === levelId)?.name ?? levelId).trim() || 'nivel';
-  return saveText(`${base}-${level}.dxf`, planDxf(p, levelId, showRoofProjection));
-}
-
 /** Categoria gráfica de uma origem do corte (parede, piso, laje, telhado ou escada). */
 function sectionCategoryOf(o: SectionOrigin): GraphicsCategory {
   return ownerOf(o)?.kind ?? 'wall';
@@ -410,7 +403,7 @@ export function sectionLineWeightsOf(p: Project, geo: DxfSectionGeometry): Recor
  * Geometria do corte/elevação para o DXF, a partir do mesmo `computeSection` da tela. Categoria oculta na vista
  * (`sectionGraphics.overrides[cat].visible === false`) não sai. As camadas levam a largura da categoria na escala.
  */
-export function sectionDxfGeometryOf(p: Project, sectionId: Id): DxfSectionGeometry {
+export function sectionDxfGeometryOf(p: Project, sectionId: Id, units?: DxfUnit): DxfSectionGeometry {
   const view = p.views.find((v) => v.id === sectionId);
   if (!view) throw new Error(`Vista ausente: ${sectionId}`);
   const pts = sectionPoints(p, view);
@@ -434,18 +427,12 @@ export function sectionDxfGeometryOf(p: Project, sectionId: Id): DxfSectionGeome
   const layerStyles = Object.fromEntries(
     dxfSectionLayersOf(geo).map((layer): [string, DxfLayerStyle] => [layer, p.dxfLayers?.[layer] ?? dxfSectionLayerStyleOf(layer, lineWeights[layer] ?? DXF_LINE_WEIGHT_DEFAULT)]),
   );
-  return { ...geo, lineWeights, layerStyles };
+  return { ...geo, lineWeights, layerStyles, ...(units === undefined ? {} : { units }) };
 }
 
 /** Texto DXF do corte/elevação, com as camadas e as larguras de linha da vista. */
-export function sectionDxf(p: Project, sectionId: Id): string {
-  return exportSectionDxf(p, sectionId, sectionDxfGeometryOf(p, sectionId));
+export function sectionDxf(p: Project, sectionId: Id, units?: DxfUnit): string {
+  return exportSectionDxf(p, sectionId, sectionDxfGeometryOf(p, sectionId, units));
 }
 
-/** Entrega o DXF do corte pelo mesmo caminho da planta e devolve a frase de status. */
-export function saveSectionDxf(p: Project, sectionId: Id): Promise<string> {
-  const base = p.name.trim() || 'projeto';
-  const found = p.views.find((v) => v.id === sectionId);
-  const view = (found ? sectionTitleOf(found) : sectionId).trim() || 'vista';
-  return saveText(`${base}-${view}.dxf`, sectionDxf(p, sectionId));
-}
+

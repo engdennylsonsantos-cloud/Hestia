@@ -7,8 +7,7 @@ import type { Vec2 } from '@hestia/geom';
 import { resolveLevel } from '@hestia/engine';
 import { buildPlanGeometry, levelBox, LIGHT, resolverZoom, type PlanOps } from '@hestia/render';
 import { areaPlanOf, DIM_TEXT_MM, dimensionGeometry, dimensionPoints, dimensionText, planAnnotationsOf, unitsOf, type AreaPlan, type DxfLayerLineType, type DxfLayerStyle, type Id, type Project } from '@hestia/model';
-import { DXF_LINE_WEIGHT_DEFAULT, writeDxf2000, type DxfDoc, type DxfDocEntity, type DxfDocLayer } from '@hestia/io';
-import { saveText } from './saveText.ts';
+import { DXF_LINE_WEIGHT_DEFAULT, writeDxf2000, type DxfDoc, type DxfDocEntity, type DxfDocLayer, type DxfUnit } from '@hestia/io';
 
 /** Camada de um traço da planta de área: referência, chamada ou contorno. */
 const areaLayerOf = (color: string, pts: number): string => (color === '#4b5563' ? 'AMBIENTES_REFERENCIA' : color === '#111827' && pts === 2 ? 'AMBIENTES_CHAMADA' : 'AMBIENTES');
@@ -96,7 +95,7 @@ function areaAnnotationEntities(p: Project, plan: AreaPlan, ops: PlanOps): DxfDo
   return out;
 }
 /** DXF da planta de área, com as camadas AMBIENTES, AMBIENTES_REFERENCIA, AMBIENTES_CHAMADA e AMBIENTES_TEXTO. */
-export function areaPlanDxf(p: Project, planId: Id): string {
+export function areaPlanDxf(p: Project, planId: Id, units?: DxfUnit): string {
   const plan = areaPlanOf(p, planId);
   if (!plan) throw new Error('Planta de área inexistente');
   const box = levelBox(p, plan.levelId) ?? { minX: 0, minY: 0, maxX: 10, maxY: 10 };
@@ -121,16 +120,7 @@ export function areaPlanDxf(p: Project, planId: Id): string {
   // Cotas/textos/detalhes de `plan.annotations`: o render da área pode já desenhá-los; o que faltar entra aqui.
   const doc = opsDocOf(p, resolverZoom(ops, zoom), zoom);
   const entities = [...doc.entities, ...areaAnnotationEntities(p, plan, ops)];
-  return writeDxf2000({ ...doc, layers: layersOfEntities(p, entities), entities });
-}
-
-/** Exporta a planta de área atual e devolve o nome do arquivo salvo. */
-export async function saveAreaPlanDxf(p: Project, planId: Id): Promise<string> {
-  const plan = areaPlanOf(p, planId);
-  if (!plan) throw new Error('Planta de área inexistente');
-  const name = `${p.name || 'projeto'}-${plan.name}.dxf`;
-  await saveText(name, areaPlanDxf(p, planId));
-  return name;
+  return writeDxf2000({ ...doc, layers: layersOfEntities(p, entities), entities, ...(units === undefined ? {} : { units }) });
 }
 
 /** Nomes das camadas fixas da planta de área (base da tabela editável do diálogo). */

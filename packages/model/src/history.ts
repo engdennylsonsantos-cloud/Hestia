@@ -258,6 +258,10 @@ export function labelOf(c: Command): string {
       return 'Padrões do projeto';
     case 'setSettings':
       return 'Configurações do projeto';
+    case 'setDxfLayerStyle':
+      return 'Editar camada do DXF';
+    case 'resetDxfLayers':
+      return 'Restaurar camadas do DXF';
     case 'toggleOpeningFavorite':
       return 'Favoritar tipo de abertura';
     case 'addView':

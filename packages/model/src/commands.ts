@@ -48,6 +48,7 @@ import { openingTypeIssue, toggleFavoriteIn } from './opening.ts';
 import { withBridgedComposition } from './openingCompositionOf.ts';
 import { comTerminoValido } from './termino.ts';
 import { viewRangeIssues, type ViewRange } from './viewRange.ts';
+import type { DxfLayerStyle } from './dxfLayerStyle.ts';
 import type { DeepPartial, ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 import {
   applyLevelGraphics,
@@ -126,6 +127,8 @@ export type Command =
   | { type: 'setProjectName'; name: string }
   | { type: 'setDefaults'; patch: Partial<Project['defaults']> }
   | { type: 'setSettings'; patch: Partial<Project['settings']> }
+  | { type: 'setDxfLayerStyle'; layer: string; style: DxfLayerStyle }
+  | { type: 'resetDxfLayers' }
   | { type: 'toggleOpeningFavorite'; id: Id }
   | { type: 'addView'; view: SectionView }
   | { type: 'updateView'; id: Id; patch: Partial<Omit<SectionView, 'id'>> }
@@ -457,6 +460,14 @@ export function applyCommand(p: Project, c: Command): void {
       break;
     case 'setSettings':
       p.settings = { ...p.settings, ...c.patch };
+      break;
+    case 'setDxfLayerStyle': {
+      const layer = c.layer.trim();
+      if (layer) p.dxfLayers = { ...(p.dxfLayers ?? {}), [layer]: { ...c.style } };
+      break;
+    }
+    case 'resetDxfLayers':
+      delete p.dxfLayers;
       break;
     case 'toggleOpeningFavorite': toggleFavoriteIn(p, c.id); break;
     case 'addView':

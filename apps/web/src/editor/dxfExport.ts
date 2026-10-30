@@ -1,24 +1,23 @@
 import { openingSymbolPaths, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, resolveLevel, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
-import { buildPlanGeometry, climbWalk, levelBox, LIGHT, openingPlanWorldPaths, ownerOf, planViewOf, resolverZoom, risersInClimbOrder, roofFootprint, roomLabelAt, roomNameText, spiralByComponent, spiralPostRing, stairCut, type PlanOps, type PlanView, type StairCut } from '@hestia/render';
+import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
+import { climbWalk, openingPlanWorldPaths, ownerOf, planViewOf, risersInClimbOrder, roofFootprint, roomLabelAt, roomNameText, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
 import {
   dxfDocOf,
   dxfGenericEntities,
+  dxfLayerStyleOf,
   dxfLayersOf,
   dxfLineRoleOf,
+  DXF_LINE_WEIGHT_DEFAULT,
   DXF_LAYER_RAMP_TEXT,
   DXF_LAYER_ROOM_TEXT,
   dxfLineWeight,
   dxfSectionLayersOf,
+  dxfSectionLayerStyleOf,
   dxfSectionLineRoleOf,
   exportSectionDxf,
   notesDxfOf,
   sectionMarksDxfOf,
   writeDxf2000,
-  type DxfDoc,
-  type DxfDocEntity,
-  type DxfDocLayer,
-  type DxfLineType,
   type DxfLevelGeometry,
   type DxfOpening,
   type DxfPoint,
@@ -27,8 +26,9 @@ import {
   type DxfSymbolPath,
   type DxfViewState,
 } from '@hestia/io';
-import { areaPlanOf, DIM_TEXT_MM, dimensionGeometry, dimensionPoints, dimensionText, openingTypeById, unitsOf, GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, planAnnotationsOf, sectionGraphicsOf, sectionPoints, sectionTitleOf, type AreaPlan, type GraphicsCategory, type Id, type Project } from '@hestia/model';
+import { areaPlanOf, openingTypeById, GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, sectionTitleOf, type DxfLayerStyle, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
+import { AREA_LAYER_NAMES, areaLayerStyleOf } from './dxfAreaPlan.ts';
 
 /**
  * Região de um piso ou laje para o DXF (F7.1, 0023 §6): a região resolvida pela junção quando houve corte; sem corte, a camada
@@ -310,135 +310,52 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
       ? { notes: notesDxfOf(p, levelId, vg.scale), sectionMarks: sectionMarksDxfOf(p, vg.scale) }
       : {}),
   };
-  return { ...withNotes, lineWeights: lineWeightsOf(p, levelId, withNotes) };
+  const lineWeights = lineWeightsOf(p, levelId, withNotes);
+  const layerStyles = Object.fromEntries(
+    dxfLayersOf(p, withNotes).map((layer): [string, DxfLayerStyle] => [layer, p.dxfLayers?.[layer] ?? dxfLayerStyleOf(layer, lineWeights[layer] ?? DXF_LINE_WEIGHT_DEFAULT)]),
+  );
+  return { ...withNotes, lineWeights, layerStyles };
 }
 
 /** Altura (m de desenho) do texto do ambiente no DXF. */
 const ROOM_TEXT_HEIGHT_M = 0.2;
 
-/** Camada de um traço da planta de área: referência, chamada ou contorno. */
-const areaLayerOf = (color: string, pts: number): string => (color === '#4b5563' ? 'AMBIENTES_REFERENCIA' : color === '#111827' && pts === 2 ? 'AMBIENTES_CHAMADA' : 'AMBIENTES');
-
-/** Estilo padrão de uma camada da planta de área (a tabela editável de camadas entra na fase 3). */
-const AREA_LAYER_STYLE: Record<string, { color: number; linetype: DxfLineType }> = {
-  AMBIENTES: { color: 7, linetype: 'CONTINUOUS' },
-  AMBIENTES_REFERENCIA: { color: 8, linetype: 'CONTINUOUS' },
-  AMBIENTES_CHAMADA: { color: 7, linetype: 'CONTINUOUS' },
-  AMBIENTES_TEXTO: { color: 7, linetype: 'CONTINUOUS' },
-  ANOTACOES: { color: 7, linetype: 'CONTINUOUS' },
-  ANOTACOES_TEXTO: { color: 7, linetype: 'CONTINUOUS' },
-  ANOTACOES_DETALHE: { color: 7, linetype: 'CONTINUOUS' },
-};
-
-/** Camadas de uma lista de entidades: `0` e as usadas, em ordem, com o estilo do mapa (ou o padrão do escritor). */
-function layersOfEntities(entities: DxfDocEntity[], styles: Record<string, { color: number; linetype: DxfLineType }>): DxfDocLayer[] {
-  const names = new Set(['0', ...entities.map((e) => e.layer)]);
-  return [...names].sort().map((name) => ({ name, ...(styles[name] ?? { color: 7, linetype: 'CONTINUOUS' }) }));
-}
-
-/**
- * Documento R2000 da planta de área a partir das operações do render: cada traço vira LINE e cada rótulo TEXT, nas camadas
- * AMBIENTES, AMBIENTES_REFERENCIA, AMBIENTES_CHAMADA e AMBIENTES_TEXTO (como no R12 anterior; antes o arquivo declarava
- * AC1015 sem a estrutura do R2000 e o AutoCAD o recusava com "DXF read error").
- */
-function opsDocOf(ops: PlanOps, zoom: number): DxfDoc {
-  const entities: DxfDocEntity[] = [];
-  for (const s of ops.strokes) {
-    const layer = areaLayerOf(s.color, s.pts.length);
-    const pts = s.closed && s.pts.length > 2 ? [...s.pts, s.pts[0]!] : s.pts;
-    for (let i = 0; i + 1 < pts.length; i++) entities.push({ kind: 'line', layer, a: pts[i]!, b: pts[i + 1]! });
-  }
-  for (const l of ops.labels) {
-    if (l.maskBoundary || !l.text) continue;
-    entities.push({ kind: 'text', layer: 'AMBIENTES_TEXTO', at: l.at, height: (l.fontPx ?? 12) / zoom, text: l.text, rotation: l.rotation ?? 0 });
-  }
-  return { layers: layersOfEntities(entities, AREA_LAYER_STYLE), entities };
-}
-
-const samePoint = (a: Vec2, b: Vec2): boolean => Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6;
-
-/**
- * Entidades R2000 das anotações da planta de área (cotas, textos e detalhes). A geometria da planta já as desenha quando o
- * render da área passou a incluí-las; o que ainda não estiver nas operações entra aqui, sem duplicar.
- */
-function areaAnnotationEntities(p: Project, plan: AreaPlan, ops: PlanOps): DxfDocEntity[] {
-  const a = planAnnotationsOf(plan);
-  if (a.dimensions.length + a.texts.length + a.detailLines.length + a.detailRegions.length === 0) return [];
-  const out: DxfDocEntity[] = [];
-  const line = (layer: string, start: Vec2, end: Vec2): void => {
-    out.push({ kind: 'line', layer, a: start, b: end });
-  };
-  const text = (layer: string, at: Vec2, height: number, value: string, rotation = 0): void => {
-    out.push({ kind: 'text', layer, at, height, text: value, rotation });
-  };
-  const rendered = new Set(ops.labels.map((l) => l.text).filter((x): x is string => !!x));
-  const mPerMm = plan.scale / 1000;
-  for (const d of a.dimensions) {
-    const value = dimensionText(p, d, unitsOf(p));
-    if (rendered.has(value)) continue;
-    const { a: pa, b: pb } = dimensionPoints(p, d);
-    const textMm = d.textHeight ?? DIM_TEXT_MM;
-    const g = dimensionGeometry(pa, pb, d.offset, mPerMm, textMm, d.textAt);
-    for (const seg of [g.line, ...g.extensions, ...g.ticks]) line('ANOTACOES', seg[0], seg[1]);
-    text('ANOTACOES_TEXTO', g.textAt, (textMm * plan.scale) / 1000, value, g.textRotation);
-  }
-  for (const t of a.texts) {
-    if (rendered.has(t.text)) continue;
-    text('ANOTACOES_TEXTO', t.at, (t.height * plan.scale) / 1000, t.text, t.rotation);
-  }
-  const hasSegment = (start: Vec2, end: Vec2): boolean =>
-    ops.strokes.some((s) => s.pts.length === 2 && samePoint(s.pts[0]!, start) && samePoint(s.pts[1]!, end));
-  for (const x of a.detailLines) if (!hasSegment(x.a, x.b)) line('ANOTACOES_DETALHE', x.a, x.b);
-  for (const x of a.detailRegions) {
-    const drawn = ops.strokes.some((s) => s.pts.length === x.boundary.length && x.boundary.every((q, i) => samePoint(s.pts[i]!, q)));
-    if (drawn) continue;
-    for (let i = 0; i < x.boundary.length; i++) line('ANOTACOES_DETALHE', x.boundary[i]!, x.boundary[(i + 1) % x.boundary.length]!);
-  }
-  return out;
-}
-/** DXF da planta de área, com as camadas AMBIENTES, AMBIENTES_REFERENCIA, AMBIENTES_CHAMADA e AMBIENTES_TEXTO. */
-export function areaPlanDxf(p: Project, planId: Id): string {
-  const plan = areaPlanOf(p, planId);
-  if (!plan) throw new Error('Planta de área inexistente');
-  const box = levelBox(p, plan.levelId) ?? { minX: 0, minY: 0, maxX: 10, maxY: 10 };
-  const zoom = 100;
-  const width = Math.max(400, (box.maxX - box.minX) * zoom + 200);
-  const height = Math.max(300, (box.maxY - box.minY) * zoom + 200);
-  const ops = buildPlanGeometry({
-    project: p,
-    levelId: plan.levelId,
-    resolved: resolveLevel(p, plan.levelId),
-    below: null,
-    areaPlan: plan,
-    viewport: { cx: (box.minX + box.maxX) / 2, cy: (box.minY + box.maxY) / 2, zoom, width, height },
-    theme: LIGHT,
-    dark: false,
-    selection: [],
-    hover: null,
-    preview: [],
-    inference: null,
-    showGrid: false,
-  });
-  // Cotas/textos/detalhes de `plan.annotations`: o render da área pode já desenhá-los; o que faltar entra aqui.
-  const doc = opsDocOf(resolverZoom(ops, zoom), zoom);
-  const entities = [...doc.entities, ...areaAnnotationEntities(p, plan, ops)];
-  return writeDxf2000({ ...doc, layers: layersOfEntities(entities, AREA_LAYER_STYLE), entities });
-}
-
-/** Exporta a planta de área atual e devolve o nome do arquivo salvo. */
-export async function saveAreaPlanDxf(p: Project, planId: Id): Promise<string> {
-  const plan = areaPlanOf(p, planId);
-  if (!plan) throw new Error('Planta de área inexistente');
-  const name = `${p.name || 'projeto'}-${plan.name}.dxf`;
-  await saveText(name, areaPlanDxf(p, planId));
-  return name;
-}
+export { areaPlanDxf, saveAreaPlanDxf } from './dxfAreaPlan.ts';
 
 export function planDxf(p: Project, levelId: Id, showRoofProjection = true): string {
   const doc = dxfDocOf(p, levelId, dxfGeometryOf(p, levelId, showRoofProjection));
   const shown = levelGraphicsOf(p, levelId).overrides.generic.visible !== false;
   const entities = [...doc.entities, ...(shown ? dxfGenericEntities(p, levelId) : [])];
   return writeDxf2000({ ...doc, entities });
+}
+
+/** Alvo da tabela de camadas do diálogo de exportação (o que a vista atual exporta). */
+export type DxfExportTarget =
+  | { kind: 'plan'; levelId: Id; showRoofProjection?: boolean }
+  | { kind: 'section'; sectionId: Id }
+  | { kind: 'area'; planId: Id };
+
+/** Camada e estilo efetivo, como a tabela do diálogo de exportação mostra. */
+export interface DxfLayerRow {
+  name: string;
+  style: DxfLayerStyle;
+}
+
+/**
+ * Camadas do DXF que a vista exportaria, com o estilo efetivo (padrão por categoria/escala + o que o projeto guarda em
+ * `dxfLayers`). É a base da tabela editável do diálogo: a mesma ordem e os mesmos nomes que o arquivo leva.
+ */
+export function dxfLayerTableOf(p: Project, target: DxfExportTarget): DxfLayerRow[] {
+  if (target.kind === 'plan') {
+    const geo = dxfGeometryOf(p, target.levelId, target.showRoofProjection ?? true);
+    return dxfLayersOf(p, geo).map((name) => ({ name, style: geo.layerStyles?.[name] ?? dxfLayerStyleOf(name, geo.lineWeights?.[name]) }));
+  }
+  if (target.kind === 'section') {
+    const geo = sectionDxfGeometryOf(p, target.sectionId);
+    return dxfSectionLayersOf(geo).map((name) => ({ name, style: geo.layerStyles?.[name] ?? dxfSectionLayerStyleOf(name, geo.lineWeights?.[name]) }));
+  }
+  if (!areaPlanOf(p, target.planId)) throw new Error('Planta de área inexistente');
+  return ['0', ...AREA_LAYER_NAMES].sort().map((name) => ({ name, style: areaLayerStyleOf(p, name) }));
 }
 
 /** Entrega o DXF pelo mesmo caminho do CSV (`saveText`) e devolve a frase de status. */
@@ -500,7 +417,11 @@ export function sectionDxfGeometryOf(p: Project, sectionId: Id): DxfSectionGeome
   const openings = section.openings.flatMap((o) => (shown(o.kind) ? [{ category: o.kind, polygons: o.polygons, cut: o.cut }] : []));
   const allShown = GRAPHICS_CATEGORIES.every(shown);
   const geo: DxfSectionGeometry = { cut, beyond, openings, ...(allShown ? { silhouette: section.silhouette } : {}) };
-  return { ...geo, lineWeights: sectionLineWeightsOf(p, geo) };
+  const lineWeights = sectionLineWeightsOf(p, geo);
+  const layerStyles = Object.fromEntries(
+    dxfSectionLayersOf(geo).map((layer): [string, DxfLayerStyle] => [layer, p.dxfLayers?.[layer] ?? dxfSectionLayerStyleOf(layer, lineWeights[layer] ?? DXF_LINE_WEIGHT_DEFAULT)]),
+  );
+  return { ...geo, lineWeights, layerStyles };
 }
 
 /** Texto DXF do corte/elevação, com as camadas e as larguras de linha da vista. */

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { buildTemplate, createEmptyProject, type Project } from '@hestia/model';
-import { dxfLayerOfMaterial, exportDxf, type DxfLevelGeometry, type DxfPoint } from './dxf.ts';
+import { dxfLayerOfMaterial, dxfLayerStyleOf, exportDxf, type DxfLevelGeometry, type DxfPoint } from './dxf.ts';
 import { dxfProblems2000 } from './dxfCheck.ts';
 import { dxfEscapeText } from './dxfNotes.ts';
-import { exportSectionDxf, type DxfSectionGeometry } from './dxfSection.ts';
+import { dxfSectionLayerStyleOf, exportSectionDxf, type DxfSectionGeometry } from './dxfSection.ts';
 
 /**
  * Compatibilidade com o AutoCAD. O Hestia exporta R2000 (AC1015): o R12 (AC1009) não guarda a espessura de linha por camada
@@ -109,6 +109,38 @@ describe('planta e corte em R2000 (AC1015)', () => {
       expect(text).toContain('9\r\n$INSUNITS\r\n70\r\n6\r\n');
       expect(text).toContain('9\r\n$LWDISPLAY\r\n290\r\n1\r\n');
     }
+  });
+});
+
+describe('tabela de camadas do DXF (cor, tipo de linha e espessura)', () => {
+  const layerOf = (name: string): { color?: string; lineType?: string; weight?: string } => {
+    const r = records(exportDxf(project, 'lv_0', planGeo)).find((x) => x.type === 'LAYER' && x.pairs.some(([c, v]) => c === 2 && v === name));
+    return { color: r?.pairs.find(([c]) => c === 62)?.[1], lineType: r?.pairs.find(([c]) => c === 6)?.[1], weight: r?.pairs.find(([c]) => c === 370)?.[1] };
+  };
+
+  it('a cor padrão vem da categoria e a espessura de lineWeights', () => {
+    expect(dxfLayerStyleOf(dxfLayerOfMaterial(mat.name), 70)).toEqual({ color: 1, lineWeight: 70, linetype: 'CONTINUOUS' });
+    expect(dxfLayerStyleOf('ABERTURA_ACIMA', 18)).toEqual({ color: 2, lineWeight: 18, linetype: 'DASHED' });
+    expect(dxfLayerStyleOf('IMPORTADO')).toEqual({ color: 8, lineWeight: -3, linetype: 'CONTINUOUS' });
+    expect(dxfLayerStyleOf('0')).toEqual({ color: 7, lineWeight: -3, linetype: 'CONTINUOUS' });
+  });
+
+  it('a camada do material sai vermelha (parede) e as de vão amarelas', () => {
+    expect(layerOf(dxfLayerOfMaterial(mat.name))).toEqual({ color: '1', lineType: 'CONTINUOUS', weight: '-3' });
+    expect(layerOf('ABERTURAS')).toEqual({ color: '2', lineType: 'CONTINUOUS', weight: '-3' });
+  });
+
+  it('layerStyles sobrepõe cor, tipo de linha e espessura da tabela', () => {
+    const layer = dxfLayerOfMaterial(mat.name);
+    const text = exportDxf(project, 'lv_0', { ...planGeo, layerStyles: { [layer]: { color: 5, lineWeight: 100, linetype: 'DASHED' } } });
+    const r = records(text).find((x) => x.type === 'LAYER' && x.pairs.some(([c, v]) => c === 2 && v === layer));
+    expect([r?.pairs.find(([c]) => c === 62)?.[1], r?.pairs.find(([c]) => c === 6)?.[1], r?.pairs.find(([c]) => c === 370)?.[1]]).toEqual(['5', 'DASHED', '100']);
+  });
+
+  it('no corte, o que está além do plano fica cinza e o corte na cor da categoria', () => {
+    expect(dxfSectionLayerStyleOf('CORTE_PAREDE')).toEqual({ color: 1, lineWeight: -3, linetype: 'CONTINUOUS' });
+    expect(dxfSectionLayerStyleOf('CORTE_PAREDE_PROJECAO')).toEqual({ color: 8, lineWeight: -3, linetype: 'CONTINUOUS' });
+    expect(dxfSectionLayerStyleOf('CORTE_NIVEIS')).toEqual({ color: 7, lineWeight: -3, linetype: 'CONTINUOUS' });
   });
 });
 

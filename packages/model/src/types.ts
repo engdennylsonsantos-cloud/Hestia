@@ -11,6 +11,7 @@ import type { ProfilePreset } from './openingComposition.ts';
 import type { DimensionSettings } from './dimensionSettings.ts';
 import type { UnitsSettings } from './units.ts';
 import type { AreaPlan, ColorScheme, RoomCategory } from './areaPlan.ts';
+import type { DxfLayerStyle } from './dxfLayerStyle.ts';
 
 export type Id = string;
 export const SCHEMA_VERSION = 21;
@@ -739,6 +740,11 @@ export interface Project {
   roomCategories?: RoomCategory[];
   /** Esquemas de cores das plantas de área; ausente = nenhum. */
   colorSchemes?: ColorScheme[];
+  /**
+   * Estilo das camadas do DXF por nome de camada (cor ACI, espessura e tipo de linha), editado no diálogo de exportação.
+   * Ausente = o padrão montado pelo escritor (categoria gráfica e escala). Ver `dxfLayerStyle.ts`.
+   */
+  dxfLayers?: Record<string, DxfLayerStyle>;
 }
 
 export const isRoof = (e: Element | undefined): e is Roof => e?.kind === 'roof';

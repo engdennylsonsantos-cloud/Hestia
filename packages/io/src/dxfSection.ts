@@ -1,5 +1,6 @@
-import type { GraphicsCategory, Id, Project } from '@hestia/model';
+import type { DxfLayerStyle, GraphicsCategory, Id, Project } from '@hestia/model';
 import type { DxfPoint, DxfPolygons } from './dxf.ts';
+import { DXF_CATEGORY_COLORS, DXF_LINE_WEIGHT_DEFAULT } from './dxf.ts';
 import { writeDxf2000, type DxfDoc, type DxfDocEntity, type DxfDocLayer } from './dxfDoc.ts';
 
 /**
@@ -32,6 +33,8 @@ export interface DxfSectionGeometry {
    * `sectionLineWeightsOf` (apps/web), na escala da vista; sai no código 370 da tabela LAYER.
    */
   lineWeights?: Partial<Record<string, number>>;
+  /** Estilo por camada vindo da tabela editável do projeto; ausente = `dxfSectionLayerStyleOf`. */
+  layerStyles?: Record<string, DxfLayerStyle>;
 }
 
 const CATEGORY_LAYER: Record<GraphicsCategory, string> = {
@@ -106,17 +109,24 @@ export function dxfSectionLayersOf(geo: DxfSectionGeometry): string[] {
   return [...new Set(['0', ...shapesOf(geo).map((s) => s.layer)])].sort();
 }
 
+/** Estilo padrão de uma camada do corte: cor da categoria (cinza na projeção), contínua e a espessura pedida. */
+export function dxfSectionLayerStyleOf(layer: string, lineWeight = DXF_LINE_WEIGHT_DEFAULT): DxfLayerStyle {
+  const role = dxfSectionLineRoleOf(layer);
+  if (role === undefined || role === 'annotation') return { color: 7, lineWeight, linetype: 'CONTINUOUS' };
+  return { color: role.view === 'projection' ? 8 : DXF_CATEGORY_COLORS[role.category], lineWeight, linetype: 'CONTINUOUS' };
+}
+
 /**
  * Documento R2000 (AC1015) do corte ou da elevação: unidades em metros, z para cima. As camadas seguem a categoria
  * (`CORTE_PAREDE`, `CORTE_PISO`, …, `_PROJECAO` para o que está além) e o contorno externo vai em `CORTE_CONTORNO`. Cada
- * camada leva a largura de linha de `geo.lineWeights` (código 370, o que o R12 não guardava); cor e tipo de linha seguem o
- * padrão do escritor até a tabela editável de camadas.
+ * camada leva a largura de linha de `geo.lineWeights` (código 370, o que o R12 não guardava) e o estilo de `layerStyles`,
+ * ou o padrão de `dxfSectionLayerStyleOf`.
  */
 export function sectionDxfDocOf(geo: DxfSectionGeometry): DxfDoc {
   const shapes = shapesOf(geo);
   const layers: DxfDocLayer[] = [...new Set(['0', ...shapes.map((s) => s.layer)])].sort().map((name) => {
-    const weight = geo.lineWeights?.[name];
-    return { name, color: 7, linetype: 'CONTINUOUS', ...(weight === undefined ? {} : { lineWeight: weight }) };
+    const style = geo.layerStyles?.[name] ?? dxfSectionLayerStyleOf(name, geo.lineWeights?.[name] ?? DXF_LINE_WEIGHT_DEFAULT);
+    return { name, color: style.color, linetype: style.linetype, lineWeight: style.lineWeight };
   });
   const entities: DxfDocEntity[] = shapes.map((s) => ({ kind: 'polyline', layer: s.layer, points: s.pts, closed: true }));
   const all = shapes.flatMap((s) => s.pts);

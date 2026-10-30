@@ -1,6 +1,7 @@
-import type { GraphicsCategory, Id, Project } from '@hestia/model';
+import { DXF_LINE_WEIGHTS, DXF_LINE_WEIGHT_DEFAULT, type DxfLayerStyle, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { DXF_LAYER_COTAS, DXF_LAYER_DETALHE, DXF_LAYER_ETIQUETAS, DXF_LAYER_TEXTOS, dxfTextEntity, type DxfNoteText, type DxfNotes } from './dxfNotes.ts';
 import { writeDxf2000, type DxfDoc, type DxfDocEntity, type DxfDocLayer, type DxfLineType } from './dxfDoc.ts';
+import { DXF_LAYER_GENERIC } from './dxfGeneric.ts';
 
 /** Ponto em metros: x para a direita, y para cima (planta). */
 export interface DxfPoint {
@@ -121,6 +122,11 @@ export interface DxfLevelGeometry {
    * o valor no código 370 da tabela LAYER (o R12 antigo não tinha esse código: o AutoCAD recusava o desenho com ele).
    */
   lineWeights?: Partial<Record<string, number>>;
+  /**
+   * Estilo por camada (cor ACI, tipo de linha e espessura) vindo da tabela editável do projeto. Ausente = o padrão de
+   * `dxfLayerStyleOf`, o que mantém os chamadores antigos e os testes.
+   */
+  layerStyles?: Record<string, DxfLayerStyle>;
   /** Cotas e textos de anotação do nível (decisão 0019): ver `notesDxfOf`. Ausente = nenhum. */
   notes?: DxfNotes;
   /** Marcas de corte/elevação em planta (linhas, setas e rótulos), ver `sectionMarksDxfOf`. Ausente = nenhuma. */
@@ -284,16 +290,39 @@ const LAYER_STYLE: Record<string, LayerStyle> = {
 };
 const styleOf = (layer: string): LayerStyle => LAYER_STYLE[layer] ?? { linetype: 'CONTINUOUS', color: 7 };
 
-/** Larguras de linha válidas do DXF (código 370, em centésimos de mm). */
-export const DXF_LINE_WEIGHTS: readonly number[] = [0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200, 211];
-/** Largura padrão do DXF (-3): a camada sem entrada em `lineWeights` sai com ela e não passa pelo arredondamento. */
-export const DXF_LINE_WEIGHT_DEFAULT = -3;
+/** Larguras de linha válidas do DXF (código 370, em centésimos de mm), da tabela do modelo. */
+export { DXF_LINE_WEIGHTS, DXF_LINE_WEIGHT_DEFAULT };
 
 /** Arredonda uma largura em centésimos de mm ao valor DXF válido mais próximo (empate: o maior; fora de 0 a 211, o limite). */
 export function dxfLineWeight(centi: number): number {
   let best = DXF_LINE_WEIGHTS[0]!;
   for (const w of DXF_LINE_WEIGHTS) if (Math.abs(w - centi) <= Math.abs(best - centi)) best = w;
   return best;
+}
+
+/**
+ * Cor ACI padrão de cada categoria na tabela de camadas do DXF: as camadas de uma mesma categoria compartilham a cor (os
+ * materiais seguem em camadas próprias). `annotation` fica em 7 (branco/preto) e o importado em 8 (cinza).
+ */
+export const DXF_CATEGORY_COLORS: Record<GraphicsCategory, number> = {
+  wall: 1,
+  door: 2,
+  window: 2,
+  floor: 5,
+  slab: 4,
+  roof: 3,
+  stair: 6,
+  room: 7,
+  annotation: 7,
+  generic: 8,
+};
+
+/** Estilo padrão de uma camada da planta: cor da categoria, tipo de linha do papel dela e a espessura pedida. */
+export function dxfLayerStyleOf(layer: string, lineWeight = DXF_LINE_WEIGHT_DEFAULT): DxfLayerStyle {
+  const style = styleOf(layer);
+  const role = dxfLineRoleOf(layer);
+  const color = role === undefined || role === 'annotation' ? style.color : DXF_CATEGORY_COLORS[role.category];
+  return { color, lineWeight, linetype: style.linetype };
 }
 
 /**
@@ -342,6 +371,8 @@ const FIXED_LINE_ROLE = new Map<string, DxfLineRole>([
   // A marca é desenho, não texto: usa o peso de corte da categoria 'anotação' (as camadas de texto ficam em 0).
   [DXF_LAYER_CORTES, cut('annotation')],
   [DXF_LAYER_ELEVACOES, cut('annotation')],
+  // Objetos importados: cinza, sem peso próprio (a espessura fica a padrão).
+  [DXF_LAYER_GENERIC, cut('generic')],
 ]);
 
 /** Papel de uma camada pelo nome. `undefined` = sem categoria (sai com -3). `PAREDE_<material>` é corte de parede. */
@@ -462,9 +493,8 @@ export function dxfDocOf(project: Project, levelId: Id, geo: DxfLevelGeometry): 
   const lines = linesOf(geo);
   const texts = textsOf(geo);
   const layers: DxfDocLayer[] = layerNamesOf(shapes, lines, texts).map((name) => {
-    const style = styleOf(name);
-    const weight = geo.lineWeights?.[name];
-    return { name, color: style.color, linetype: style.linetype, ...(weight === undefined ? {} : { lineWeight: weight }) };
+    const style = geo.layerStyles?.[name] ?? dxfLayerStyleOf(name, geo.lineWeights?.[name] ?? DXF_LINE_WEIGHT_DEFAULT);
+    return { name, color: style.color, linetype: style.linetype, lineWeight: style.lineWeight };
   });
   const entities: DxfDocEntity[] = [
     ...shapes.map((s): DxfDocEntity => ({ kind: 'polyline', layer: s.layer, points: s.pts, closed: s.closed !== false, ...(s.dashed === true ? { dashed: true } : {}) })),

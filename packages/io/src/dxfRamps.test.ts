@@ -72,9 +72,11 @@ describe('DXF: camadas da rampa', () => {
     expect(dxfLineRoleOf(DXF_LAYER_RAMP_TEXT)).toBe('annotation');
   });
 
-  it('RAMPA_ACIMA sai tracejada na tabela LAYER', () => {
+  it('RAMPA_ACIMA sai tracejada na tabela LAYER, na cor da escada (magenta)', () => {
     const out = exportDxf(p, 'lv_0', geo);
-    expect(out).toContain('\r\nRAMPA_ACIMA\r\n70\r\n0\r\n62\r\n7\r\n6\r\nDASHED\r\n');
+    const r = records(out).find((x) => x.type === 'LAYER' && x.pairs.some(([c, v]) => c === 2 && v === 'RAMPA_ACIMA'));
+    expect(r?.pairs.find(([c]) => c === 6)?.[1]).toBe('DASHED');
+    expect(r?.pairs.find(([c]) => c === 62)?.[1]).toBe('6');
   });
 
   it('os contornos, as linhas e o texto da inclinação saem no arquivo', () => {

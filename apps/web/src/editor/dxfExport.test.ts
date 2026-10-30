@@ -28,7 +28,26 @@ import {
   type ViewRange,
 } from '@hestia/model';
 import { climbWalk, openingPlanWorldPaths, planViewOf, risersInClimbOrder } from '@hestia/render';
-import { arrowOfPath, dxfGeometryOf, lineWeightsOf, planDxf, sectionDxf, sectionDxfGeometryOf, sectionLineWeightsOf, stairArrow } from './dxfExport.ts';
+import { arrowOfPath, dxfGeometryOf, dxfLayerTableOf, lineWeightsOf, planDxf, sectionDxf, sectionDxfGeometryOf, sectionLineWeightsOf, stairArrow } from './dxfExport.ts';
+
+/** Tabela de camadas do diálogo de exportação: a mesma lista que o arquivo leva, com o estilo efetivo. */
+describe('tabela de camadas do DXF (diálogo de exportação)', () => {
+  it('planta: uma linha por camada, com a cor da categoria e a espessura do lineWeights', () => {
+    const p = buildTemplate('house2');
+    const rows = dxfLayerTableOf(p, { kind: 'plan', levelId: 'lv_0' });
+    const byName = new Map(rows.map((r) => [r.name, r.style]));
+    expect(byName.get('PAREDE_CONTORNO')).toEqual({ color: 1, lineWeight: 50, linetype: 'CONTINUOUS' });
+    expect(byName.get('ABERTURA_ACIMA')).toEqual({ color: 2, lineWeight: 18, linetype: 'DASHED' });
+    expect(rows.map((r) => r.name)).toEqual(dxfLayersOf(p, dxfGeometryOf(p, 'lv_0')));
+  });
+
+  it('o que o projeto guarda em dxfLayers sobrepõe o padrão, na tabela e no arquivo', () => {
+    const p = structuredClone(buildTemplate('house2'));
+    p.dxfLayers = { PAREDE_CONTORNO: { color: 5, lineWeight: 100, linetype: 'DASHED' } };
+    expect(dxfLayerTableOf(p, { kind: 'plan', levelId: 'lv_0' }).find((r) => r.name === 'PAREDE_CONTORNO')?.style).toEqual({ color: 5, lineWeight: 100, linetype: 'DASHED' });
+    expect(planDxf(p, 'lv_0')).toContain('\r\nPAREDE_CONTORNO\r\n70\r\n0\r\n62\r\n5\r\n6\r\nDASHED\r\n');
+  });
+});
 
 /** Duas paredes em L no térreo, com uma porta na primeira. Passa pelo engine real, como no app. */
 function lPlan(): ProjectStore {

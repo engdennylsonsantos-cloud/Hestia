@@ -1,5 +1,5 @@
 import { boxOf, boxesOverlap, dist, dot, intersectSegments, len, sub, type Vec2 } from '@hestia/geom';
-import { areaPlanOf, dimensionGeometry, dimensionPoints, levelDimensions, levelGraphicsOf, levelTexts, planAnnotationsOf, wallsOnLevel, type DetailLine, type DetailRegion, type Dimension, type DimensionRef, type ElementTag, type Id, type Project, type TextNote } from '@hestia/model';
+import { areaPlanOf, resolveViewProfile, type RoomTag, dimensionGeometry, dimensionPoints, levelDimensions, levelGraphicsOf, levelTexts, planAnnotationsOf, wallsOnLevel, type DetailLine, type DetailRegion, type Dimension, type DimensionRef, type ElementTag, type Id, type Project, type TextNote } from '@hestia/model';
 
 /** Tolerância (m) para dizer que um ponto é a extremidade de uma parede. */
 const END_TOL = 1e-4;
@@ -75,7 +75,13 @@ export interface ViewAnnotations {
 export function viewAnnotationsOf(p: Project, levelId: Id, planId?: Id): ViewAnnotations {
   const plan = planId ? areaPlanOf(p, planId) : undefined;
   if (plan) {
-    const a = planAnnotationsOf(plan);
+    // O perfil da vista decide o que aparece: categoria oculta não é alvo de seleção (nem de alça).
+    const a = { ...planAnnotationsOf(plan) };
+    const ly = resolveViewProfile(plan).layers;
+    if (!ly.dimensions) a.dimensions = [];
+    if (!ly.texts) a.texts = [];
+    if (!ly.detail) { a.detailLines = []; a.detailRegions = []; }
+    if (!ly.tags) a.tags = [];
     const scale = Number.isFinite(plan.scale) && plan.scale > 0 ? plan.scale : levelGraphicsOf(p, levelId).scale;
     return { scale, ...a };
   }
@@ -259,3 +265,47 @@ export function textGripAt(p: Project, levelId: Id, sel: Id[], at: Vec2, mpp: nu
 
 /** Ponto médio de um segmento. */
 export const mid = (a: Vec2, b: Vec2): Vec2 => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+/** Meia-largura/altura (m) aproximada da etiqueta de ambiente na escala da vista (nome + linha de informação). */
+function roomTagHalf(scale: number): { hw: number; hh: number } {
+  return { hw: (12 * 2.5 * TEXT_CHAR_EM * scale) / 2000, hh: (2 * 3.2 * scale) / 2000 };
+}
+
+/** Etiquetas de ambiente (RoomTag) visíveis da planta de área. */
+const visibleRoomTags = (p: Project, planId: Id | undefined): { tags: RoomTag[]; scale: number } => {
+  const plan = planId ? areaPlanOf(p, planId) : undefined;
+  return plan ? { tags: plan.tags.filter((t) => t.visible), scale: plan.scale > 0 ? plan.scale : 50 } : { tags: [], scale: 50 };
+};
+
+/** Etiqueta de ambiente da planta de área sob o cursor (a caixa do texto mais 6 px). Planta de piso: sempre null. */
+export function roomTagAt(p: Project, at: Vec2, mpp: number, planId?: Id): Id | null {
+  const { tags, scale } = visibleRoomTags(p, planId);
+  const { hw, hh } = roomTagHalf(scale);
+  for (const t of [...tags].reverse()) {
+    if (Math.abs(at.x - t.at.x) <= hw + 6 * mpp && Math.abs(at.y - t.at.y) <= hh + 6 * mpp) return t.id;
+  }
+  return null;
+}
+
+/** Etiquetas de ambiente da planta de área dentro da janela (esq→dir contém; dir→esq cruza). */
+export function roomTagIdsInBox(p: Project, a: Vec2, b: Vec2, planId?: Id): Id[] {
+  const { tags, scale } = visibleRoomTags(p, planId);
+  const { hw, hh } = roomTagHalf(scale);
+  const box = boxOf([a, b]);
+  const crossing = b.x < a.x;
+  return tags.filter((t) => {
+    const bx = { minX: t.at.x - hw, maxX: t.at.x + hw, minY: t.at.y - hh, maxY: t.at.y + hh };
+    if (crossing) return bx.minX <= box.maxX && bx.maxX >= box.minX && bx.minY <= box.maxY && bx.maxY >= box.minY;
+    return bx.minX >= box.minX && bx.maxX <= box.maxX && bx.minY >= box.minY && bx.maxY <= box.maxY;
+  }).map((t) => t.id);
+}
+
+/** Retângulo (anel) da etiqueta, para o realce de hover/seleção. */
+export function roomTagRing(p: Project, id: Id, planId?: Id, at?: Vec2): Vec2[] | null {
+  const { tags, scale } = visibleRoomTags(p, planId);
+  const t = tags.find((x) => x.id === id);
+  if (!t) return null;
+  const c = at ?? t.at;
+  const { hw, hh } = roomTagHalf(scale);
+  return [{ x: c.x - hw, y: c.y - hh }, { x: c.x + hw, y: c.y - hh }, { x: c.x + hw, y: c.y + hh }, { x: c.x - hw, y: c.y + hh }];
+}

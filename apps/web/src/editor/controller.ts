@@ -6,6 +6,7 @@ import {
   ProjectStore,
   annotationIdsIn, projectGrids, areaPlanOf, areaPlansOfLevel, DEFAULT_AREA_GRAPHICS, isRoom,
   planAnnotationIds,
+  levelRoomSeparators,
   buildTemplate,
   createEmptyProject,
   migrateProject,
@@ -19,7 +20,7 @@ import {
   type SectionView,
   type TemplateId,
 } from '@hestia/model';
-import { annotationAt, DEFAULT_SNAP, createTool, execWithHostedLoss, isStairTool, type HostedApplyResult, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
+import { annotationAt, roomTagAt, DEFAULT_SNAP, createTool, execWithHostedLoss, isStairTool, type HostedApplyResult, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
 import { transfer } from './transfer.ts';
 import { desfazerOuRefazer } from './historyStatus.ts';
 import { keptFloorType } from './typeActions.ts'; import { keptSlabType } from './slabTypeActions.ts'; import { PerimeterMode } from './perimeterMode.ts';
@@ -36,19 +37,11 @@ import { deleteViewAction, renameViewAction, updateViewAction } from './sectionV
 import { entregarArquivo } from './entregarArquivo.ts';
 import { safeFilename } from './nomeArquivo.ts';
 import { FluxoEdicao } from './fluxoEdicao.ts';
+import { hiddenCreationWarning } from './profileWarning.ts';
 import { CacheGeometria } from './geometryCache.ts';
 import { abrirComCache, TETO_GEOMETRIA_BYTES, type PortasAbertura } from './geometriaAbertura.ts';
 import { aceitaCaractereNumerico } from './entradaNumerica.ts';
 
-
-/**
- * Ferramentas que continuam disponíveis na planta de área: a vista é de ANOTAÇÃO. Todo o resto (parede, porta,
- * piso, laje, forro, telhado, escada, ambiente, grades...) é do modelo e fica bloqueado nela.
- */
-export const AREA_PLAN_TOOLS: readonly ToolId[] = ['select', 'measure', 'dimension', 'text', 'tag', 'detailLine', 'filledRegion', 'roomsep'];
-
-/** A ferramenta pode rodar na planta de área? */
-export const areaPlanToolAllowed = (id: ToolId): boolean => AREA_PLAN_TOOLS.includes(id);
 
 /** Comandos de anotação que, na planta de área, moram em `plan.annotations` (não no nível). */
 const PLAN_ANNOTATION_TYPES = new Set<Command['type']>([
@@ -70,7 +63,7 @@ function labelHit(p: Project, levelId: Id, scale: number, planId: Id | null, at:
     const room = p.elements[r.roomId];
     if (!isRoom(room) || !r.polygon) continue;
     const tag = plan?.tags.find((t) => t.roomId === room.id);
-    const labelAt = room.labelPosition ?? tag?.at ?? referenceAt(room, r);
+    const labelAt = tag?.at ?? room.labelPosition ?? referenceAt(room, r);
     const draft: RoomTag = tag ?? {
       id: `auto:${room.id}`,
       planId: plan?.id ?? '',
@@ -136,7 +129,7 @@ export class Editor {
     selection: () => useUi.getState().selection,
     setSelection: (ids) => useUi.setState({ selection: ids }),
     exec: (c) => this.exec(c),
-    transaction: (l, fn, session) => this.store.transaction(l, fn, session),
+    transaction: (l, fn, session) => this.avisandoOculto(() => this.store.transaction(l, fn, session)),
     metersPerPixel: () => 1 / (this.viewport()?.zoom ?? 60),
     gridStep: () => effectiveGridStep(this.viewport()?.zoom ?? 60, useUi.getState().gridStep),
     say: (m) => useUi.setState({ status: m }), lang: () => useI18n.getState().lang, confirmHostedLoss: (losses, message) => pedirConfirmacaoHostedLoss(losses, message),
@@ -159,6 +152,20 @@ export class Editor {
    * antigos e para o modo de compatibilidade sem o contrato novo.
    */
   private exec(c: Command): void {
+    this.avisandoOculto(() => this.exec1(c));
+  }
+
+  /** Política R1: criar na planta de área algo que o perfil oculta não bloqueia a ferramenta, mas avisa na barra de status. */
+  private avisandoOculto(run: () => void): void {
+    const planId = this.areaPlanIdNow();
+    if (!planId) { run(); return; }
+    const antes = this.store.project;
+    run();
+    const aviso = hiddenCreationWarning(antes, this.store.project, planId);
+    if (aviso) useUi.setState({ status: aviso });
+  }
+
+  private exec1(c: Command): void {
     const planId = this.areaPlanIdNow();
     if (planId && isPlanAnnotation(c) && (!('planId' in c) || c.planId === undefined)) {
       this.store.exec({ ...c, planId } as AnnotationCommand);
@@ -257,12 +264,6 @@ export class Editor {
 
   // Perímetro: Telhado, Piso, Laje e Forro abrem o modo; com o modo aberto, trocar de ferramenta não conclui (a barra pede Concluir ou Cancelar).
   setTool(id: ToolId): void {
-    const st = useUi.getState();
-    // A planta de área é de anotação: ferramentas de modelo não entram nela (nem por atalho, nem ao voltar de um corte).
-    if (st.planKind === 'area' && st.view !== '3d' && !areaPlanToolAllowed(id)) {
-      useUi.setState({ status: 'Na planta de área ficam disponíveis só as ferramentas de anotação (medir, cota, texto, etiqueta e detalhe).' });
-      return;
-    }
     if (this.perimetro.intercepta(id)) return;
     // Ferramentas de desenho são da planta: escolher uma delas na vista de corte volta à planta.
     if (useUi.getState().view === 'section') useUi.setState({ view: 'plan', sectionId: null });
@@ -290,7 +291,9 @@ export class Editor {
       if (kind === 'down') {
         // A anotação da vista fica por cima do rótulo do ambiente: com uma cota/texto sob o cursor, o clique é dela.
         const anotacao = annotationAt(this.project, ui.levelId, info.raw, this.env.metersPerPixel(), planId ?? undefined);
-        const hit = anotacao ? null : labelHit(this.project, ui.levelId, scale, planId, info.raw);
+        // Etiqueta de ambiente (RoomTag) da vista: é selecionável e arrastável pelo `selectTool` (grava em RoomTag.at).
+        const etiqueta = ui.planKind === 'area' && planId ? roomTagAt(this.project, info.raw, this.env.metersPerPixel(), planId) : null;
+        const hit = anotacao || etiqueta ? null : labelHit(this.project, ui.levelId, scale, planId, info.raw);
         if (hit) {
           this.tagDrag = { planId, roomId: hit.roomId, offset: { x: hit.at.x - info.raw.x, y: hit.at.y - info.raw.y }, at: hit.at, moved: false };
           useUi.setState({ status: 'Arraste o rótulo e solte para posicionar. A chamada liga ao sair do ambiente.' });
@@ -465,7 +468,8 @@ export class Editor {
     const plan = st.view === 'plan' && st.planKind === 'area' && st.areaPlanId ? areaPlanOf(p, st.areaPlanId) : undefined;
     const notes = new Set([...annotationIdsIn(p, st.levelId, sel), ...(plan ? planAnnotationIds(plan).filter((id) => sel.includes(id)) : [])]);
     const views = new Set(p.views.map((v) => v.id));
-    const keep = sel.filter((id) => p.elements[id] || notes.has(id) || views.has(id) || projectGrids(p).some((g) => g.id === id));
+    const seps = new Set(levelRoomSeparators(p, st.levelId).map((r) => r.id));
+    const keep = sel.filter((id) => p.elements[id] || notes.has(id) || views.has(id) || seps.has(id) || projectGrids(p).some((g) => g.id === id));
     if (keep.length !== sel.length) useUi.setState({ selection: keep });
     const lv = useUi.getState().levelId;
     if (!p.levels.some((l) => l.id === lv)) useUi.setState({ levelId: p.levels[0]?.id ?? 'lv_0' });

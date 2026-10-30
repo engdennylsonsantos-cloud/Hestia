@@ -61,10 +61,10 @@ describe('ferramentas de anotação na planta de área', () => {
     expect(editor.project.levels[0]!.dimensions ?? []).toHaveLength(0);
   });
 
-  it('ferramenta de modelo não entra na planta de área (nem por atalho)', () => {
+  it('ferramenta de modelo também entra na planta de área', () => {
     iniciar('select');
     editor.setTool('wall');
-    expect(useUi.getState().tool).toBe('select');
+    expect(useUi.getState().tool).toBe('wall');
     editor.setTool('text');
     expect(useUi.getState().tool).toBe('text');
   });

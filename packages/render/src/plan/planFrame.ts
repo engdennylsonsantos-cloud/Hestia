@@ -1,4 +1,4 @@
-import { unitsOf, type Id, type Project, type ResolvedUnits } from '@hestia/model';
+import { resolveViewProfile, unitsOf, type Id, type Project, type ResolvedUnits } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
 import type { ResolvedLevel, ResolvedRoof } from '@hestia/engine';
 import type { Inference, PreviewItem } from '@hestia/tools';
@@ -7,8 +7,7 @@ import type { Viewport } from '../viewport.ts';
 import { effectiveGridStep, gridCovers, gridLayer, type GridLayer } from './grid.ts';
 import type { PlanSlot, PlanScene } from './gpuPlan.ts';
 import { buildPlanGeometry, buildPlanHoverOverlay, buildPlanLiveOverlay, buildPlanScreenOverlay, planBelowOf, planGeometrySelection } from './build.ts';
-import { areaPlanHighlightOps, labelGhostOps } from './areaPlan.ts';
-import { annotationHighlightOps, drawnAnnotations } from './notes.ts';
+import { areaPlanHighlightOps } from './areaPlan.ts';
 import { telhadosDoNivel } from './resolucao.ts';
 import { assinaturaDeZoom } from './limiares.ts';
 import { resolverRotulos, resolverZoom } from './zoomOps.ts';
@@ -78,13 +77,11 @@ export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
   // O nível de baixo continua resolvido apenas quando a geometria é refeita (ver `planBelowOf`).
   const base = { project: p, levelId, viewport: v, theme, dark, showGrid: s.showGrid, thinLines: s.thinLines, showRoofProjection: s.showRoofProjection, roofPlanMode: rp, areaPlan: s.areaPlan, tagGhost: s.tagGhost };
   const area = s.areaPlan !== undefined;
-  const areaKey = area ? `${JSON.stringify(s.areaPlan)}|${s.tagGhost?.roomId ?? ''}` : '';
-  // Planta de área: o destaque de seleção/hover das anotações (textos e cotas) entra nas camadas de sobreposição, com a
-  // seleção do quadro. As anotações são resolvidas uma vez por atualização, como o resto do estado da vista.
-  const escalaAnotacoes = s.areaPlan && s.areaPlan.scale > 0 ? s.areaPlan.scale : 50;
-  const anotacoes = area ? drawnAnnotations(p, levelId, s.areaPlan) : null;
-  const destaqueAnotacoes = (selection: readonly Id[], hover: Id | null): PlanOps =>
-    anotacoes ? annotationHighlightOps(p, levelId, escalaAnotacoes, { select: theme.select, paper: theme.bg, hoverColor: theme.selectHover }, { selection, hover }, anotacoes) : EMPTY;
+  // O perfil resolvido entra na chave: mudar a visibilidade de uma camada invalida geometria, seleção, hover e camada viva.
+  const areaKey = area ? `${JSON.stringify(s.areaPlan)}|${JSON.stringify(resolveViewProfile(s.areaPlan).layers)}|${s.tagGhost?.roomId ?? ''}` : '';
+  // Planta de área: mesmo caminho da planta de piso (seleção, hover, alças, fantasmas, prévia, guias e captura), filtrado
+  // pelo perfil. Além do caminho comum ficam o destaque dos ambientes (aqui) e o das anotações da vista (em `planOverlay`).
+  const destaqueAmbientes = (hover: Id | null): PlanOps => (area ? areaPlanHighlightOps(p, s.areaPlan!, s.selection, hover, theme, s.areaPlan?.scale ?? 50) : EMPTY);
   // Uma resolução por atualização, mesmo com as camadas de sobreposição sendo refeitas na mesma passagem.
   let resolvida: ResolvedLevel | null = null;
   const resolvido = (): ResolvedLevel => (rp ? (resolvida ??= s.resolve(levelId)) : resolucaoVazia(levelId));
@@ -110,13 +107,9 @@ export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
       // Com o esboço de perímetro aberto, o resto do desenho fica em cinza bem claro e as linhas do esboço se destacam.
       return s.sketch ? dimPlanOps(g, theme.bg) : g;
     },
-    overlay: () => (area ? juntarOps(areaPlanHighlightOps(p, s.areaPlan!, s.selection, null, theme, s.areaPlan?.scale ?? 50), destaqueAnotacoes(s.selection, null)) : buildPlanScreenOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: null, preview: [], inference: null })),
-    hover: () => (area ? juntarOps(areaPlanHighlightOps(p, s.areaPlan!, s.selection, s.hover, theme, s.areaPlan?.scale ?? 50), destaqueAnotacoes(s.selection, s.hover)) : buildPlanHoverOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: s.hover, preview: [], inference: null })),
-    live: () => area
-      ? s.tagGhost
-        ? labelGhostOps(p, levelId, s.tagGhost, s.areaPlan?.scale ?? 50, s.areaPlan?.graphics.tagDefault.fields, s.dark)
-        : EMPTY
-      : comEsboco(buildPlanLiveOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: null, preview: s.preview, inference: s.inference }), s.sketch, theme, v, unitsOf(p)),
+    overlay: () => juntarOps(buildPlanScreenOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: null, preview: [], inference: null }), destaqueAmbientes(null)),
+    hover: () => juntarOps(buildPlanHoverOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: s.hover, preview: [], inference: null }), destaqueAmbientes(s.hover)),
+    live: () => comEsboco(buildPlanLiveOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: null, preview: s.preview, inference: s.inference }), s.sketch, theme, v, unitsOf(p)),
   };
 }
 

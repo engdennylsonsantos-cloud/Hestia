@@ -164,3 +164,15 @@
 .lbl-split-wrap { position: sticky; top: 0; z-index: 5; height: 0; }
 .lbl-split { position: absolute; top: 0; left: calc(var(--lbl, 46%) - 3px); width: 6px; cursor: col-resize; touch-action: none; }
 .lbl-split:hover { background: color-mix(in srgb, var(--accent) 40%, transparent); }
+/* ---- editor de layout da prancha: palco, vazio e barra ---- */
+.sheet-stage { user-select: none; background: #e6e9ee; background-image: radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.10) 1px, transparent 0); background-size: 12px 12px; }
+.sheet-stage svg { outline: none; }
+.sheet-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; pointer-events: none; }
+.sheet-empty > * { pointer-events: auto; }
+.sheet-empty p { margin: 0; font-size: 12px; color: #4a5360; }
+.vcb-zoom { min-width: 38px; text-align: center; font-variant-numeric: tabular-nums; opacity: 0.85; }
+.vcb-sheet-info { margin-left: auto; padding-left: 10px; white-space: nowrap; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; }
+.vcb-btn.danger { color: #b42318; }
+.vcb-btn.danger:hover:not(:disabled) { background: rgba(180, 35, 24, 0.10); border-color: rgba(180, 35, 24, 0.35); }
+.sheet-vcb { flex-wrap: wrap; height: auto; min-height: 26px; padding: 2px 8px; row-gap: 2px; }
+@media (max-width: 1100px) { .vcb-sheet-info { display: none; } }

@@ -1,4 +1,4 @@
-import { sheetDimsMm, sheetOf, type Id, type Project, type SheetViewport } from '@hestia/model';
+import { sheetDimsMm, sheetOf, viewportClipped, type Id, type Project, type SheetViewport } from '@hestia/model';
 import { furnitureParts } from './frame.ts';
 import { areaTablePartsOf, areaPlanPartsOf, planPartsOf, sectionPartsOf } from './viewports.ts';
 import { emptyParts, type SheetDrawList, type ViewportParts } from './types.ts';
@@ -41,7 +41,8 @@ export function buildSheetDrawList(p: Project, sheetId: Id): SheetDrawList | nul
   if (!s) return null;
   const d = sheetDimsMm(s);
   const groups: SheetDrawList['groups'] = s.viewports.map((v) => ({
-    clip: { x: v.at.x, y: v.at.y, w: v.size.w, h: v.size.h },
+    // `clip: false` deixa o desenho transbordar a caixa (detalhes); ausente = recorta, como no Revit.
+    clip: viewportClipped(v) ? { x: v.at.x, y: v.at.y, w: v.size.w, h: v.size.h } : null,
     ...partsOfViewport(p, v),
   }));
   groups.push({ clip: null, ...furnitureParts(p, s) });

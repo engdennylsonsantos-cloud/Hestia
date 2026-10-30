@@ -8,6 +8,7 @@ import type { DockLayout, DockPanel, DockSide } from '../../editor/dockLayout.ts
 import { editThinLines, thinLinesOn } from '../../editor/graphicsActions.ts';
 import { perimeterActions } from '../../editor/perimeter.ts';
 import { addSheetAction } from '../../editor/sheetActions.ts';
+import { sheetsPerLevelAction } from '../../editor/sheetInsert.ts';
 import { setSnap, toggleRoofProjection, useUi, type DialogKind, type UiState } from '../../editor/state.ts';
 import { activateView } from '../../editor/viewTabActions.ts';
 import { applyDrop } from '../dockDrag.ts';
@@ -261,6 +262,40 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
       try {
         activateView({ kind: 'sheet', sheetId: addSheetAction(editor.store) });
         useUi.setState({ status: 'Prancha criada.' });
+      } catch (e) {
+        useUi.setState({ status: e instanceof Error ? e.message : 'Operação recusada.' });
+      }
+    },
+  },
+  addViewSheet: {
+    label: t('Adicionar vista', 'Add View'),
+    icon: 'plan',
+    hint: t('Adiciona plantas, cortes ou o 3D à prancha aberta.', 'Adds plans, sections or the 3D to the open sheet.'),
+    run: () => {
+      const s = useUi.getState();
+      if (s.view !== 'sheet' || !s.sheetId) {
+        useUi.setState({ status: 'Abra uma prancha para adicionar vistas.' });
+        return;
+      }
+      useUi.setState({ dialog: 'addView', dialogArg: s.sheetId });
+    },
+  },
+  publishSheets: {
+    label: t('Publicar pranchas', 'Publish Sheets'),
+    icon: 'sheet',
+    hint: t('Escolhe as pranchas, a ordem e um PDF por prancha.', 'Pick sheets, order and one PDF per sheet.'),
+    run: () => useUi.setState({ dialog: 'publish', dialogArg: null }),
+  },
+  sheetsPerLevel: {
+    label: t('Prancha por nível', 'Sheet per Level'),
+    icon: 'sheet',
+    hint: t('Cria uma prancha A3 com a planta de cada nível do projeto.', 'Creates an A3 sheet with each level plan.'),
+    run: () => {
+      try {
+        const ids = sheetsPerLevelAction(editor.store);
+        const first = ids[0];
+        if (first) activateView({ kind: 'sheet', sheetId: first });
+        useUi.setState({ status: ids.length === 1 ? 'Prancha do nível criada.' : `${ids.length} pranchas criadas, uma por nível.` });
       } catch (e) {
         useUi.setState({ status: e instanceof Error ? e.message : 'Operação recusada.' });
       }

@@ -1,4 +1,4 @@
-import { dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, levelDimensions, levelRoomSeparators, levelTexts, planAnnotationsOf, unitsOf, type AreaPlan, type AreaPlanAnnotations, type Id, type Project, type TextNote } from '@hestia/model';
+import { dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, levelDimensions, levelRoomSeparators, levelTexts, planAnnotationsOf, planOwnsAnnotations, resolveViewProfile, unitsOf, type AreaPlan, type AreaPlanAnnotations, type Id, type Project, type TextNote } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
 import type { Viewport } from '../viewport.ts';
 import { quadradoEm } from './marcadores.ts';
@@ -6,7 +6,7 @@ import { elementTagOps, noteLabel } from './tags.ts';
 import { dimensionLabelOps } from './dimLabels.ts';
 import { espessuraDeCorte, espessuraDeProjecao, type PlanPaint } from './style.ts';
 import { espessuraVezes } from './espessura.ts';
-import { areaPlanProfile, type Espessura, type FillOp, type LabelOp, type StrokeOp } from './types.ts';
+import { type Espessura, type FillOp, type LabelOp, type StrokeOp } from './types.ts';
 
 /** Cores e seleção para desenhar as anotações. */
 export interface NoteLook {
@@ -121,9 +121,9 @@ export function blocoEm(at: Vec2, w: number, h: number, rotation: number, folga 
  * da vista filtra o que aparece (a mesma regra de `build.ts`), para o destaque não cercar anotação oculta.
  */
 export function drawnAnnotations(p: Project, levelId: Id, plan?: AreaPlan): AreaPlanAnnotations {
-  const all: AreaPlanAnnotations = plan?.annotations ? planAnnotationsOf(plan) : annotationsOfLevel(p, levelId);
+  const all: AreaPlanAnnotations = plan && planOwnsAnnotations(plan) ? planAnnotationsOf(plan) : annotationsOfLevel(p, levelId);
   if (!plan) return all;
-  const prof = areaPlanProfile(plan);
+  const prof = resolveViewProfile(plan).layers;
   return {
     dimensions: prof.dimensions ? all.dimensions : [],
     texts: prof.texts ? all.texts : [],

@@ -60,7 +60,7 @@ import {
 } from './graphicsCommands.ts';
 
 import { applyAnnotationCommand, type AnnotationCommand } from './annotations.ts';
-import { applySheetCommand, type SheetCommand } from './sheetCommands.ts';
+import { applySheetCommand, dropOrphanViewports, type SheetCommand } from './sheetCommands.ts';
 import { applyGridCommand, type GridCommand } from './grid.ts';
 import { applyViewCommand } from './viewCommands.ts';
 import { applyCeilingCommand } from './ceilingCommands.ts';
@@ -386,6 +386,7 @@ export function applyCommand(p: Project, c: Command): void {
       if (Object.values(p.elements).some((e) => (hasLevel(e) && e.levelId === c.id) || (isStair(e) && e.topLevelId === c.id) || (isRamp(e) && e.topLevelId === c.id))) throw new Error('Nível em uso');
       p.levels = p.levels.filter((l) => l.id !== c.id);
       dropAreaPlansOfLevel(p, c.id);
+      dropOrphanViewports(p);
       break;
     }
     case 'addDimension':
@@ -408,6 +409,7 @@ export function applyCommand(p: Project, c: Command): void {
     case 'addViewport':
     case 'updateViewport':
     case 'removeViewport':
+    case 'setSheetOrder':
       applySheetCommand(p, c);
       break;
     case 'addGrid':

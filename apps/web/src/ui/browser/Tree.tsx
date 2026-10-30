@@ -101,15 +101,28 @@ export interface NodeProps {
   /** Clique simples (além de selecionar o nó). */
   onSelect?: () => void;
   menu?: MenuItem[];
+  /** Arrastar este nó (ex.: vista do navegador para a prancha). */
+  drag?: DragData;
   children?: ReactNode;
   /** Conteúdo extra logo depois da linha (painéis inline do tipo). */
   after?: ReactNode;
 }
 
+/** Dados de um nó arrastável: MIME próprio, conteúdo JSON e os avisos de início/fim do arraste. */
+export interface DragData {
+  type: string;
+  value: string;
+  /** Texto do arraste (fantasma e `text/plain`). */
+  label?: string;
+  onStart?: () => void;
+  onEnd?: () => void;
+}
+
 /** Um nó da árvore. Grupos abrem e fecham pela caixa, pela seta do teclado ou por duplo clique. */
-export function Node({ id, label, icon, group = false, open: initial = false, bold = false, title, empty, onOpen, onSelect, menu, children, after }: NodeProps): ReactElement {
+export function Node({ id, label, icon, group = false, open: initial = false, bold = false, title, empty, onOpen, onSelect, menu, drag, children, after }: NodeProps): ReactElement {
   const t = useContext(TreeCtx);
   const [open, setOpenState] = useState(() => openState.get(id) ?? initial);
+  const [dragging, setDragging] = useState(false);
   const setOpen = (v: boolean): void => {
     openState.set(id, v);
     setOpenState(v);
@@ -131,10 +144,24 @@ export function Node({ id, label, icon, group = false, open: initial = false, bo
       <div
         role="treeitem"
         tabIndex={0}
+        data-node={id}
         aria-selected={selected}
         aria-expanded={has ? open : undefined}
-        className={`bnode${selected ? ' sel' : ''}${bold ? ' bold' : ''}`}
+        className={`bnode${selected ? ' sel' : ''}${bold ? ' bold' : ''}${dragging ? ' dragging' : ''}`}
         title={title}
+        draggable={drag ? true : undefined}
+        onDragStart={(e) => {
+          if (!drag) return;
+          e.dataTransfer.setData(drag.type, drag.value);
+          e.dataTransfer.setData('text/plain', drag.label ?? '');
+          e.dataTransfer.effectAllowed = 'copy';
+          drag.onStart?.();
+          setDragging(true);
+        }}
+        onDragEnd={() => {
+          drag?.onEnd?.();
+          setDragging(false);
+        }}
         onClick={() => { t.set(id); onSelect?.(); }}
         onDoubleClick={() => { if (onOpen) onOpen(); else if (has) toggle(); }}
         onContextMenu={(e) => { t.set(id); t.menu(e, menu ?? []); }}

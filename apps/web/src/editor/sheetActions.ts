@@ -1,5 +1,6 @@
-import { newSheetId, newViewportId, areaPlanOf, projectSheets, sheetInnerBox, sheetIssue, sheetOf, viewportIssue, type Command, type Id, type Project, type ProjectStore, type Sheet, type SheetViewport, type SheetViewSource } from '@hestia/model';
-import { buildSheetDrawList, levelBox, STAMP_H, STAMP_W, type SheetDrawList } from '@hestia/render';
+import { newSheetId, newViewportId, areaPlanOf, projectSheets, sectionPoints, sheetDimsMm, sheetInnerBox, sheetIssue, sheetOf, viewportAnchor, viewportIssue, type Command, type Id, type Project, type ProjectStore, type Sheet, type SheetViewport, type SheetViewSource } from '@hestia/model';
+import { buildSheetDrawList, levelBox, sectionBox, STAMP_W, stampHeightOf, type SheetDrawList } from '@hestia/render';
+import { computeSection } from '@hestia/engine';
 import { exportSheetsPdf } from '@hestia/io';
 
 /**
@@ -54,14 +55,20 @@ export function defaultViewSize(s: Pick<Sheet, 'size' | 'orientation' | 'margin'
 type Rect = { x: number; y: number; w: number; h: number };
 const overlaps = (a: Rect, b: Rect): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
+/** Caixa do carimbo na folha (o carimbo cresce com as revisões da prancha). */
+const stampRect = (s: Pick<Sheet, 'size' | 'orientation' | 'margin' | 'revisions'>): Rect => {
+  const box = sheetInnerBox(s);
+  return { x: box.x1 - STAMP_W, y: box.y0, w: STAMP_W, h: stampHeightOf(s) };
+};
+
 /**
  * Lugar para uma vista nova: a primeira posição da grade (passo de 10 mm, de baixo para cima) em que a caixa cabe na
  * área de desenho sem tocar as vistas existentes nem o carimbo (canto inferior direito, por cima da folha). Sem lugar
  * livre, o canto inferior esquerdo.
  */
-export function freeSpot(s: Pick<Sheet, 'size' | 'orientation' | 'margin' | 'viewports'>, size: { w: number; h: number }): { x: number; y: number } {
+export function freeSpot(s: Pick<Sheet, 'size' | 'orientation' | 'margin' | 'viewports' | 'revisions'>, size: { w: number; h: number }): { x: number; y: number } {
   const box = sheetInnerBox(s);
-  const stamp: Rect = { x: box.x1 - STAMP_W, y: box.y0, w: STAMP_W, h: STAMP_H };
+  const stamp = stampRect(s);
   const taken = (r: Rect): boolean => overlaps(r, stamp) || s.viewports.some((v) => overlaps(r, { x: v.at.x, y: v.at.y, w: v.size.w, h: v.size.h }));
   for (let y = box.y0; y + size.h <= box.y1 + 1e-6; y += SPOT_STEP) {
     for (let x = box.x0; x + size.w <= box.x1 + 1e-6; x += SPOT_STEP) {
@@ -81,7 +88,7 @@ export function duplicateSheetCommand(p: Pick<Project, 'sheets'>, id: Id): Comma
     number: nextSheetNumber(p),
     name: `${src.name} (cópia)`,
     titleBlock: { ...src.titleBlock },
-    viewports: src.viewports.map((v) => ({ ...v, id: newViewportId(), at: { ...v.at }, size: { ...v.size } })),
+    viewports: src.viewports.map((v) => ({ ...v, id: newViewportId(), at: { ...v.at }, size: { ...v.size }, ...(v.anchor ? { anchor: { ...v.anchor } } : {}) })),
   };
   return { type: 'batch', commands: [{ type: 'addSheet', sheet: copy }] };
 }
@@ -126,12 +133,159 @@ export function moveViewportAction(store: ProjectStore, sheetId: Id, vpId: Id, a
   const s = sheetOf(store.project, sheetId);
   const vp = s?.viewports.find((v) => v.id === vpId);
   if (!s || !vp) return 'Vista inexistente';
+  if (vp.locked === true) return 'A vista está travada. Destrave-a para mover.';
   const next = clampedAt(s, vp.size, at);
+  const patch: Partial<Omit<SheetViewport, 'id'>> = { at: next };
+  // A âncora acompanha a vista: o desenho continua no mesmo ponto relativo à caixa.
+  if (vp.anchor) patch.anchor = { x: vp.anchor.x + (next.x - vp.at.x), y: vp.anchor.y + (next.y - vp.at.y) };
   try {
-    store.exec({ type: 'updateViewport', sheetId, id: vpId, patch: { at: next } }, 'Mover vista da prancha');
+    store.exec({ type: 'updateViewport', sheetId, id: vpId, patch }, 'Mover vista da prancha');
     return null;
   } catch (e) {
     return e instanceof Error ? e.message : 'Não foi possível mover a vista.';
+  }
+}
+
+/** Folga (m) que o `levelBox` já acrescenta em volta das paredes (0,5 m de cada lado). */
+const LEVEL_BOX_PAD_M = 1;
+
+/** Caixa do conteúdo de uma vista em metros (largura × altura), ou null quando não há modelo a enquadrar. */
+export function viewContentBoxM(p: Project, view: SheetViewSource): { w: number; h: number } | null {
+  if (view.kind === 'plan') {
+    const b = levelBox(p, view.levelId);
+    return b ? { w: Math.max(0.1, b.maxX - b.minX - LEVEL_BOX_PAD_M), h: Math.max(0.1, b.maxY - b.minY - LEVEL_BOX_PAD_M) } : null;
+  }
+  if (view.kind === 'areaPlan') {
+    const plan = areaPlanOf(p, view.planId);
+    const b = plan ? levelBox(p, plan.levelId) : null;
+    return b ? { w: Math.max(0.1, b.maxX - b.minX - LEVEL_BOX_PAD_M), h: Math.max(0.1, b.maxY - b.minY - LEVEL_BOX_PAD_M) } : null;
+  }
+  if (view.kind === 'section') {
+    const section = p.views.find((v) => v.id === view.sectionId);
+    if (!section) return null;
+    const pts = sectionPoints(p, section);
+    const box = sectionBox(computeSection(p, { a: pts.a, b: pts.b, depth: section.depth }));
+    return box ? { w: box.maxX - box.minX, h: box.maxY - box.minY } : null;
+  }
+  return null;
+}
+
+/** Tamanho de moldura (mm de papel) que enquadra o conteúdo na escala dada, com folga `padMm` de cada lado. */
+export function fitSizeMm(p: Project, view: SheetViewSource, scale: number, padMm = 8): { w: number; h: number } | null {
+  const c = viewContentBoxM(p, view);
+  if (!c) return null;
+  // 1:50 → 1 m do mundo vale 20 mm de papel.
+  const k = 1000 / scale;
+  return { w: Math.max(20, c.w * k + padMm * 2), h: Math.max(20, c.h * k + padMm * 2) };
+}
+
+/** Caixa centrada no centro atual com o tamanho novo, encaixada na área de desenho. */
+function centredBox(s: Sheet, vp: SheetViewport, size: { w: number; h: number }): { at: { x: number; y: number }; size: { w: number; h: number }; anchor: { x: number; y: number } } {
+  const box = sheetInnerBox(s);
+  const w = Math.min(size.w, box.x1 - box.x0);
+  const h = Math.min(size.h, box.y1 - box.y0);
+  const at = clampedAt(s, { w, h }, { x: vp.at.x + (vp.size.w - w) / 2, y: vp.at.y + (vp.size.h - h) / 2 });
+  return { at, size: { w, h }, anchor: { x: at.x + w / 2, y: at.y + h / 2 } };
+}
+
+/**
+ * Redimensiona a vista (Revit: arrastar a *Crop Region*): a caixa é encaixada na área de desenho e o desenho continua
+ * na mesma escala. Na primeira vez, grava a âncora no centro atual do conteúdo para a caixa crescer/encolher sem
+ * mover o desenho. Um passo de desfazer por gesto. Devolve a recusa, ou null.
+ */
+export function resizeViewportAction(store: ProjectStore, sheetId: Id, vpId: Id, rect: { x: number; y: number; w: number; h: number }): string | null {
+  const s = sheetOf(store.project, sheetId);
+  const vp = s?.viewports.find((v) => v.id === vpId);
+  if (!s || !vp) return 'Vista inexistente';
+  if (vp.locked === true) return 'A vista está travada. Destrave-a para redimensionar.';
+  const box = sheetInnerBox(s);
+  const w = Math.max(5, Math.min(rect.w, box.x1 - box.x0));
+  const h = Math.max(5, Math.min(rect.h, box.y1 - box.y0));
+  const at = clampedAt(s, { w, h }, { x: rect.x, y: rect.y });
+  try {
+    if (Math.abs(w - vp.size.w) < 1e-6 && Math.abs(h - vp.size.h) < 1e-6 && Math.abs(at.x - vp.at.x) < 1e-6 && Math.abs(at.y - vp.at.y) < 1e-6) return null;
+    const patch: Partial<Omit<SheetViewport, 'id'>> = { at, size: { w, h } };
+    // Sem âncora (arquivo antigo), fixa a posição atual do conteúdo: o primeiro redimensionamento já não pula.
+    if (!vp.anchor) patch.anchor = viewportAnchor(vp);
+    store.exec({ type: 'updateViewport', sheetId, id: vpId, patch }, 'Redimensionar vista da prancha');
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Não foi possível redimensionar a vista.';
+  }
+}
+
+/**
+ * Muda a escala da vista. Com `fitFrame` (padrão), a moldura cresce/encolhe junto para enquadrar o conteúdo — o
+ * comportamento esperado ao trocar 1:100 por 1:50 (ArchiCAD). Sem ele, a moldura fica e o desenho é recortado (Revit).
+ */
+export function setViewportScaleAction(store: ProjectStore, sheetId: Id, vpId: Id, scale: number, fitFrame = true): string | null {
+  const s = sheetOf(store.project, sheetId);
+  const vp = s?.viewports.find((v) => v.id === vpId);
+  if (!s || !vp) return 'Vista inexistente';
+  if (!(Number.isFinite(scale) && scale > 0)) return 'A escala deve ser maior que zero.';
+  if (vp.locked === true) return 'A vista está travada. Destrave-a para trocar a escala.';
+  const patch: Partial<Omit<SheetViewport, 'id'>> = { scale };
+  if (fitFrame) {
+    const size = fitSizeMm(store.project, vp.view, scale);
+    if (size) Object.assign(patch, centredBox(s, vp, size));
+  }
+  try {
+    store.exec({ type: 'updateViewport', sheetId, id: vpId, patch }, 'Alterar escala da vista');
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Não foi possível alterar a escala.';
+  }
+}
+
+/** Ajusta a moldura ao conteúdo na escala atual, mantendo o centro (Revit: *Size Crop* > Fit). */
+export function fitViewportAction(store: ProjectStore, sheetId: Id, vpId: Id, padMm = 8): string | null {
+  const s = sheetOf(store.project, sheetId);
+  const vp = s?.viewports.find((v) => v.id === vpId);
+  if (!s || !vp) return 'Vista inexistente';
+  const size = fitSizeMm(store.project, vp.view, vp.scale, padMm);
+  if (!size) return 'Esta vista não tem modelo para enquadrar.';
+  if (vp.locked === true) return 'A vista está travada. Destrave-a para ajustar a moldura.';
+  const next = centredBox(s, vp, size);
+  try {
+    store.exec({ type: 'updateViewport', sheetId, id: vpId, patch: { at: next.at, size: next.size, anchor: next.anchor } }, 'Ajustar moldura ao conteúdo');
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Não foi possível ajustar a moldura.';
+  }
+}
+
+/**
+ * Move o conteúdo dentro da moldura (pan da vista): desloca a âncora em mm de papel, sem tocar na caixa e sem o limite
+ * artificial do `offset` antigo (o desenho pode sair de vista e voltar).
+ */
+export function moveViewportContentAction(store: ProjectStore, sheetId: Id, vpId: Id, offset: { x: number; y: number }): string | null {
+  const s = sheetOf(store.project, sheetId);
+  const vp = s?.viewports.find((v) => v.id === vpId);
+  if (!s || !vp) return 'Vista inexistente';
+  if (vp.locked === true) return 'A vista está travada. Destrave-a para mover o conteúdo.';
+  if (!(Number.isFinite(offset.x) && Number.isFinite(offset.y))) return 'O deslocamento do conteúdo deve ser um ponto finito.';
+  const base = viewportAnchor(vp);
+  try {
+    store.exec(
+      { type: 'updateViewport', sheetId, id: vpId, patch: { anchor: { x: base.x + offset.x, y: base.y + offset.y }, offset: undefined } },
+      'Mover conteúdo da vista',
+    );
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Não foi possível mover o conteúdo da vista.';
+  }
+}
+
+/** Trava/destrava a vista (Revit: *Pin*): travada, ela não se move, não se redimensiona e não troca de escala. */
+export function toggleViewportLockAction(store: ProjectStore, sheetId: Id, vpId: Id): string | null {
+  const s = sheetOf(store.project, sheetId);
+  const vp = s?.viewports.find((v) => v.id === vpId);
+  if (!s || !vp) return 'Vista inexistente';
+  try {
+    store.exec({ type: 'updateViewport', sheetId, id: vpId, patch: { locked: vp.locked !== true } }, vp.locked === true ? 'Destravar vista' : 'Travar vista');
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Não foi possível travar a vista.';
   }
 }
 
@@ -166,3 +320,37 @@ export function pranchaDaPlantaAtual(store: ProjectStore, levelId: Id): Id {
   return id;
 }
 
+
+/**
+ * Muda folha (tamanho, orientação ou margem) reencaixando as vistas na nova área de desenho, em vez de recusar quando
+ * alguma ficaria fora. É um único passo de desfazer: primeiro as vistas encolhem/movem, depois a folha muda (o comando
+ * `updateSheet` valida a folha nova com as vistas já dentro). Devolve a recusa, ou null quando gravou.
+ */
+export function changeSheetAction(store: ProjectStore, sheetId: Id, patch: Partial<Pick<Sheet, 'size' | 'orientation' | 'margin'>>): string | null {
+  const s = sheetOf(store.project, sheetId);
+  if (!s) return 'Prancha inexistente';
+  const next: Sheet = { ...s, ...patch };
+  const dims = sheetDimsMm(next);
+  const m = next.margin;
+  const inner = { x0: m, y0: m, x1: dims.w - m, y1: dims.h - m };
+  const cmds: Command[] = [];
+  for (const v of s.viewports) {
+    const w = Math.max(5, Math.min(v.size.w, inner.x1 - inner.x0));
+    const h = Math.max(5, Math.min(v.size.h, inner.y1 - inner.y0));
+    const x = Math.min(Math.max(v.at.x, inner.x0), inner.x1 - w);
+    const y = Math.min(Math.max(v.at.y, inner.y0), inner.y1 - h);
+    const moved = Math.abs(x - v.at.x) > 1e-6 || Math.abs(y - v.at.y) > 1e-6;
+    const resized = Math.abs(w - v.size.w) > 1e-6 || Math.abs(h - v.size.h) > 1e-6;
+    if (!moved && !resized) continue;
+    const patch: Partial<Omit<SheetViewport, 'id'>> = { at: { x, y }, size: { w, h } };
+    // A âncora acompanha o deslocamento (o desenho continua relativo à caixa) e a caixa nova.
+    if (v.anchor) patch.anchor = { x: v.anchor.x + (x - v.at.x), y: v.anchor.y + (y - v.at.y) };
+    cmds.push({ type: 'updateViewport', sheetId, id: v.id, patch });
+  }
+  try {
+    store.exec({ type: 'batch', commands: [...cmds, { type: 'updateSheet', id: sheetId, patch }] }, 'Alterar folha da prancha');
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Não foi possível alterar a folha.';
+  }
+}

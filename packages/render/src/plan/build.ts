@@ -1,7 +1,7 @@
 /* eslint-disable max-lines */
 import { add, boxOf, mul, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
-import { openingTypeById, dimensionPoints, isGeneric, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, planAnnotationIds, planAnnotationsOf, projectGrids, wallsOnLevel, type AreaPlan, type AreaPlanAnnotations, type DetailLevel, type Id, type Material, type Project } from '@hestia/model';
+import { openingTypeById, dimensionPoints, isGeneric, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, planAnnotationIds, planAnnotationsOf, planOwnsAnnotations, projectGrids, resolveViewProfile, wallsOnLevel, type AreaPlan, type AreaPlanAnnotations, type DetailLevel, type Id, type Material, type Project } from '@hestia/model';
 import { resolveRooms } from '@hestia/engine';
 import { areaPlanLegendOps, areaPlanRoomOps, areaPlanTableOps, areaPlanTagOps } from './areaPlan.ts';
 import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel, rampasDoNivel, telhadosDoNivel } from './resolucao.ts';
@@ -31,7 +31,7 @@ import { Limiares, type VistaComLimiares } from './limiares.ts';
 import { tracoEm } from './marcadores.ts';
 import { resolverZoom } from './zoomOps.ts';
 import { planContext } from './planContext.ts';
-import { areaPlanProfile, type FillOp, type LabelOp, type PlanDrawList, type PlanOps, type PlanTheme, type StrokeOp } from './types.ts';
+import { type FillOp, type LabelOp, type PlanDrawList, type PlanOps, type PlanTheme, type StrokeOp } from './types.ts';
 
 import { buildPlanOverlay } from './planOverlay.ts';
 
@@ -436,7 +436,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
 }
 
 /**
- * Planta de área (F) pelo MESMO motor da planta de piso, com o perfil `areaPlanProfile`: pisos, aberturas, cotas,
+ * Planta de área (F) pelo MESMO motor da planta de piso, com o perfil `resolveViewProfile(plan).layers`: pisos, aberturas, cotas,
  * textos, detalhes, etiquetas, eixos e marcas de corte entram conforme os gráficos da vista. O padrão continua o de
  * sempre — paredes claras, diagonais de referência, etiquetas de ambiente, legenda e quadro, sem preenchimento quando não
  * há esquema de cores. As anotações são as da vista (`plan.annotations`) e, sem elas, as do nível.
@@ -444,7 +444,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
 function buildAreaPlanGeometry(input: PlanInput, plan: AreaPlan): PlanOps {
   const { project: p, theme } = input;
   const { style, geo, hidden } = planContext(input);
-  const profile = areaPlanProfile(plan);
+  const profile = resolveViewProfile(plan).layers;
   const scale = plan.scale > 0 ? plan.scale : style.scale;
   const fillBase = input.dark ? theme.bg : '#ffffff';
   const limiares = new Limiares();
@@ -537,7 +537,7 @@ function buildAreaPlanGeometry(input: PlanInput, plan: AreaPlan): PlanOps {
 
   // Anotações da vista: as próprias da planta de área ou, sem elas, as do nível (sem somar as duas). O perfil filtra o
   // que entra; as linhas de separação de ambiente não são anotação de vista e saem abaixo, no desenho de sempre.
-  const annotations: AreaPlanAnnotations = plan.annotations ? planAnnotationsOf(plan) : annotationsOfLevel(p, input.levelId);
+  const annotations: AreaPlanAnnotations = planOwnsAnnotations(plan) ? planAnnotationsOf(plan) : annotationsOfLevel(p, input.levelId);
   const visiveis: AreaPlanAnnotations = {
     dimensions: profile.dimensions ? annotations.dimensions : [],
     texts: profile.texts ? annotations.texts : [],

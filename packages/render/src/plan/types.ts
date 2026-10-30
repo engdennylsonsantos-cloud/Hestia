@@ -1,5 +1,5 @@
 import type { MultiPolygon, Vec2 } from '@hestia/geom';
-import type { AreaPlan, AreaPlanGraphics, HatchKind } from '@hestia/model';
+import type { HatchKind } from '@hestia/model';
 
 export interface FillOp {
   polygons: MultiPolygon;
@@ -137,7 +137,7 @@ export interface PlanOps {
 
 /**
  * Perfil de visibilidade da planta: o que a vista desenha. A planta de piso usa `FLOOR_PLAN_PROFILE`; a de área usa
- * `areaPlanProfile`, que traduz os gráficos da própria planta (paredes claras, sem pisos nem cotas por padrão) e
+ * `resolveViewProfile(plan).layers` (modelo), que traduz os gráficos da própria planta (paredes claras, sem pisos nem cotas por padrão) e
  * acrescenta as anotações da vista. É por ele que a planta de área reaproveita o mesmo motor da planta de piso.
  */
 export interface PlanProfile {
@@ -202,30 +202,6 @@ export const AREA_PLAN_PROFILE: PlanProfile = {
   underlay: false,
   roofProjection: false,
 };
-
-/**
- * Perfil de desenho de uma planta de área, a partir dos gráficos dela. As anotações próprias da vista (guardadas em
- * `annotations`) aparecem mesmo com as opções de cota/anotação desligadas: elas foram criadas nesta vista e não são as
- * do nível. Sem anotações próprias, valem as opções dos gráficos (que filtram o fallback para as do nível).
- */
-export function areaPlanProfile(plan: Pick<AreaPlan, 'graphics' | 'annotations'>): PlanProfile {
-  const g: AreaPlanGraphics = plan.graphics;
-  return {
-    walls: g.showWalls,
-    openings: g.showOpenings,
-    floors: g.showFloors,
-    dimensions: g.showDimensions,
-    texts: g.showAnnotations,
-    detail: g.showAnnotations,
-    tags: g.showAnnotations,
-    grids: g.showGrids === true,
-    sectionMarks: g.showSectionMarks === true,
-    rooms: true,
-    referenceLines: g.referenceLines !== 'never',
-    underlay: g.showBelowLevel,
-    roofProjection: false,
-  };
-}
 
 export interface PlanTheme {
   bg: string;

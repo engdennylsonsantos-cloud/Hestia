@@ -4,6 +4,7 @@ import { exportDxf, exportIfc, exportPdf, nextTheme } from '../editor/fileAction
 import { useI18n } from '../editor/i18n.ts';
 import { importIfcFile, resumoImportacao, type ResumoImportacao } from '../editor/ifcImport.ts';
 import { useUi } from '../editor/state.ts';
+import { openPublish } from './dialogs/PublishDialog.tsx';
 
 type Section = 'export' | 'info' | 'options';
 
@@ -107,6 +108,7 @@ export function FileMenu(): ReactElement | null {
               <div className="fm-cards">
                 {card('DXF', pt ? 'Planta ou corte ativo para o CAD.' : 'Active plan or section to CAD.', exportDxf)}
                 {card('PDF', pt ? 'Todas as pranchas em um arquivo (cria uma prancha da planta atual se não houver).' : 'All sheets in one file.', exportPdf)}
+                {card(pt ? 'Publicar…' : 'Publish…', pt ? 'Escolhe pranchas, ordem e um arquivo por prancha.' : 'Pick sheets, order and one file per sheet.', async () => openPublish())}
                 {card('IFC', pt ? 'Modelo completo para outros programas BIM.' : 'Full model for other BIM software.', exportIfc)}
               </div>
             </>

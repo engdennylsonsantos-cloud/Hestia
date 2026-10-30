@@ -37,7 +37,25 @@ export interface TitleBlock {
 /** O que a vista mostra: planta de um nível, planta de área, corte/elevação de uma seção do projeto ou o 3D (só quadro no PDF). */
 export type SheetViewSource = { kind: 'plan'; levelId: Id } | { kind: 'areaPlan'; planId: Id } | { kind: 'areaTable' } | { kind: 'section'; sectionId: Id } | { kind: '3d' };
 
-/** Vista colocada numa prancha. `at` é o canto inferior esquerdo e `size` a caixa, ambos em mm de papel. */
+/**
+ * Legenda da vista na prancha (Revit: *View Title*, ArchiCAD: *Drawing Title*). Ausente = legenda padrão abaixo da
+ * caixa, com o nome e a escala.
+ */
+export interface SheetViewportLabel {
+  /** `false` esconde a legenda (a moldura continua). Ausente = mostra. */
+  show?: boolean;
+  /** Altura do texto em mm de papel. Ausente = 2,5 mm. */
+  sizeMm?: number;
+  /** Barra de escala gráfica ao lado do texto (arquiCAD/Revit). Ausente = não. */
+  scaleBar?: boolean;
+  /** Linha sob o texto, como no Revit. Ausente = sim. */
+  rule?: boolean;
+}
+
+/**
+ * Vista colocada numa prancha. `at` é o canto inferior esquerdo e `size` a caixa, ambos em mm de papel. `size` é a
+ * região de recorte (Revit: *Crop Region*): redimensionar a caixa recorta o desenho, sem mudar a escala.
+ */
 export interface SheetViewport {
   id: Id;
   view: SheetViewSource;
@@ -46,6 +64,35 @@ export interface SheetViewport {
   /** Denominador da escala: 100 = 1:100. */
   scale: number;
   title?: string;
+  /**
+   * Deslocamento do conteúdo dentro da caixa (pan), em mm de papel. Ausente = conteúdo centrado. Serve para escolher
+   * que parte do modelo aparece no recorte, sem abrir a vista.
+   */
+  offset?: Vec2;
+  /** Recorta o desenho à caixa. `false` deixa o desenho transbordar (útil para detalhes). Ausente = recorta. */
+  clip?: boolean;
+  /** Desenha a moldura fina da vista. Ausente = desenha. */
+  frame?: boolean;
+  /** Como a legenda aparece. Ausente = legenda padrão. */
+  label?: SheetViewportLabel;
+  /** Vista travada: não se move nem se redimensiona na prancha (Revit: *Pin*). */
+  locked?: boolean;
+  /**
+   * Âncora do conteúdo no papel (mm): o ponto onde cai o centro do desenho. Ausente = centro da caixa + `offset`
+   * (comportamento antigo, recentralizado). Com âncora, redimensionar a caixa recorta o desenho sem movê-lo — como no
+   * Revit — e mover a vista desloca a âncora junto.
+   */
+  anchor?: Vec2;
+}
+
+/** Linha da tabela de revisões do carimbo (Revit: *Sheet Issues/Revisions*, ArchiCAD: *Revision History*). */
+export interface SheetRevision {
+  /** Identificador curto da revisão: "0", "A", "R1". */
+  tag: string;
+  date: string;
+  description: string;
+  /** Autor da revisão. */
+  by?: string;
 }
 
 export interface Sheet {
@@ -58,6 +105,12 @@ export interface Sheet {
   margin: number;
   titleBlock: TitleBlock;
   viewports: SheetViewport[];
+  /** Histórico de revisões mostrado no carimbo; ausente = nenhuma revisão listada. */
+  revisions?: SheetRevision[];
+  /** Assinatura do carimbo (logo em data URL, PNG). Ausente = carimbo só com texto. */
+  logo?: string;
+  /** Disciplina da prancha ("Arquitetura", "Estrutura"), usada na lista e na numeração. Ausente = sem disciplina. */
+  discipline?: string;
 }
 
 /** Largura e altura da folha em mm, conforme a orientação. */
@@ -90,10 +143,61 @@ export function viewportIssue(s: Pick<Sheet, 'size' | 'orientation' | 'margin'>,
   if (!finite(v.at)) return 'A posição da vista deve ser um ponto finito.';
   if (!(Number.isFinite(v.size.w) && Number.isFinite(v.size.h) && v.size.w > 0 && v.size.h > 0)) return 'A vista precisa de largura e altura maiores que zero.';
   if (!(Number.isFinite(v.scale) && v.scale > 0)) return 'A escala deve ser maior que zero.';
+  if (v.offset !== undefined && !finite(v.offset)) return 'O deslocamento da vista deve ser um ponto finito.';
+  if (v.anchor !== undefined && !finite(v.anchor)) return 'A âncora da vista deve ser um ponto finito.';
+  if (v.label?.sizeMm !== undefined && !(Number.isFinite(v.label.sizeMm) && v.label.sizeMm > 0)) return 'O tamanho da legenda deve ser maior que zero.';
   const box = sheetInnerBox(s);
   const eps = 1e-6;
   if (v.at.x < box.x0 - eps || v.at.y < box.y0 - eps || v.at.x + v.size.w > box.x1 + eps || v.at.y + v.size.h > box.y1 + eps) return 'A vista sai da folha.';
   return null;
+}
+
+/** Retângulo de uma vista na folha (mm de papel, y para cima). */
+export interface SheetBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export const viewportBox = (v: Pick<SheetViewport, 'at' | 'size'>): SheetBox => ({ x: v.at.x, y: v.at.y, w: v.size.w, h: v.size.h });
+
+/** Deslocamento do conteúdo da vista (mm de papel); ausente = centrado. */
+export const viewportOffset = (v: Pick<SheetViewport, 'offset'>): Vec2 => v.offset ?? { x: 0, y: 0 };
+
+/**
+ * Âncora do conteúdo no papel (mm, y para cima): onde cai o centro do desenho. A âncora existe para redimensionar a
+ * caixa sem mover o desenho; sem ela, vale o centro da caixa mais o `offset` (arquivos antigos).
+ */
+export function viewportAnchor(v: Pick<SheetViewport, 'at' | 'size'> & Partial<Pick<SheetViewport, 'offset' | 'anchor'>>): Vec2 {
+  if (v.anchor) return v.anchor;
+  const o = v.offset ?? { x: 0, y: 0 };
+  return { x: v.at.x + v.size.w / 2 + o.x, y: v.at.y + v.size.h / 2 + o.y };
+}
+
+/** A vista recorta o desenho à caixa? (ausente = sim, como no Revit). */
+export const viewportClipped = (v: Pick<SheetViewport, 'clip'>): boolean => v.clip !== false;
+
+/** A moldura fina da vista aparece? (ausente = sim). */
+export const viewportFrameVisible = (v: Pick<SheetViewport, 'frame'>): boolean => v.frame !== false;
+
+/** Legenda normalizada da vista: tamanho em mm, linha e barra de escala. */
+export interface ResolvedViewportLabel {
+  show: boolean;
+  sizeMm: number;
+  scaleBar: boolean;
+  rule: boolean;
+}
+
+export const LABEL_DEFAULT_MM = 2.5;
+
+export function viewportLabel(v: Pick<SheetViewport, 'label'>): ResolvedViewportLabel {
+  return {
+    show: v.label?.show !== false,
+    sizeMm: v.label?.sizeMm !== undefined && v.label.sizeMm > 0 ? v.label.sizeMm : LABEL_DEFAULT_MM,
+    scaleBar: v.label?.scaleBar === true,
+    rule: v.label?.rule !== false,
+  };
 }
 
 /** Pranchas do projeto (ausente = nenhuma). */

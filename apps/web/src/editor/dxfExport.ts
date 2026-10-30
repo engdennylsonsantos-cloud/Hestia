@@ -1,6 +1,6 @@
 import { openingSymbolPaths, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, resolveLevel, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
-import { buildPlanGeometry, climbWalk, levelBox, LIGHT, openingPlanWorldPaths, ownerOf, planViewOf, resolverZoom, risersInClimbOrder, roofFootprint, roomLabelAt, roomLabelText, spiralByComponent, spiralPostRing, stairCut, type PlanOps, type PlanView, type StairCut } from '@hestia/render';
+import { buildPlanGeometry, climbWalk, drawnAnnotations, levelBox, LIGHT, openingPlanWorldPaths, ownerOf, planViewOf, resolverZoom, risersInClimbOrder, roofFootprint, roomLabelAt, roomLabelText, spiralByComponent, spiralPostRing, stairCut, type PlanOps, type PlanView, type StairCut } from '@hestia/render';
 import {
   dxfGenericRecords,
   dxfLayersOf,
@@ -22,7 +22,7 @@ import {
   type DxfSymbolPath,
   type DxfViewState,
 } from '@hestia/io';
-import { areaPlanOf, DIM_TEXT_MM, dimensionGeometry, dimensionPoints, dimensionText, openingTypeById, unitsOf, GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, planAnnotationsOf, sectionGraphicsOf, sectionPoints, sectionTitleOf, type AreaPlan, type GraphicsCategory, type Id, type Project } from '@hestia/model';
+import { areaPlanOf, DIM_TEXT_MM, dimensionGeometry, dimensionPoints, dimensionText, openingTypeById, unitsOf, GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, sectionTitleOf, type AreaPlan, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 /**
@@ -373,11 +373,13 @@ function appendAreaRecords(dxf: string, records: string[]): string {
 const samePoint = (a: Vec2, b: Vec2): boolean => Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6;
 
 /**
- * Registros DXF das anotações da planta de área (cotas, textos e detalhes). A geometria da planta já as desenha
- * quando o render da área passou a incluí-las; o que ainda não estiver nas operações é escrito aqui, sem duplicar.
+ * Registros DXF das anotações da vista de área, guiados pelo perfil resolvido e pela posse das anotações
+ * (`drawnAnnotations`: as da vista ou, sem elas, as do nível; camadas ocultas pelo perfil não saem). O que o render já
+ * desenhou não duplica, mas a correspondência é por INSTÂNCIA (cada anotação consome um rótulo/traço já desenhado), não
+ * por texto: dois textos iguais saem ambos.
  */
 function areaAnnotationRecords(p: Project, plan: AreaPlan, ops: PlanOps): string[] {
-  const a = planAnnotationsOf(plan);
+  const a = drawnAnnotations(p, plan.levelId, plan);
   if (a.dimensions.length + a.texts.length + a.detailLines.length + a.detailRegions.length === 0) return [];
   const out: string[] = [];
   const rec = (code: number, value: string | number): void => { out.push(String(code), String(value)); };
@@ -387,11 +389,25 @@ function areaAnnotationRecords(p: Project, plan: AreaPlan, ops: PlanOps): string
   const text = (layer: string, at: Vec2, height: number, value: string, rotation = 0): void => {
     rec(0, 'TEXT'); rec(8, layer); rec(10, at.x); rec(20, at.y); rec(30, 0); rec(40, height); rec(1, value); rec(50, rotation);
   };
-  const rendered = new Set(ops.labels.map((l) => l.text).filter((x): x is string => !!x));
+  const rendered = new Map<string, number>();
+  for (const l of ops.labels) if (l.text) rendered.set(l.text, (rendered.get(l.text) ?? 0) + 1);
+  const consumeLabel = (value: string): boolean => {
+    const n = rendered.get(value) ?? 0;
+    if (n <= 0) return false;
+    rendered.set(value, n - 1);
+    return true;
+  };
+  const usedStrokes = new Set<number>();
+  const consumeStroke = (match: (s: PlanOps['strokes'][number]) => boolean): boolean => {
+    const i = ops.strokes.findIndex((s, k) => !usedStrokes.has(k) && match(s));
+    if (i < 0) return false;
+    usedStrokes.add(i);
+    return true;
+  };
   const mPerMm = plan.scale / 1000;
   for (const d of a.dimensions) {
     const value = dimensionText(p, d, unitsOf(p));
-    if (rendered.has(value)) continue;
+    if (consumeLabel(value)) continue;
     const { a: pa, b: pb } = dimensionPoints(p, d);
     const textMm = d.textHeight ?? DIM_TEXT_MM;
     const g = dimensionGeometry(pa, pb, d.offset, mPerMm, textMm, d.textAt);
@@ -399,15 +415,14 @@ function areaAnnotationRecords(p: Project, plan: AreaPlan, ops: PlanOps): string
     text('ANOTACOES_TEXTO', g.textAt, (textMm * plan.scale) / 1000, value, g.textRotation);
   }
   for (const t of a.texts) {
-    if (rendered.has(t.text)) continue;
+    if (consumeLabel(t.text)) continue;
     text('ANOTACOES_TEXTO', t.at, (t.height * plan.scale) / 1000, t.text, t.rotation);
   }
-  const hasSegment = (start: Vec2, end: Vec2): boolean =>
-    ops.strokes.some((s) => s.pts.length === 2 && samePoint(s.pts[0]!, start) && samePoint(s.pts[1]!, end));
-  for (const x of a.detailLines) if (!hasSegment(x.a, x.b)) line('ANOTACOES_DETALHE', x.a, x.b);
+  for (const x of a.detailLines) {
+    if (!consumeStroke((s) => s.pts.length === 2 && samePoint(s.pts[0]!, x.a) && samePoint(s.pts[1]!, x.b))) line('ANOTACOES_DETALHE', x.a, x.b);
+  }
   for (const x of a.detailRegions) {
-    const drawn = ops.strokes.some((s) => s.pts.length === x.boundary.length && x.boundary.every((q, i) => samePoint(s.pts[i]!, q)));
-    if (drawn) continue;
+    if (consumeStroke((s) => s.pts.length === x.boundary.length && x.boundary.every((q, i) => samePoint(s.pts[i]!, q)))) continue;
     for (let i = 0; i < x.boundary.length; i++) line('ANOTACOES_DETALHE', x.boundary[i]!, x.boundary[(i + 1) % x.boundary.length]!);
   }
   return out;
@@ -528,4 +543,22 @@ export function saveSectionDxf(p: Project, sectionId: Id): Promise<string> {
   const found = p.views.find((v) => v.id === sectionId);
   const view = (found ? sectionTitleOf(found) : sectionId).trim() || 'vista';
   return saveText(`${base}-${view}.dxf`, sectionDxf(p, sectionId));
+}
+
+/** Vista de planta exportável: a planta de piso do nível ou uma planta de área (perfil + anotações próprias). */
+export interface PlanViewRef {
+  levelId: Id;
+  areaPlanId?: Id | null;
+  showRoofProjection?: boolean;
+}
+
+/** Ponto único de exportação do DXF de uma planta: a de área segue o perfil da vista; a de piso é inalterada. */
+export function viewDxf(p: Project, v: PlanViewRef): string {
+  return v.areaPlanId ? areaPlanDxf(p, v.areaPlanId) : planDxf(p, v.levelId, v.showRoofProjection ?? true);
+}
+
+/** Salva o DXF da vista de planta e devolve a frase de status (mesmo caminho para piso e área). */
+export async function saveViewDxf(p: Project, v: PlanViewRef): Promise<string> {
+  if (v.areaPlanId) return `DXF salvo: ${await saveAreaPlanDxf(p, v.areaPlanId)}`;
+  return savePlanDxf(p, v.levelId, v.showRoofProjection ?? true);
 }

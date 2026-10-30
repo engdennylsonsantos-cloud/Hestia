@@ -87,9 +87,23 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
   (padrão 2,60 m); tipos em camadas (gesso 12,5 mm, PVC, laje aparente).
 - **Planta de forro** em "Direção da vista → Para cima"; 3D, corte, quantitativos por camada, tabela e CSV; DXF na camada `FORRO`.
 
-**Pranchas e PDF** — 19 feitos, 4 fora de escopo, 0 pendentes (`docs/paridade/pranchas.md`).
-- Prancha A0–A4 com margem e carimbo; vistas de planta, corte ou 3D com escala; 3D aparece como quadro ("3D não vai no PDF").
-- **Exportar PDF**: PDF 1.4 vetorial sem dependências, uma página por prancha.
+**Pranchas e PDF** — 19 feitos, 4 fora de escopo, 0 pendentes (`docs/paridade/pranchas.md`); editor de layout na
+decisão 0039.
+- Prancha A0–A4 com margem, carimbo (com disciplina e tabela de revisões) e logo reservado; vistas de planta, corte ou
+  3D com escala; 3D aparece como quadro ("3D não vai no PDF").
+- **Editor de layout** (0039): zoom no cursor e pan (roda/botão do meio/Espaço), redimensionar o recorte com 8 alças,
+  pan do conteúdo (Alt), recorte e moldura ligáveis, legenda por vista, travar vista, encaixe e guias, alinhar/distribuir,
+  setas (1/10 mm), Delete, Z/G/0. Câmera por prancha na sessão.
+- **Mover na prancha** (0039): escolher a vista pela moldura ou por um ponto do desenho, ponto base → destino, captura de
+  pontos, cota e distância digitada. Com prancha aberta a faixa fica contextual (só Selecionar, Mover e Alinhar).
+- **Alinhar na prancha** (0039): referência → alvo reaproveitando a captura do Alinhar do modelo (faces, eixos, ombreiras,
+  arestas) + moldura + folha; Ctrl+clique, Tab, Esc; move só a vista. Âncora do conteúdo: redimensionar recorta sem
+  mover o desenho e o arraste grava o ponto do ponteiro.
+- **Inserção e numeração**: arrastar a vista do Navegador para a prancha (prévia com escala, estilo Revit), adicionar
+  várias vistas com escala automática, prancha por nível, renumerar em lote,
+  reordenar e emitir revisão.
+- **Exportar PDF**: PDF 1.4 vetorial sem dependências, uma página por prancha; **Publicar** escolhe pranchas, ordem e
+  um arquivo por prancha (`tests/e2e/prancha-editor.mjs`).
 
 **Anotações** — cota (**Y**, com referência à parede) e texto (**X**), na planta e no DXF (camadas `COTAS` e `TEXTOS`).
 Cotas automáticas do nível ativo pelo botão **Cotas auto** (0028): diálogo de critérios (o que cotar, referência da parede

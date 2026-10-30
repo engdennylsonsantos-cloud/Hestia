@@ -101,7 +101,14 @@ export const TAB_VISTA: RibbonTab = {
         act('schedRoofs', 'small'), act('schedStairs', 'small'), act('schedRooms', 'small'), act('schedOpenings', 'small'),
       ]),
     ),
-    panel('prancha', t('Composição de pranchas', 'Sheet Composition'), act('newSheet'), soon(t('Vista', 'View'), 'plan'), soon(t('Linhas de correspondência', 'Matchline'), 'soon'), soon(t('Revisões', 'Revisions'), 'soon')),
+    panel(
+      'prancha',
+      t('Composição de pranchas', 'Sheet Composition'),
+      act('newSheet'),
+      act('addViewSheet'),
+      split(act('publishSheets', 'large'), [act('publishSheets', 'small'), act('sheetsPerLevel', 'small', t('Prancha por nível', 'Sheet per Level'))]),
+      soon(t('Linhas de correspondência', 'Matchline'), 'soon'),
+    ),
     panel(
       'janelas',
       t('Janelas', 'Windows'),

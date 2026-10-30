@@ -186,7 +186,7 @@ export function areaPlanTagOps(p: Project, plan: AreaPlan, scale: number, hidden
     if (!room || !r.polygon || hidden?.has(room.id) || room.id === hideRoomId) continue;
     const tag = plan.tags.find((t) => t.roomId === room.id);
     if (tag && !tag.visible) continue;
-    let at = room.labelPosition ?? tag?.at ?? referenceAt(room, r);
+    let at = tag?.at ?? room.labelPosition ?? referenceAt(room, r);
     const rotation = room.labelRotation ?? (tag?.orientation === 'vertical' ? 90 : 0);
     const draft: RoomTag = tag ?? {
       id: `auto:${room.id}`,

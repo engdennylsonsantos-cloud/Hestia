@@ -109,6 +109,15 @@ describe('planta de área · desenho', () => {
     }
   });
 
+  it('a RoomTag da planta vence room.labelPosition ao posicionar o texto', () => {
+    const s2 = project();
+    s2.exec({ type: 'setRoomLabel', id: 'r1', position: { x: 8, y: 8 } });
+    const tag = { id: 't1', planId: 'ap', roomId: 'r1', at: { x: 2, y: 3 }, orientation: 'horizontal' as const, leader: 'none' as const, fields: [...DEFAULT_AREA_GRAPHICS.tagDefault.fields], visible: true };
+    const ops = areaPlanTagOps(s2.project, plan({ tags: [tag] }), 50, undefined, resolveRooms(s2.project, 'lv_0'));
+    const sala = ops.labels.find((l) => l.text === 'Sala');
+    expect(sala?.at).toEqual({ x: 2, y: 3 });
+  });
+
   it('no tema escuro o texto segue o tema e não há halo', () => {
     const s2 = project();
     const ops = areaPlanTagOps(s2.project, plan({ tags: [] }), 50, undefined, resolveRooms(s2.project, 'lv_0'), undefined, true);

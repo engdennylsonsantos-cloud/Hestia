@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
-import { areaPlanToolAllowed, editor } from '../../editor/controller.ts';
+import { editor } from '../../editor/controller.ts';
 import { useAtalhos } from '../../editor/shortcutConfig.ts';
 import { toolLabel, type Lang } from '../../editor/i18n.ts';
-import { useUi } from '../../editor/state.ts';
+import { useUi, type ViewKind } from '../../editor/state.ts';
 import { Icon } from '../Icon.tsx';
 import { ACTIONS, type RibbonCtx } from './actions.ts';
 import { estadoNoEsboco } from './perimeterFace.ts';
+import { toolDisabledOnSheet } from './sheetTools.ts';
 import { txt, type RibbonItem, type RibbonPanel, type Size } from './model.ts';
 
 /** Tudo que um botão da faixa precisa para se desenhar e reagir; vem de `useFace` a partir do item do modelo. */
@@ -24,6 +25,9 @@ interface Face {
 
 const SOON_PT = 'ainda não disponível';
 const SOON_EN = 'not available yet';
+/** Motivo no tooltip do que não age sobre a prancha (decisão 0039). */
+const SEM_PRANCHA_PT = 'não se aplica à prancha';
+const SEM_PRANCHA_EN = 'not available for sheets';
 
 /**
  * Resolve rótulo, ícone, tooltip, estado e clique de um item folha (ferramenta, ação, opção ou "em breve"). Com o modo de
@@ -32,25 +36,49 @@ const SOON_EN = 'not available yet';
 function useFace(entry: RibbonItem, ctx: RibbonCtx, lang: Lang): Face {
   const item = entry.kind === 'split' ? entry.main : entry;
   const toolId = item.kind === 'tool' ? item.tool : null;
-  const active = useUi((s) => toolId !== null && s.tool === toolId);
+  const active = useUi((s) => toolId !== null && (s.tool === toolId || (toolId === 'align' && s.view === 'sheet' && s.sheetAlign) || (toolId === 'move' && s.view === 'sheet' && s.sheetMove)));
   const sc = useAtalhos((s) => (toolId ? s.mapa[toolId] : undefined));
-  const face = faceBase(item, ctx, lang, active, sc);
+  const view = useUi((s) => s.view);
+  const face = faceBase(item, ctx, lang, view, active, sc);
   const noEsboco = estadoNoEsboco(item, ctx);
   if (!noEsboco) return face;
   return { ...face, on: noEsboco.on, disabled: noEsboco.disabled, title: noEsboco.motivo ? `${face.label}\n— ${noEsboco.motivo}` : face.title };
 }
 
-/** Rótulo, tooltip, estado e clique de um item fora do modo de perímetro (ou sem regra própria dele). */
-function faceBase(item: RibbonItem, ctx: RibbonCtx, lang: Lang, active: boolean, sc: string | undefined): Face {
+/**
+ * Rótulo, tooltip, estado e clique de um item fora do modo de perímetro (ou sem regra própria dele). Com a prancha aberta,
+ * a ferramenta que não age sobre ela fica desabilitada e o tooltip diz o motivo (decisão 0039).
+ */
+function faceBase(item: RibbonItem, ctx: RibbonCtx, lang: Lang, view: ViewKind, active: boolean, sc: string | undefined): Face {
   switch (item.kind) {
     case 'tool': {
       const label = item.label ? txt(item.label, lang) : toolLabel(item.tool, lang);
-      // Planta de área: só anotação (o controlador também recusa, inclusive por atalho).
-      const blocked = ctx.planKind === 'area' && ctx.view !== '3d' && !areaPlanToolAllowed(item.tool);
-      const why = blocked ? (lang === 'pt' ? 'Na planta de área, use as ferramentas de anotação.' : 'In an area plan, use the annotation tools.') : '';
+      const titulo = sc ? `${label} (${sc})` : label;
+      const disabled = toolDisabledOnSheet(view, item.tool);
       return {
-        icon: item.icon ?? item.tool, label, title: `${sc ? `${label} (${sc})` : label}${why ? `\n— ${why}` : ''}`,
-        on: active, soon: false, disabled: blocked, onClick: () => editor.setTool(item.tool),
+        icon: item.icon ?? item.tool, label,
+        title: disabled ? `${titulo} — ${lang === 'pt' ? SEM_PRANCHA_PT : SEM_PRANCHA_EN}` : titulo,
+        on: active, soon: false, disabled,
+        onClick: () => {
+          // Desabilitado, o clique não faz nada (o botão também já o bloqueia).
+          if (disabled) return;
+          const s = useUi.getState();
+          // Na prancha, Mover e Alinhar agem sobre as vistas (decisão 0039); o resto do modelo não se aplica.
+          if (s.view === 'sheet') {
+            if (item.tool === 'move') {
+              useUi.setState({ sheetMove: !s.sheetMove, sheetAlign: false });
+              return;
+            }
+            if (item.tool === 'align') {
+              useUi.setState({ sheetAlign: !s.sheetAlign, sheetMove: false });
+              return;
+            }
+            if (item.tool === 'select') {
+              useUi.setState({ sheetAlign: false, sheetMove: false });
+            }
+          }
+          editor.setTool(item.tool);
+        },
       };
     }
     case 'action': {

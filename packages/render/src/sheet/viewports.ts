@@ -52,10 +52,18 @@ export function planPartsOf(p: Project, levelId: Id, vp: SheetViewport): Viewpor
   return partsOf(list, toPaper(vp, m), LIGHT);
 }
 
+/** Viewport órfã (vista apagada): o quadro mostra o aviso em vez de lançar ou sumir sem explicação. */
+export function removedViewParts(vp: SheetViewport): ViewportParts {
+  const out = emptyParts();
+  out.texts.push({ at: { x: vp.at.x + vp.size.w / 2, y: vp.at.y + vp.size.h / 2 }, text: 'Vista removida', sizeMm: 3, rotation: 0, center: true, color: '#7a828c' });
+  return out;
+}
+
 /** Planta de área na escala da vista, centrada no conteúdo do nível. Planta inexistente: sem partes. */
 export function areaPlanPartsOf(p: Project, planId: Id, vp: SheetViewport): ViewportParts {
   const plan = areaPlanOf(p, planId);
-  if (!plan || !p.levels.some((l) => l.id === plan.levelId)) return emptyParts();
+  if (!plan) return removedViewParts(vp);
+  if (!p.levels.some((l) => l.id === plan.levelId)) return emptyParts();
   const pp = withSheetScale(p, { kind: 'plan', levelId: plan.levelId }, vp.scale);
   const centre = centreOf(levelBox(p, plan.levelId));
   const m = viewMappingOf(vp, centre);

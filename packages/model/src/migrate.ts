@@ -4,6 +4,7 @@ import { DEFAULT_CEILING_TYPES } from './ceiling.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
 import { DEFAULT_STAIR_OPENING_MARGIN, DEFAULT_STAIR_POST_MATERIAL_ID, DEFAULT_STAIR_TREAD_OVERLAP, DEFAULT_STAIR_TYPES } from './stair.ts';
+import { DEFAULT_AREA_SCALE, mergeAreaGraphics } from './viewProfile.ts';
 import { DEFAULT_RAMP_TYPES } from './ramp.ts';
 import { DEFAULT_STAIR_CALC_RULE } from './stairTypes.ts';
 import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
@@ -245,6 +246,18 @@ const migrations: Record<number, Migration> = {
     ...raw,
     rampTypes: { ...Object.fromEntries(DEFAULT_RAMP_TYPES.map((t) => [t.id, t])), ...((raw.rampTypes as object) ?? {}) },
   }),
+  // v21 → v22: perfil de vista. Cada planta de área ganha `graphics` completo (merge profundo sobre o padrão), `scale` e
+  // `tags` padrão. `annotations` fica exatamente como está (undefined continua herdando do nível). Idempotente.
+  21: (raw) => {
+    if (!Array.isArray(raw.areaPlans)) return raw;
+    const areaPlans = (raw.areaPlans as Record<string, unknown>[]).map((plan) => {
+      const next: Record<string, unknown> = { ...plan, graphics: mergeAreaGraphics(plan.graphics as never) };
+      if (!(typeof plan.scale === 'number' && Number.isFinite(plan.scale) && plan.scale > 0)) next.scale = DEFAULT_AREA_SCALE;
+      if (!Array.isArray(plan.tags)) next.tags = [];
+      return next;
+    });
+    return { ...raw, areaPlans };
+  },
 };
 
 export class SchemaError extends Error {}

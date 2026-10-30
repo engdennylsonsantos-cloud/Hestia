@@ -11,7 +11,7 @@ import { loadDock, type DockLayout } from './dockLayout.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section' | 'sheet';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'rampType' | 'rampSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'roomCategories' | 'cotasAuto' | 'moveLevel' | 'gridType' | 'units' | 'dimensions' | 'hostedLoss' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'rampType' | 'rampSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'renumberSheets' | 'revision' | 'publish' | 'roomSchedule' | 'roomCategories' | 'cotasAuto' | 'moveLevel' | 'gridType' | 'units' | 'dimensions' | 'hostedLoss' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -27,6 +27,10 @@ export interface UiState {
   areaPlanId: Id | null;
   /** Rótulo em arraste (fantasma), compartilhado por qualquer planta. */
   tagDrag: { planId: Id; roomId: Id; at: Vec2 } | null;
+  /** Ferramenta Alinhar ativa na prancha (sessão; decisão 0039). */
+  sheetAlign: boolean;
+  /** Ferramenta Mover ativa na prancha (sessão; decisão 0039). */
+  sheetMove: boolean;
   selection: Id[];
   hover: Id | null;
   options: ToolOptions;
@@ -229,6 +233,8 @@ export const useUi = create<UiState>(() => ({
   planKind: 'floor',
   areaPlanId: null,
   tagDrag: null,
+  sheetAlign: false,
+  sheetMove: false,
   sectionId: null,
   sheetId: null,
   selection: [],

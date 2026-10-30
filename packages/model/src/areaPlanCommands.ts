@@ -1,6 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 import { areaPlanIssue, areaPlanOf, copyPlanAnnotations, DEFAULT_AREA_GRAPHICS, DEFAULT_ROOM_CATEGORIES, planAnnotationsOf, roomTagIssue, type AreaPlan, type RoomCategory, type RoomTag } from './areaPlan.ts';
 import type { Command } from './commands.ts';
+import { dropOrphanViewports } from './sheetCommands.ts';
 import { isRoom, type Id, type Project } from './types.ts';
 
 /** Comandos da planta de área e da etiqueta de ambiente (fora do `switch` grande de `commands.ts`). */
@@ -43,6 +44,7 @@ export function applyAreaPlanCommand(p: Project, c: Command): boolean {
     case 'removeAreaPlan': {
       planOf(p, c.id);
       p.areaPlans = (p.areaPlans ?? []).filter((x) => x.id !== c.id);
+      dropOrphanViewports(p);
       return true;
     }
     case 'addRoomTag': {
@@ -150,5 +152,6 @@ export function dropAreaPlansOfLevel(p: Project, levelId: Id): void {
   if (!p.areaPlans?.length) return;
   p.areaPlans = p.areaPlans.filter((x) => x.levelId !== levelId);
 }
+
 
 export const areaPlanCategories = (p: Pick<Project, 'roomCategories'>): RoomCategory[] => p.roomCategories ?? [];

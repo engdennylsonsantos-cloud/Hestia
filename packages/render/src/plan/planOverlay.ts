@@ -1,6 +1,6 @@
 import { orientedRect, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { frameOfWall, openingGeometry, wallEndCorners, type ResolvedLevel } from '@hestia/engine';
-import { isOpening, isWall, type Id, type Project } from '@hestia/model';
+import { isOpening, isWall, resolveViewProfile, type Id, type Project, type ResolvedProfile } from '@hestia/model';
 import { floorSelectionOps } from './floors.ts';
 import { ALCA_PX, quadradoEm } from './marcadores.ts';
 import { slabSelectionOps } from './slabs.ts';
@@ -29,11 +29,21 @@ function wallUnion(geo: ResolvedLevel, id: Id, outline = false): MultiPolygon {
   return outline ? union(...rw.layers.map((l) => l.fragment)) : union(...rw.layers.map((l) => l.cut));
 }
 
-function elementHighlight(p: Project, geo: ResolvedLevel, ids: Id[], color: string, alpha: number, view: PlanView | null): FillOp[] {
+type Camadas = ResolvedProfile['layers'];
+
+/**
+ * Camadas que a vista mostra (perfil resolvido da planta de área). Planta de piso: `null`, sem filtro. Seleção, hover,
+ * alças e destaques saem do mesmo caminho nas duas plantas; o perfil só tira o que a vista não desenha.
+ */
+const camadasDe = (input: PlanInput): Camadas | null => (input.areaPlan ? resolveViewProfile(input.areaPlan).layers : null);
+
+function elementHighlight(p: Project, geo: ResolvedLevel, ids: Id[], color: string, alpha: number, view: PlanView | null, layers: Camadas | null = null): FillOp[] {
   const out: FillOp[] = [];
   for (const id of ids) {
     if (view?.hidden.has(id)) continue;
     const e = p.elements[id];
+    if (isWall(e) && layers?.walls === 'hidden') continue;
+    if (isOpening(e) && layers && !layers.openings) continue;
     if (isWall(e)) out.push({ polygons: wallUnion(geo, id, view?.outlineWalls.has(id) === true), color, alpha });
     else if (isOpening(e)) {
       const f = frameOfWall(p, e.hostId);
@@ -70,6 +80,7 @@ function comAnotacoes(out: PlanOps, input: PlanInput, escala: number, target: { 
 export function buildPlanSelectionOverlay(input: PlanInput): PlanOps {
   const { project: p, theme } = input;
   const { geo, hidden, up, roofHidden, stairs, view, style } = planContext(input);
+  const layers = camadasDe(input);
   const selection = input.selection;
   const out = vazio();
   const add = (o: PlanOps): void => {
@@ -79,19 +90,23 @@ export function buildPlanSelectionOverlay(input: PlanInput): PlanOps {
   };
 
   // Seleção (pisos: destaque próprio; paredes e aberturas em elementHighlight).
-  add(floorSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden));
-  const rmsel = roomSelectionOps(p, input.levelId, selection, null, theme, hidden);
-  out.fills.push(...rmsel.fills);
-  out.strokes.push(...rmsel.strokes);
-  add(slabSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden));
-  if (up) add(ceilingSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden));
-  add(roofSelectionOps(p, input.levelId, selection, null, theme, input.viewport, roofHidden, style.paint.roof));
-  add(stairSelectionOps(p, stairs, selection, null, theme, input.viewport));
+  // Planta de área: o destaque do ambiente é o dela (`areaPlanHighlightOps`, em `planFrame`); pisos, lajes, telhados e
+  // escadas só entram quando o perfil os desenha.
+  if (!layers || layers.floors) add(floorSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden));
+  if (!layers) {
+    const rmsel = roomSelectionOps(p, input.levelId, selection, null, theme, hidden);
+    out.fills.push(...rmsel.fills);
+    out.strokes.push(...rmsel.strokes);
+  }
+  if (!layers || layers.floors) add(slabSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden));
+  if (up && !layers) add(ceilingSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden));
+  if (!layers || layers.roofProjection) add(roofSelectionOps(p, input.levelId, selection, null, theme, input.viewport, roofHidden, style.paint.roof));
+  if (!layers) add(stairSelectionOps(p, stairs, selection, null, theme, input.viewport));
   if (selection.length) {
-    out.fills.push(...elementHighlight(p, geo, selection, theme.select, 0.26, view));
+    out.fills.push(...elementHighlight(p, geo, selection, theme.select, 0.26, view, layers));
     for (const id of selection) {
       const e = p.elements[id];
-      if (!isWall(e) || hidden?.has(id)) continue;
+      if (!isWall(e) || hidden?.has(id) || layers?.walls === 'hidden') continue;
       for (const ring of ringsOf(wallUnion(geo, id, view?.outlineWalls.has(id) === true))) out.strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
       // Alças nas pontas do eixo e nos cantos visíveis (a ponta que se vê): é lá que o arrasto pega a parede.
       const corners = wallEndCorners(p, e);
@@ -111,6 +126,7 @@ export function buildPlanSelectionOverlay(input: PlanInput): PlanOps {
 export function buildPlanHoverOverlay(input: PlanInput): PlanOps {
   const { project: p, theme } = input;
   const { geo, hidden, up, roofHidden, stairs, ramps, view, style } = planContext(input);
+  const layers = camadasDe(input);
   const hover = input.hover;
   if (!hover || input.selection.includes(hover)) return vazio();
   const out = vazio();
@@ -119,16 +135,20 @@ export function buildPlanHoverOverlay(input: PlanInput): PlanOps {
     out.strokes.push(...o.strokes);
     out.labels.push(...o.labels);
   };
-  add(floorSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden));
-  const rmsel = roomSelectionOps(p, input.levelId, [], hover, theme, hidden);
-  out.fills.push(...rmsel.fills);
-  out.strokes.push(...rmsel.strokes);
-  add(slabSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden));
-  if (up) add(ceilingSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden));
-  add(roofSelectionOps(p, input.levelId, [], hover, theme, input.viewport, roofHidden, style.paint.roof));
-  add(stairSelectionOps(p, stairs, [], hover, theme, input.viewport));
-  add(rampSelectionOps(p, ramps, [], hover, theme, input.viewport));
-  out.fills.push(...elementHighlight(p, geo, [hover], theme.select, 0.16, view));
+  if (!layers || layers.floors) add(floorSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden));
+  if (!layers) {
+    const rmsel = roomSelectionOps(p, input.levelId, [], hover, theme, hidden);
+    out.fills.push(...rmsel.fills);
+    out.strokes.push(...rmsel.strokes);
+  }
+  if (!layers || layers.floors) add(slabSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden));
+  if (up && !layers) add(ceilingSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden));
+  if (!layers || layers.roofProjection) add(roofSelectionOps(p, input.levelId, [], hover, theme, input.viewport, roofHidden, style.paint.roof));
+  if (!layers) {
+    add(stairSelectionOps(p, stairs, [], hover, theme, input.viewport));
+    add(rampSelectionOps(p, ramps, [], hover, theme, input.viewport));
+  }
+  out.fills.push(...elementHighlight(p, geo, [hover], theme.select, 0.16, view, layers));
   comAnotacoes(out, input, style.scale, { selection: [], hover });
   return out;
 }
@@ -138,6 +158,7 @@ export function buildPlanLiveOverlay(input: PlanInput): PlanOps {
   const { project: p, theme } = input;
   const { geo, view, style } = planContext(input);
   const out = vazio();
+  // A prévia da ferramenta aparece sempre, mesmo com a camada oculta pelo perfil (o usuário vê o que está criando).
   const previa = previewOverlay(input.preview, theme, (ids) => elementHighlight(p, geo, ids, theme.accent, 0.2, view));
   out.fills.push(...previa.fills);
   out.strokes.push(...previa.strokes);
@@ -165,6 +186,7 @@ export function buildPlanLiveOverlay(input: PlanInput): PlanOps {
 export function buildPlanOverlay(input: PlanInput): PlanOps {
   const { project: p, theme, viewport: v } = input;
   const { geo, hidden, up, roofHidden, stairs, ramps, view, style } = planContext(input);
+  const layers = camadasDe(input);
   const { selection, hover } = input;
   const out = vazio();
   const add = (o: PlanOps): void => {
@@ -174,21 +196,25 @@ export function buildPlanOverlay(input: PlanInput): PlanOps {
   };
 
   // Hover e seleção (pisos: destaque próprio; paredes e aberturas em elementHighlight).
-  add(floorSelectionOps(p, input.levelId, selection, hover, theme, v, hidden));
-  const rmsel = roomSelectionOps(p, input.levelId, selection, hover, theme, hidden);
-  out.fills.push(...rmsel.fills);
-  out.strokes.push(...rmsel.strokes);
-  add(slabSelectionOps(p, input.levelId, selection, hover, theme, v, hidden));
-  if (up) add(ceilingSelectionOps(p, input.levelId, selection, hover, theme, v, hidden));
-  add(roofSelectionOps(p, input.levelId, selection, hover, theme, v, roofHidden, style.paint.roof));
-  add(stairSelectionOps(p, stairs, selection, hover, theme, v));
-  add(rampSelectionOps(p, ramps, selection, hover, theme, v));
-  if (hover && !selection.includes(hover)) out.fills.push(...elementHighlight(p, geo, [hover], theme.select, 0.16, view));
+  if (!layers || layers.floors) add(floorSelectionOps(p, input.levelId, selection, hover, theme, v, hidden));
+  if (!layers) {
+    const rmsel = roomSelectionOps(p, input.levelId, selection, hover, theme, hidden);
+    out.fills.push(...rmsel.fills);
+    out.strokes.push(...rmsel.strokes);
+  }
+  if (!layers || layers.floors) add(slabSelectionOps(p, input.levelId, selection, hover, theme, v, hidden));
+  if (up && !layers) add(ceilingSelectionOps(p, input.levelId, selection, hover, theme, v, hidden));
+  if (!layers || layers.roofProjection) add(roofSelectionOps(p, input.levelId, selection, hover, theme, v, roofHidden, style.paint.roof));
+  if (!layers) {
+    add(stairSelectionOps(p, stairs, selection, hover, theme, v));
+    add(rampSelectionOps(p, ramps, selection, hover, theme, v));
+  }
+  if (hover && !selection.includes(hover)) out.fills.push(...elementHighlight(p, geo, [hover], theme.select, 0.16, view, layers));
   if (selection.length) {
-    out.fills.push(...elementHighlight(p, geo, selection, theme.select, 0.26, view));
+    out.fills.push(...elementHighlight(p, geo, selection, theme.select, 0.26, view, layers));
     for (const id of selection) {
       const e = p.elements[id];
-      if (!isWall(e) || hidden?.has(id)) continue;
+      if (!isWall(e) || hidden?.has(id) || layers?.walls === 'hidden') continue;
       for (const ring of ringsOf(wallUnion(geo, id, view?.outlineWalls.has(id) === true))) out.strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
       const corners = wallEndCorners(p, e);
       for (const pt of [e.a, e.b, ...corners.a, ...corners.b] as Vec2[]) {

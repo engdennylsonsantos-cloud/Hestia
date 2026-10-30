@@ -10,6 +10,7 @@ import {
   DXF_LINE_WEIGHT_DEFAULT,
   DXF_LAYER_RAMP_TEXT,
   DXF_LAYER_ROOM_TEXT,
+  DXF_LAYER_GENERIC,
   dxfLineWeight,
   dxfSectionLayersOf,
   dxfSectionLayerStyleOf,
@@ -325,8 +326,12 @@ export { areaPlanDxf, saveAreaPlanDxf } from './dxfAreaPlan.ts';
 export function planDxf(p: Project, levelId: Id, showRoofProjection = true): string {
   const doc = dxfDocOf(p, levelId, dxfGeometryOf(p, levelId, showRoofProjection));
   const shown = levelGraphicsOf(p, levelId).overrides.generic.visible !== false;
-  const entities = [...doc.entities, ...(shown ? dxfGenericEntities(p, levelId) : [])];
-  return writeDxf2000({ ...doc, entities });
+  const generics = shown ? dxfGenericEntities(p, levelId) : [];
+  // A camada dos importados entra com a cor da categoria (cinza), como as do nível.
+  const layers = generics.length > 0 && !doc.layers.some((l) => l.name === DXF_LAYER_GENERIC)
+    ? [...doc.layers, { name: DXF_LAYER_GENERIC, ...(p.dxfLayers?.[DXF_LAYER_GENERIC] ?? dxfLayerStyleOf(DXF_LAYER_GENERIC)) }]
+    : doc.layers;
+  return writeDxf2000({ ...doc, layers, entities: [...doc.entities, ...generics] });
 }
 
 /** Alvo da tabela de camadas do diálogo de exportação (o que a vista atual exporta). */
@@ -348,7 +353,15 @@ export interface DxfLayerRow {
 export function dxfLayerTableOf(p: Project, target: DxfExportTarget): DxfLayerRow[] {
   if (target.kind === 'plan') {
     const geo = dxfGeometryOf(p, target.levelId, target.showRoofProjection ?? true);
-    return dxfLayersOf(p, geo).map((name) => ({ name, style: geo.layerStyles?.[name] ?? dxfLayerStyleOf(name, geo.lineWeights?.[name]) }));
+    const rows = dxfLayersOf(p, geo).map((name) => ({ name, style: geo.layerStyles?.[name] ?? dxfLayerStyleOf(name, geo.lineWeights?.[name]) }));
+    // A camada dos importados só entra no arquivo quando há `Generic` no nível e a categoria está visível.
+    const generic = levelGraphicsOf(p, target.levelId).overrides.generic.visible !== false
+      && Object.values(p.elements).some((e) => e.kind === 'generic' && e.levelId === target.levelId);
+    if (generic && !rows.some((r) => r.name === DXF_LAYER_GENERIC)) {
+      rows.push({ name: DXF_LAYER_GENERIC, style: p.dxfLayers?.[DXF_LAYER_GENERIC] ?? dxfLayerStyleOf(DXF_LAYER_GENERIC) });
+      rows.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return rows;
   }
   if (target.kind === 'section') {
     const geo = sectionDxfGeometryOf(p, target.sectionId);

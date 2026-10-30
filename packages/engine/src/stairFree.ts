@@ -111,7 +111,7 @@ interface Turn {
 }
 
 const angleBetween = (dA: Vec2, dB: Vec2): number => Math.acos(Math.max(-1, Math.min(1, dot(dA, dB))));
-const pt2 = (v: number): string => v.toFixed(2).replace('.', ',');
+const pt2 = (v: number): string => v.toFixed(2).replace('.', ','); // units-ok: coordenadas do desenho técnico da escada livre
 
 /** Anel do patamar de giro: compactado; giro (quase) nulo vira o retângulo de 4 pontos. */
 function turnRing(t: Turn, width: number, tIn: number, tOut: number): Vec2[] {
@@ -339,7 +339,7 @@ interface Cand {
   plan: StairFreePlan;
 }
 
-const cmNum = (m: number): string => (m * 100 + 1e-5).toFixed(1).replace('.', ',');
+const cmNum = (m: number): string => (m * 100 + 1e-5).toFixed(1).replace('.', ','); // units-ok: cotas em cm do desenho técnico da escada livre
 
 /**
  * "Ajustar": escolhe N, h e piso (T) para o trajeto caber na regra Blondel do tipo. Testa N = Nmin … Nmin + 4 e, para

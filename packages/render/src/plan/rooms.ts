@@ -25,7 +25,7 @@ export function roomNameText(r: ResolvedRoom): string {
 }
 
 /**
- * Rótulo completo para o DXF da planta de piso: `Sala (101) · 12,34 m²` (nome, número entre parênteses quando há e
+ * Rótulo completo para o DXF da planta de piso: `Sala (101) · 12,34 m2` (nome, número entre parênteses quando há e
  * área com 2 casas). Na tela a planta de piso mostra só o nome (decisão 0037); o desenho técnico leva tudo.
  */
 export function roomFullText(r: ResolvedRoom, u: ResolvedUnits): string {

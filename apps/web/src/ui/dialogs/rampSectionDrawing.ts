@@ -65,7 +65,7 @@ export const RAMP_DRAWING_TEXT: Record<'pt' | 'en', RampDrawingText> = {
   },
 };
 
-const defaultFmt = (n: number, decimals: number): string => n.toFixed(decimals).replace('.', ',');
+const defaultFmt = (n: number, decimals: number): string => n.toFixed(decimals).replace('.', ','); // units-ok: texto técnico do desenho do corte da rampa
 
 const fill = (text: string, values: Record<string, string>): string => text.replace(/\{(\w+)\}/g, (_, k: string) => values[k] ?? '');
 

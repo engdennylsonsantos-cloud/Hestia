@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- seleção reúne alças, arrastes e as etiquetas de ambiente da vista (decisão 0039). */
 import { add, boxOf, dist, dot, sub, type Vec2 } from '@hestia/geom';
 import { ceilingOutline, frameOfWall } from '@hestia/engine';
 import { angularDimensionGeometry, areaPlanOf, formatQuantity, isCeiling, isFloor, isOpening, isRamp, isRoof, isSlab, isStair, isWall, resolveViewProfile, unitsOf, type Id, type ProfileLayers, type Project, type ResolvedUnits } from '@hestia/model';

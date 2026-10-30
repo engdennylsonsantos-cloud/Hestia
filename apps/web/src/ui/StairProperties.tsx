@@ -202,7 +202,7 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
         <Group title={t.stair_free_group}>
           <Row label={t.stair_free_group} readOnly><span className="val">{freeInfo}</span></Row>
           <Row label={t.stair_free_width} htmlFor="p-sfreewidth">
-            <NumField id="p-sfreewidth" value={freeWidth} min={0.1} unit="m" onCommit={(v) => editFreeWidth(v)} />
+            <NumField id="p-sfreewidth" value={freeWidth} min={0.1} unit="m" onCommit={(v) => editFreeWidth(v)} /> {/* units-ok: largura livre da escada sempre em metros */}
           </Row>
           <Row label={t.stair_adjust}>
             <button id="p-sadjust" className="chiplink" title={t.stair_adjust_title} onClick={adjust}>{t.stair_adjust}</button>
@@ -235,7 +235,7 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
           {Math.abs(spiral.sp.sweep) > 2 * Math.PI && (
             <>
               {/* units-ok: contagem sem unidade */}
-              <Row label="Espelhos por volta"><span className="val">{String(Math.round(spiralNums.perTurn * 10) / 10).replace('.', ',')}</span></Row>
+              <Row label="Espelhos por volta"><span className="val">{String(Math.round(spiralNums.perTurn * 10) / 10).replace('.', ',')}</span></Row> {/* units-ok: contagem de espelhos, não é medida */}
               <Row label="Folga entre voltas"><span className="val">{fmt('length', spiralNums.headroom)}</span></Row>
             </>
           )}

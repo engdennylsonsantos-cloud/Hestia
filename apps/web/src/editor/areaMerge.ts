@@ -26,7 +26,7 @@ const roomSummary = (room: { roomId: Id; name: string; number: string; area: num
 });
 
 const labelOf = (r: AreaMergeRoom): string => `${r.number ? `${r.number} — ` : ''}${r.name || 'Ambiente'}`;
-const areaText = (a: number): string => `${a.toFixed(2).replace('.', ',')} m²`;
+const areaText = (a: number): string => `${a.toFixed(2).replace('.', ',')} m²`; // units-ok: rótulo de área do diálogo de fusão
 
 /**
  * Previsão pura da regra de áreas: simula as remoções num projeto clonado, resolve os ambientes e, se uma parede ou

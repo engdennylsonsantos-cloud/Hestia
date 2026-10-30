@@ -4,7 +4,7 @@ import type { StairRemaining } from '@hestia/engine';
 export const TEXTO_ALCANCADO = 'nível de topo alcançado';
 
 /** Número com vírgula decimal e casas fixas. */
-const numero = (valor: number, casas: number): string => Math.abs(valor).toFixed(casas).replace('.', ',');
+const numero = (valor: number, casas: number): string => Math.abs(valor).toFixed(casas).replace('.', ','); // units-ok: mensagens ao vivo da escada/rampa usam a unidade já resolvida
 
 /** Comprimento, 1 casa: `1,4 m`. */
 const comprimento = (metros: number): string => `${numero(metros, 1)} m`;

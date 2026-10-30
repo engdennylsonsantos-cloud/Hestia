@@ -61,7 +61,7 @@ const MIN_SEGMENT = 0.01;
 /** Clique a menos que isso (m) do último vértice conclui (faz o papel do duplo clique). */
 const REPEAT_CLICK = 0.05;
 
-const num = (n: number, d = 2): string => Math.abs(n).toFixed(d).replace('.', ',');
+const num = (n: number, d = 2): string => Math.abs(n).toFixed(d).replace('.', ','); // units-ok: mensagens ao vivo da escada usam a unidade já resolvida
 
 const emptyLayout = (): StairSegmentLayout => ({ pieces: [], risers: 0, length: 0, leftover1: false });
 

@@ -39,7 +39,7 @@ export interface SheetMoveApi {
 const fmtText = (d: { x: number; y: number }): string => {
   const dist = Math.hypot(d.x, d.y);
   const angle = (Math.atan2(d.y, d.x) * 180) / Math.PI;
-  return `${dist.toFixed(1).replace('.', ',')} mm · ${angle.toFixed(0)}°`;
+  return `${dist.toFixed(1).replace('.', ',')} mm · ${angle.toFixed(0)}°`; // units-ok: prévia de distância/ângulo do Mover da prancha
 };
 
 /**

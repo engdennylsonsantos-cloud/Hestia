@@ -70,6 +70,8 @@ const R: Record<string, string> = {
   props: p('s1', 'M5 4H27V28H5Z') + p('ln', 'M9 10H23M9 15H23M9 20H18') + p('ac', 'M9 25H14'),
   paste: p('s2', 'M7 6H25V28H7Z') + p('s3', 'M12 3H20V8H12Z') + p('ln', 'M11 14H21M11 18H21M11 22H17'),
   cut: p('s2', 'M4 12H28V22H4Z') + p('ac ic-ds', 'M2 17H30'),
+  // Recortar (área de transferência): pasta com tesoura, para não se confundir com Cortar geometria.
+  cutscissors: p('s2', 'M3 8H12L15 11H29V27H3Z') + p('s3', 'M3 8H12L15 11H3Z') + p('ac', 'M21 14L28 21M21 22L28 15') + '<circle class="ic-fa" cx="19" cy="13.5" r="2.2"/><circle class="ic-fa" cx="19" cy="22.5" r="2.2"/><circle class="ic-ac" cx="24" cy="18" r="1.2"/>',
   hide: p('s1', 'M2 16C8 6 24 6 30 16C24 26 8 26 2 16Z') + p('ac', 'M5 27L27 5'),
   eye: p('s1', 'M2 16C8 6 24 6 30 16C24 26 8 26 2 16Z') + p('bl', 'M16 11A5 5 0 1 0 16 21A5 5 0 1 0 16 11Z'),
   component: p('s2', 'M6 10H24V28H6Z') + p('s3', 'M6 10L11 5H29L24 10Z') + p('s3', 'M24 10L29 5V23L24 28Z'),

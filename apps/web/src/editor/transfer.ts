@@ -1,5 +1,5 @@
 import type { Id, Project, ProjectStore } from '@hestia/model';
-import { clipboardFrom, idsOfType, pasteAlignedCommand, sameNameRoomIds, selectedTypeId, type ClipBuffer } from '@hestia/tools';
+import { clipboardFrom, copyableIds as copyableIdsOf, idsOfType, pasteAlignedCommand, sameNameRoomIds, selectedTypeId, type ClipBuffer } from '@hestia/tools';
 import { useUi } from './state.ts';
 
 /** Contagens do buffer copiado (ausente em buffers antigos = nenhuma escada). */
@@ -34,6 +34,21 @@ function describe(c: Counts): string {
 export class Transfer {
   private clip: ClipBuffer | null = null;
 
+  /** Já há algo copiado? (o buffer vive só na memória desta sessão) */
+  hasClip(): boolean {
+    return this.clip !== null;
+  }
+
+  /** Buffer atual, para o Colar com prévia (null sem cópia). */
+  clipBuffer(): ClipBuffer | null {
+    return this.clip;
+  }
+
+  /** Ids que Copiar levaria da seleção (paredes, pisos, lajes, telhados, escadas, rampas, ambientes e aberturas hospedadas). */
+  copyableIds(p: Project, ids: readonly Id[]): Id[] {
+    return copyableIdsOf(p, ids);
+  }
+
   /** Copia as paredes selecionadas e as aberturas nelas. Sem parede, mantém o que já estava copiado. */
   copy(p: Project, ids: Id[]): boolean {
     const next = clipboardFrom(p, ids);
@@ -42,7 +57,7 @@ export class Transfer {
       return false;
     }
     this.clip = next;
-    useUi.setState({ status: `${describe(counts(next))} copiado(s). Ctrl+V cola alinhado no nível ativo.` });
+    useUi.setState({ status: `${describe(counts(next))} copiado(s). Ctrl+V cola seguindo o cursor.` });
     return true;
   }
 

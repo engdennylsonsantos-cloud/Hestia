@@ -1,4 +1,4 @@
-import { isFloor, isOpening, isRamp, isRoof, isRoom, isSlab, isStair, isWall, newId, type Command, type Floor, type Id, type Opening, type Project, type Ramp, type Room, type Roof, type Slab, type Stair, type Wall } from '@hestia/model';
+import { isFloor, isOpening, isRamp, isRoof, isRoom, isSlab, isStair, isWall, newId, type Command, type Element, type Floor, type Id, type Opening, type Project, type Ramp, type Room, type Roof, type Slab, type Stair, type Wall } from '@hestia/model';
 import { stairTypeId } from './stairCommands.ts';
 import { rampTypeId } from './rampCommands.ts';
 
@@ -39,6 +39,32 @@ export function clipboardFrom(p: Project, ids: Id[]): ClipBuffer | null {
     .filter((o) => hostIds.has(o.hostId))
     .map((o) => structuredClone(o));
   return { walls, openings, floors, slabs, roofs, stairs, ramps, rooms };
+}
+
+/** Elemento que `clipboardFrom` leva por si só: parede, piso, laje, telhado, escada, rampa ou ambiente. */
+const isCopyableElement = (e: Element | undefined): boolean =>
+  isWall(e) || isFloor(e) || isSlab(e) || isRoof(e) || isStair(e) || isRamp(e) || isRoom(e);
+
+/**
+ * Ids que `clipboardFrom` levaria para a seleção dada, sem copiar nada: os elementos copiáveis da seleção, na ordem
+ * em que aparecem nela, mais as aberturas hospedadas nas paredes selecionadas, na ordem de `p.elements`. Sem
+ * duplicatas. Ficam de fora forros, objetos genéricos, anotações, grades, separadores de ambiente e ids inexistentes.
+ */
+export function copyableIds(p: Project, ids: readonly Id[]): Id[] {
+  const hostIds = new Set(ids.filter((id) => isWall(p.elements[id])));
+  const out: Id[] = [];
+  const seen = new Set<Id>();
+  for (const id of ids) {
+    if (!isCopyableElement(p.elements[id]) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  for (const e of Object.values(p.elements)) {
+    if (!isOpening(e) || !hostIds.has(e.hostId) || seen.has(e.id)) continue;
+    seen.add(e.id);
+    out.push(e.id);
+  }
+  return out;
 }
 
 /**

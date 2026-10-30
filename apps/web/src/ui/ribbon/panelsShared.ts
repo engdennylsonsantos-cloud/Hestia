@@ -22,8 +22,8 @@ export const P_MEASURE: RibbonPanel = panel('medir', t('Medir', 'Measure'), tool
 export const P_CLIPBOARD: RibbonPanel = panel(
   'area-transferencia',
   t('Área de transferência', 'Clipboard'),
-  soon(t('Colar', 'Paste'), 'paste'),
-  stack(soonS(t('Recortar', 'Cut'), 'cut'), soonS(t('Copiar p/ área', 'Copy'), 'copy'), soonS(t('Corresp. tipo', 'Match Type'), 'sametype')),
+  act('pasteAligned', 'large', t('Colar', 'Paste')),
+  stack(act('cutSelection', 'small'), act('copySelection', 'small'), soonS(t('Corresp. tipo', 'Match Type'), 'sametype')),
 );
 
 export const P_GEOMETRY: RibbonPanel = panel(
@@ -42,4 +42,4 @@ export const P_SELECTION_EXTRA: RibbonPanel = panel(
   stack(act('sameType', 'small'), act('sameName', 'small'), act('moveLevel', 'small')),
 );
 
-export const P_CREATE: RibbonPanel = panel('criar', t('Criar', 'Create'), soon(t('Criar similar', 'Create Similar'), 'copy'), soon(t('Criar grupo', 'Create Group'), 'layers'));
+export const P_CREATE: RibbonPanel = panel('criar', t('Criar', 'Create'), act('createSimilar'), soon(t('Criar grupo', 'Create Group'), 'layers'));

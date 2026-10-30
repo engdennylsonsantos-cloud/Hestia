@@ -141,6 +141,15 @@ describe('CasadorSequencia', () => {
     expect(casa.tecla('u')).toEqual({ comando: 'unidades', tratada: true });
   });
 
+  it('CS ativa Criar semelhante no Revit; no simples, é VS', () => {
+    casa = monta(PERFIL_REVIT);
+    expect(casa.tecla('c')).toEqual({ tratada: true });
+    expect(casa.tecla('s')).toEqual({ comando: 'createSimilar', tratada: true });
+    casa = monta(PERFIL_SIMPLES);
+    expect(casa.tecla('v')).toEqual({ tratada: true });
+    expect(casa.tecla('s')).toEqual({ comando: 'createSimilar', tratada: true });
+  });
+
   it('limpar() zera o buffer e cancela o tempo', () => {
     casa = monta(PERFIL_REVIT);
     casa.tecla('W');

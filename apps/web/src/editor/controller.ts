@@ -19,8 +19,9 @@ import {
   type SectionView,
   type TemplateId,
 } from '@hestia/model';
-import { annotationAt, DEFAULT_SNAP, createTool, execWithHostedLoss, isStairTool, type HostedApplyResult, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
+import { annotationAt, DEFAULT_SNAP, createTool, execWithHostedLoss, isStairTool, setPasteClip, type HostedApplyResult, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
 import { transfer } from './transfer.ts';
+import { startCreateSimilar } from './createSimilar.ts';
 import { desfazerOuRefazer } from './historyStatus.ts';
 import { keptFloorType } from './typeActions.ts'; import { keptSlabType } from './slabTypeActions.ts'; import { PerimeterMode } from './perimeterMode.ts';
 import { AUTOSAVE_KEY, safeGet, safeSet } from './storage.ts';
@@ -373,7 +374,12 @@ export class Editor {
       this.save();
       return true;
     }
-    if (mod && ui.view === 'plan' && /^[cv]$/i.test(k) && !this.perimetro.ativo) return k.toLowerCase() === 'c' ? this.copySelection() : this.pasteAligned(ui.levelId);
+    if (mod && ui.view === 'plan' && /^[cvx]$/i.test(k) && !this.perimetro.ativo) {
+      const tecla = k.toLowerCase();
+      if (tecla === 'c') return this.copySelection();
+      if (tecla === 'x') return this.cutSelection();
+      return this.pasteAligned();
+    }
     if (mod) return /^a$/i.test(k) && this.perimetro.selecionarTudo();
     if (k === 'F3') {
       const cur = (useUi.getState().options.snap ?? DEFAULT_SNAP).enabled !== false;
@@ -460,6 +466,7 @@ export class Editor {
     const r = casador.tecla(k);
     if (!r.tratada) return false;
     if (r.comando === 'atalhos' || r.comando === 'unidades') useUi.setState({ dialog: r.comando === 'atalhos' ? 'shortcutsConfig' : 'units', dialogArg: null });
+    else if (r.comando === 'createSimilar') startCreateSimilar(this.project, (id) => this.setTool(id));
     else if (r.comando) this.setTool(r.comando);
     return true;
   }
@@ -527,8 +534,38 @@ export class Editor {
 
   /** Copiar (Ctrl+C): paredes selecionadas e suas aberturas, em memória. */
   copySelection(): boolean { return transfer.copy(this.project, useUi.getState().selection); }
-  /** Colar alinhado (Ctrl+V): mesmas coordenadas no nível dado. */
-  pasteAligned(levelId: Id): boolean { return transfer.paste(this.store, levelId); }
+
+  /** A seleção inteira é copiável? (Recortar só apaga o que o buffer consegue levar.) */
+  canCutSelection(ids: readonly Id[] = useUi.getState().selection, p: Project = this.project): boolean {
+    if (ids.length === 0) return false;
+    const copiaveis = transfer.copyableIds(p, ids);
+    return ids.every((id) => copiaveis.includes(id));
+  }
+
+  /** Recortar (Ctrl+X): copia e apaga a seleção num passo de desfazer. */
+  cutSelection(): boolean {
+    const ids = useUi.getState().selection;
+    if (!this.canCutSelection(ids)) {
+      useUi.setState({ status: 'Recortar só vale para paredes, pisos, lajes, telhados, escadas, rampas, ambientes e aberturas hospedadas (com a parede selecionada).' });
+      return false;
+    }
+    if (!transfer.copy(this.project, ids)) return false;
+    this.deleteSelection();
+    useUi.setState({ status: 'Recortado(s). Ctrl+V cola seguindo o cursor.' });
+    return true;
+  }
+
+  /** Colar (Ctrl+V): entrega o buffer ao modo Colar, que acompanha o cursor até o clique. */
+  pasteAligned(): boolean {
+    const clip = transfer.clipBuffer();
+    if (!clip) {
+      useUi.setState({ status: 'Nada copiado. Use Copiar ou Ctrl+C.' });
+      return false;
+    }
+    setPasteClip(clip);
+    this.setTool('paste');
+    return useUi.getState().tool === 'paste';
+  }
   /** Seleciona todas as paredes e aberturas do nível ativo com o tipo dado. */
   selectAllOfType(typeId: Id): number { return transfer.ofType(this.project, useUi.getState().levelId, typeId); }
   /** "Mesmo tipo" (botão na aba Modificar). */

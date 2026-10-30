@@ -18,9 +18,10 @@ export type RibbonTabId =
 export type ActionId =
   | 'cotasAuto' | 'typeProps' | 'properties' | 'browser' | 'sameType' | 'sameName' | 'moveLevel' | 'delete'
   | 'zoomFit' | 'thinLines' | 'grid' | 'underlay' | 'roofProjection' | 'graphicsVisibility' | 'view3d' | 'genElevations' | 'newSheet'
-  | 'materials' | 'levels' | 'lineWeights' | 'shortcutsConfig' | 'shortcuts' | 'importCad'
+  | 'materials' | 'levels' | 'lineWeights' | 'units' | 'shortcutsConfig' | 'shortcuts' | 'importCad'
   | 'schedWalls' | 'schedFloors' | 'schedSlabs' | 'schedCeilings' | 'schedRoofs' | 'schedStairs' | 'schedRooms' | 'schedOpenings'
-  | 'stairSketch' | 'stairTypes' | 'rampTypes' | 'schedRamps' | 'propsSide' | 'browserSide' | 'resetDock' | 'tagAll' | 'wallTags' | 'editPerimeter';
+  | 'stairSketch' | 'stairTypes' | 'rampTypes' | 'schedRamps' | 'propsSide' | 'browserSide' | 'resetDock' | 'tagAll' | 'wallTags' | 'editPerimeter'
+  | 'copySelection' | 'cutSelection' | 'pasteAligned' | 'createSimilar';
 
 export type RibbonItem =
   /** Ferramenta do editor: o clique chama `editor.setTool`; mostra o atalho no tooltip. */

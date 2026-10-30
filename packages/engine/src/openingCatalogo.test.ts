@@ -403,7 +403,8 @@ describe('catálogo completo: modelo único', () => {
   }, 30_000); // Com o catálogo brasileiro (130 tipos) passa dos 5 s padrão sob carga da suíte.
 });
 
-describe('catálogo completo: planta', () => {
+// Mesmo motivo do bloco anterior: o catálogo brasileiro passa dos 5 s padrão sob a carga da suíte completa.
+describe('catálogo completo: planta', { timeout: 30_000 }, () => {
   it('low/mid/high: pontos finitos e nenhum traço com menos de dois pontos', () => {
     for (const base of DEFAULT_OPENING_TYPES.map((t) => t.id)) {
       for (const flips of combos) {

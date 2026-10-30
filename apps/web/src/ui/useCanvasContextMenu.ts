@@ -7,6 +7,7 @@ import { buildContextMenu, type ContextMenuCtx, type MenuEntry, type MenuView } 
 import { useI18n, toolLabel } from '../editor/i18n.ts';
 import { repeatLast, selectPrevious, useRecent } from '../editor/recentCommands.ts';
 import { clickSelect3d, useUi } from '../editor/state.ts';
+import { startCreateSimilar } from '../editor/createSimilar.ts';
 import { comEditarPerimetro, EDITAR_PERIMETRO_ID, idPerimetroEditavel } from './perimeter/perimeterEditavel.ts';
 
 /** Menu aberto: posição na tela, o contexto em que foi montado e as entradas. */
@@ -71,28 +72,6 @@ export interface Camera3dMenu {
   orbit: { zoom: (delta: number) => void };
 }
 
-/** Tipo de elemento -> ferramenta de criação e a opção de tipo dela (Criar semelhante). */
-const FERRAMENTA_DO_TIPO: Record<string, { tool: ToolId; option: 'wallTypeId' | 'doorTypeId' | 'windowTypeId' | 'floorTypeId' | 'slabTypeId' | 'ceilingTypeId' | 'roofTypeId' }> = {
-  wall: { tool: 'wall', option: 'wallTypeId' },
-  door: { tool: 'door', option: 'doorTypeId' },
-  window: { tool: 'window', option: 'windowTypeId' },
-  floor: { tool: 'floor', option: 'floorTypeId' },
-  slab: { tool: 'slab', option: 'slabTypeId' },
-  ceiling: { tool: 'ceiling', option: 'ceilingTypeId' },
-  roof: { tool: 'roof', option: 'roofTypeId' },
-};
-
-/** Criar semelhante: a ferramenta do tipo do elemento, já com o tipo dele escolhido. */
-function criarSemelhante(): void {
-  const { selection } = useUi.getState();
-  const el = editor.project.elements[selection[0] ?? ''];
-  const alvo = el ? FERRAMENTA_DO_TIPO[el.kind] : undefined;
-  if (!el || !alvo || !('typeId' in el)) return;
-  const typeId = (el as { typeId: Id }).typeId;
-  useUi.setState((st) => ({ options: { ...st.options, [alvo.option]: typeId } }));
-  editor.setTool(alvo.tool);
-}
-
 /** "Editar perímetro" do elemento selecionado (o menu só oferece com um elemento editável). */
 function editarPerimetroSelecionado(): void {
   const id = idPerimetroEditavel(editor.project, useUi.getState().selection);
@@ -122,7 +101,7 @@ export function executaComandoDoMenu(id: string, view: MenuView, camera: Camera3
     case 'properties': useUi.setState((s) => ({ propsOpen: !s.propsOpen })); return;
     case 'delete': editor.deleteSelection(); return;
     case 'selectAllView': editor.selectAllOfSelectedType(); return;
-    case 'createSimilar': criarSemelhante(); return;
+    case 'createSimilar': startCreateSimilar(editor.project, (id) => editor.setTool(id)); return;
     case EDITAR_PERIMETRO_ID: editarPerimetroSelecionado(); return;
     default:
   }

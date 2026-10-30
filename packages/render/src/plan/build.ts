@@ -31,6 +31,7 @@ import { Limiares, type VistaComLimiares } from './limiares.ts';
 import { tracoEm } from './marcadores.ts';
 import { resolverZoom } from './zoomOps.ts';
 import { planContext } from './planContext.ts';
+import { cadPlanOps } from './cad.ts';
 import { areaPlanProfile, type FillOp, type LabelOp, type PlanDrawList, type PlanOps, type PlanTheme, type StrokeOp } from './types.ts';
 
 import { buildPlanOverlay } from './planOverlay.ts';
@@ -427,6 +428,10 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
       if (!isGeneric(e) || e.levelId !== input.levelId || !e.outline?.length) continue;
       strokes.push({ pts: e.outline, closed: true, widthPx: 1, color: theme.inkSoft, alpha: 0.8, dash: [5, 3] });
     }
+    // CAD importado (fase 5): os traços e textos do desenho, finos e na cor de cada camada/entidade.
+    const cad = cadPlanOps(p, input.levelId, theme, style.scale);
+    strokes.push(...cad.strokes);
+    labels.push(...cad.labels);
   }
 
   // Linhas finas (só na tela): os traços do modelo ficam com 1 px; o que vem depois (seleção, cursor, cotas temporárias,

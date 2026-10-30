@@ -1,5 +1,6 @@
 import { boxOf, boxesOverlap, dist, dot, intersectSegments, len, sub, type Vec2 } from '@hestia/geom';
-import { areaPlanOf, dimensionGeometry, dimensionPoints, levelDimensions, levelGraphicsOf, levelTexts, planAnnotationsOf, wallsOnLevel, type DetailLine, type DetailRegion, type Dimension, type DimensionRef, type ElementTag, type Id, type Project, type TextNote } from '@hestia/model';
+import { areaPlanOf, angularDimensionGeometry, dimensionGeometry, dimensionPoints, levelDimensions, levelGraphicsOf, levelTexts, planAnnotationsOf, wallsOnLevel, type DetailLine, type DetailRegion, type Dimension, type DimensionRef, type ElementTag, type Id, type Project, type TextNote } from '@hestia/model';
+import { resolveAngularDimension } from '@hestia/engine';
 
 /** Tolerância (m) para dizer que um ponto é a extremidade de uma parede. */
 const END_TOL = 1e-4;
@@ -123,6 +124,13 @@ export function annotationAt(p: Project, levelId: Id, at: Vec2, mpp: number, pla
     if (inside) return { id: region.id, kind: 'text' };
   }
   for (const d of a.dimensions) {
+    if (d.angular) {
+      const g = angularDimensionGeometry(resolveAngularDimension(p, levelId, d));
+      if (!g) continue;
+      if (dist(at, g.textAt) <= 10 * mpp) return { id: d.id, kind: 'dimension' };
+      for (const [s, e] of [...g.arc.slice(0, -1).map((q, i) => [q, g.arc[i + 1]!] as const), ...g.extensions]) if (distToSegment(at, s, e) <= 6 * mpp) return { id: d.id, kind: 'dimension' };
+      continue;
+    }
     const pts = dimensionPoints(p, d);
     const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4, d.textHeight, d.textAt);
     if (dist(at, g.textAt) <= 10 * mpp) return { id: d.id, kind: 'dimension' };
@@ -148,6 +156,13 @@ export function annotationIdsInBox(p: Project, levelId: Id, a: Vec2, b: Vec2, mp
   };
   const ids: Id[] = [];
   for (const d of a0.dimensions) {
+    if (d.angular) {
+      const g = angularDimensionGeometry(resolveAngularDimension(p, levelId, d));
+      if (!g) continue;
+      const pontos = [...g.arc, g.textAt];
+      if (pontos.every(dentro) || (crossing && boxesOverlap(boxOf(pontos), box))) ids.push(d.id);
+      continue;
+    }
     const pts = dimensionPoints(p, d);
     const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4, d.textHeight, d.textAt);
     const pontos = [g.line[0], g.line[1], ...g.extensions.flat(), ...(d.textAt ? [d.textAt] : [])];
@@ -172,7 +187,7 @@ export function annotationIdsInBox(p: Project, levelId: Id, a: Vec2, b: Vec2, mp
 export function dimGripAt(p: Project, levelId: Id, sel: Id[], at: Vec2, mpp: number, planId?: Id): Id | null {
   if (sel.length !== 1) return null;
   const d = viewAnnotationsOf(p, levelId, planId).dimensions.find((x) => x.id === sel[0]);
-  if (!d) return null;
+  if (!d || d.angular) return null;
   const pts = dimensionPoints(p, d);
   const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4);
   return dist(at, mid(g.line[0], g.line[1])) <= 6 * mpp ? d.id : null;
@@ -183,6 +198,10 @@ export function dimTextGripAt(p: Project, levelId: Id, sel: Id[], at: Vec2, mpp:
   if (sel.length !== 1) return null;
   const d = viewAnnotationsOf(p, levelId, planId).dimensions.find((x) => x.id === sel[0]);
   if (!d) return null;
+  if (d.angular) {
+    const g = angularDimensionGeometry(resolveAngularDimension(p, levelId, d));
+    return g && dist(at, g.textAt) <= 9 * mpp ? d.id : null;
+  }
   const pts = dimensionPoints(p, d);
   const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4, d.textHeight, d.textAt);
   return dist(at, g.textAt) <= 9 * mpp ? d.id : null;

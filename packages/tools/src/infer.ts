@@ -20,6 +20,7 @@ import { openingTypeById, openingsOfWall, totalThickness, wallsOnLevel, type Id,
 import { closestOnWall, wallMid } from './wallGeom.ts';
 import { addGridSnaps } from './gridSnapPoints.ts';
 import { addExtraPoints, addExtraSegments, addExtraTracks } from './snapExtras.ts';
+import { orthoPoint, polarPoint } from './angleSnap.ts';
 import { DEFAULT_SNAP, type Guide, type Inference, type SnapKind, type SnapOptions } from './types.ts';
 
 /** Ponto extra de captura. `hostId` é o elemento dono: some da captura quando ele está em `ignore` (ex.: o piso sendo movido). */
@@ -34,6 +35,9 @@ export interface InferContext {
   /** Ponto anterior (para ortogonal, perpendicular e comprimento). */
   from?: Vec2;
   orthoLock?: boolean;
+  /** Rastreamento polar (F10): trava a direção nos múltiplos de `polarIncrementDeg`. Ortogonal tem prioridade. */
+  polar?: boolean;
+  polarIncrementDeg?: number;
   /** Ignorar estes elementos (por exemplo, os que estão sendo movidos). */
   ignore?: Set<Id>;
   /** Desliga a atração para a grade (ex.: inserir aberturas). */
@@ -75,6 +79,7 @@ const WEIGHT: Record<SnapKind, number> = {
   nearest: 0.7,
   alignment: 0.9,
   ortho: 1,
+  polar: 1,
   grid: 1.5,
   center: 0.2,
   tangent: 0.3,
@@ -196,21 +201,20 @@ function crossAxis(p: Vec2, d: Vec2, axis: 'x' | 'y', v: number): Vec2 | null {
  */
 export function infer(cursor: Vec2, ctx: InferContext): Inference {
   const sn = { ...DEFAULT_SNAP, ...ctx.snap };
-  if (sn.enabled === false && !ctx.orthoLock) {
+  if (sn.enabled === false && !ctx.orthoLock && !ctx.polar) {
     return { point: cursor, kind: 'none', guides: [] };
   }
 
   const tol = TOL_PX * ctx.mpp;
-  // Grade só quantiza quando está ligada e a ferramenta não a dispensou (S-03).
   const g = ctx.noGrid || !sn.grid ? 0 : ctx.gridStep;
   const free = (v: number): number => (g > 0 ? Math.round(v / g) * g : v);
-  // Modo ortogonal travado (F8): só a projeção no eixo mais próximo, sem disputar com endpoint/alinhamento.
   if (ctx.orthoLock && ctx.from) {
-    const d = sub(cursor, ctx.from);
-    if (len(d) <= 1e-6) return { point: cursor, kind: 'none', guides: [] };
-    const horiz = Math.abs(d.y) <= Math.abs(d.x);
-    const snapped = horiz ? v2(free(cursor.x), ctx.from.y) : v2(ctx.from.x, free(cursor.y));
-    return { point: snapped, kind: 'ortho', guides: [{ from: ctx.from, to: snapped, kind: 'ortho' }] };
+    const snapped = orthoPoint(cursor, ctx.from, free);
+    return snapped ? { point: snapped, kind: 'ortho', guides: [{ from: ctx.from, to: snapped, kind: 'ortho' }] } : { point: cursor, kind: 'none', guides: [] };
+  }
+  if (ctx.polar && ctx.from) {
+    const snapped = polarPoint(cursor, ctx.from, ctx.polarIncrementDeg);
+    return snapped ? { point: snapped, kind: 'polar', guides: [{ from: ctx.from, to: snapped, kind: 'polar' }] } : { point: cursor, kind: 'none', guides: [] };
   }
   // Pavimento atual e, se visível como referência, o de baixo: o que se vê na planta é o que se captura.
   const levels: Id[] = ctx.underlayLevelId ? [ctx.levelId, ctx.underlayLevelId] : [ctx.levelId];

@@ -1,4 +1,5 @@
-import { openingTypeById, dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, isOpening, isWall, levelDimensions, levelTexts, unitsOf, wallHeight, wallType, type Id, type Project } from '@hestia/model';
+import { openingTypeById, angularDimensionGeometry, dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, isOpening, isWall, levelDimensions, levelTexts, unitsOf, wallHeight, wallType, type Id, type Project } from '@hestia/model';
+import { resolveAngularDimension } from '@hestia/engine';
 import type { DxfPoint } from './dxf.ts';
 
 /** Camadas das anotações da planta (decisão 0019): cotas em LINE e TEXT; textos livres em TEXT. */
@@ -51,6 +52,15 @@ export function notesDxfOf(p: Project, levelId: Id, scale: number): DxfNotes {
   const texts: DxfNoteText[] = [];
   const otherLines: Array<{ a: DxfPoint; b: DxfPoint; layer: string }> = [];
   for (const d of levelDimensions(p, levelId)) {
+    if (d.angular) {
+      const rd = resolveAngularDimension(p, levelId, d);
+      const g = angularDimensionGeometry(rd);
+      if (!g) continue;
+      for (let i = 1; i < g.arc.length; i++) lines.push([g.arc[i - 1]!, g.arc[i]!]);
+      lines.push(...g.extensions, ...g.ticks);
+      texts.push({ at: rd.textAt ?? g.textAt, text: dimensionText(p, rd, unitsOf(p)), height: (rd.textHeight ?? DIM_TEXT_MM) * mPerMm, rotation: g.textRotation, layer: DXF_LAYER_COTAS });
+      continue;
+    }
     const { a, b } = dimensionPoints(p, d);
     const g = dimensionGeometry(a, b, d.offset, mPerMm);
     lines.push(g.line, ...g.extensions, ...dimensionMarks(g.line[0], g.line[1], g.ticks, d.tickStyle, mPerMm));

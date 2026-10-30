@@ -42,3 +42,25 @@ describe('modo ortogonal travado (F8)', () => {
     expect(inf.kind).not.toBe('ortho');
   });
 });
+
+describe('rastreamento polar (F10)', () => {
+  it('projeta no múltiplo do incremento e devolve guia polar', () => {
+    const inf = infer({ x: 3, y: 1.1 }, ctx({ polar: true, polarIncrementDeg: 30 }));
+    const angle = Math.atan2(inf.point.y, inf.point.x) * 180 / Math.PI;
+    expect(angle).toBeCloseTo(30, 6);
+    expect(inf.kind).toBe('polar');
+    expect(inf.guides[0]).toMatchObject({ kind: 'polar' });
+  });
+
+  it('aceita incremento personalizado (22,5°)', () => {
+    const inf = infer({ x: 3, y: 1.2 }, ctx({ polar: true, polarIncrementDeg: 22.5 }));
+    const angle = Math.atan2(inf.point.y, inf.point.x) * 180 / Math.PI;
+    expect(angle).toBeCloseTo(22.5, 6);
+  });
+
+  it('ortogonal tem prioridade quando os dois estão ligados', () => {
+    const inf = infer({ x: 3, y: 1.1 }, ctx({ orthoLock: true, polar: true, polarIncrementDeg: 30 }));
+    expect(inf.kind).toBe('ortho');
+    expect(inf.point).toEqual({ x: 3, y: 0 });
+  });
+});

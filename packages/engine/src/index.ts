@@ -89,3 +89,4 @@ export * from './projectIssues.ts';
 export * from './resolveLevels.ts';
 export * from './wallPlanes.ts';
 export * from './openingExtents.ts';
+export * from './angularDimension.ts';

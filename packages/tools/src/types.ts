@@ -6,12 +6,12 @@ import type { StairToolOptions, StairTone } from './stairSketchState.ts';
 import type { StairRunToolOptions } from './stairRunPlan.ts';
 import type { RampToolOptions } from './rampOptions.ts';
 
-export type SnapKind = 'endpoint' | 'face' | 'core' | 'midpoint' | 'intersection' | 'perpendicular' | 'nearest' | 'alignment' | 'ortho' | 'grid' | 'center' | 'tangent' | 'none';
+export type SnapKind = 'endpoint' | 'face' | 'core' | 'midpoint' | 'intersection' | 'perpendicular' | 'nearest' | 'alignment' | 'ortho' | 'polar' | 'grid' | 'center' | 'tangent' | 'none';
 
 export interface Guide {
   from: Vec2;
   to: Vec2;
-  kind: 'alignment' | 'ortho' | 'perpendicular';
+  kind: 'alignment' | 'ortho' | 'polar' | 'perpendicular';
 }
 
 export interface Inference {
@@ -126,6 +126,16 @@ export const DEFAULT_DISJOIN = { move: false, rotate: true, mirror: false } as c
 /** Alinhar: feição inicial oferecida nas paredes (Faces, Eixos ou Núcleo). */
 export type AlignPrefer = 'faces' | 'eixos' | 'nucleo';
 
+/**
+ * Grupo Orto/Polar (F8/F10): rastreamento angular global. `ortho` trava em 0°/90° e tem prioridade quando os dois estão
+ * ligados; `polar` trava nos múltiplos de `polarIncrementDeg` (15° por padrão, aceita valores personalizados).
+ */
+export interface AngleMode {
+  ortho: boolean;
+  polar: boolean;
+  polarIncrementDeg: number;
+}
+
 export interface ToolOptions {
   /** Capturas ligadas; ausente = padrão. */
   snap?: SnapOptions;
@@ -184,6 +194,8 @@ export interface ToolOptions {
   regionColor?: string;
   detailLineStyle?: 'solid' | 'dashed' | 'dotted';
   orthoLock: boolean;
+  /** Grupo Orto/Polar; ausente usa `orthoLock` para compatibilidade. */
+  angleMode?: AngleMode;
   arrayCount: number;
   /** Matriz: linear (repete pelo espaçamento) ou radial (gira em torno de um centro). Ausente = linear. */
   arrayKind?: ArrayKind;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolverRotulo } from './zoomOps.ts';
-import { ProjectStore, createEmptyProject, paperMmToPx } from '@hestia/model';
+import { ProjectStore, createEmptyProject, angularDimensionData, paperMmToPx } from '@hestia/model';
 import { noteOps } from './notes.ts';
 import { defaultPaint } from './style.ts';
 import { Limiares, type VistaComLimiares } from './limiares.ts';
@@ -111,5 +111,15 @@ describe('anotações na planta', () => {
     expect(t.papel).toMatchObject({ escala: SCALE, fontMm: 3, widthMm: 40 });
     expect(t.bold).toBe(true);
     expect(resolverRotulo(t, ZOOM).widthPx).toBeCloseTo(paperMmToPx(40, ZOOM, SCALE), 9);
+  });
+
+  it('cota angular: arco, chamadas, marcas e valor em graus', () => {
+    const s = new ProjectStore(createEmptyProject());
+    const angular = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, 2, 'minor', 'a', 'b');
+    s.exec({ type: 'addDimension', levelId: LV0, dimension: { id: 'ang', a: { x: 0, y: 0 }, b: { x: 0, y: 2 }, offset: 0, angular, precision: 1 } });
+    const ops = noteOps(s.project, LV0, defaultPaint('annotation', ZOOM), LOOK, SCALE);
+    expect(ops.labels).toHaveLength(1);
+    expect(ops.labels[0]!.text).toContain('90');
+    expect(ops.strokes.length).toBeGreaterThanOrEqual(5);
   });
 });

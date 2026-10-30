@@ -27,7 +27,7 @@ import { AUTOSAVE_KEY, safeGet, safeSet } from './storage.ts';
 import { useI18n } from './i18n.ts';
 import { pedirConfirmacaoHostedLoss } from './hostedLossPrompt.ts';
 import { fitBox, levelFrameBox, panBy, planViewOf, referenceAt, roomTagLines, sectionBox, tagBoxModel, underlayIdOf, effectiveGridStep, zoomAt, type Viewport } from '@hestia/render';
-import { key3d, setSnap, toggleOrtho, useUi } from './state.ts';
+import { key3d, setSnap, toggleOrtho, togglePolar, useUi } from './state.ts';
 import { defaultOpenViews, type PlanKind } from './openViews.ts';
 import { casador } from './shortcutConfig.ts'; import { clearSelectionForTool } from './toolSelection.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
@@ -383,6 +383,10 @@ export class Editor {
     }
     if (k === 'F8') {
       toggleOrtho();
+      return true;
+    }
+    if (k === 'F10') {
+      togglePolar();
       return true;
     }
     if (k === 'F11') {

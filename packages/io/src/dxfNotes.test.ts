@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject } from '@hestia/model';
+import { ProjectStore, createEmptyProject, angularDimensionData } from '@hestia/model';
 import { DXF_LAYER_COTAS, DXF_LAYER_TEXTOS, dxfTextRecords, notesDxfOf } from './dxfNotes.ts';
 import { exportDxf, type DxfLevelGeometry } from './dxf.ts';
 
@@ -80,5 +80,14 @@ describe('anotações no DXF da planta', () => {
     expect(rec[50]).toBe('90.000000');
     expect(rec[72]).toBe(1);
     expect(rec[73]).toBe(2);
+  });
+
+  it('cota angular sai como arco segmentado, chamadas e texto em COTAS', () => {
+    const s = new ProjectStore(createEmptyProject());
+    const angular = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, 2, 'minor', 'a', 'b');
+    s.exec({ type: 'addDimension', levelId: LV0, dimension: { id: 'ang', a: { x: 0, y: 0 }, b: { x: 0, y: 2 }, offset: 0, angular, precision: 1 } });
+    const notes = notesDxfOf(s.project, LV0, 100);
+    expect(notes.lines.length).toBeGreaterThanOrEqual(28);
+    expect(notes.texts.filter((t) => t.layer === DXF_LAYER_COTAS).map((t) => t.text)[0]).toContain('90');
   });
 });

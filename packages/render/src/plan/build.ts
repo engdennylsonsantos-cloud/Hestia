@@ -1,7 +1,7 @@
 import { add, boxOf, mul, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
-import { openingTypeById, dimensionPoints, isGeneric, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, planAnnotationIds, projectGrids, wallsOnLevel, type AreaPlan, type DetailLevel, type Id, type Material, type Project } from '@hestia/model';
-import { resolveRooms } from '@hestia/engine';
+import { openingTypeById, angularDimensionGeometry, dimensionPoints, isGeneric, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, planAnnotationIds, projectGrids, wallsOnLevel, type AreaPlan, type DetailLevel, type Id, type Material, type Project } from '@hestia/model';
+import { resolveRooms, resolveAngularDimension } from '@hestia/engine';
 import { areaPlanLegendOps, areaPlanRoomOps, areaPlanTableOps, areaPlanTagOps } from './areaPlan.ts';
 import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel, rampasDoNivel, telhadosDoNivel } from './resolucao.ts';
 import type { Inference, PreviewItem } from '@hestia/tools';
@@ -534,6 +534,11 @@ export function levelFrameBox(p: Project, levelId: Id): { minX: number; minY: nu
   const base = levelBox(p, levelId);
   const pts: Vec2[] = [];
   for (const d of levelDimensions(p, levelId)) {
+    if (d.angular) {
+      const g = angularDimensionGeometry(resolveAngularDimension(p, levelId, d));
+      if (g) pts.push(...g.arc, ...g.extensions.flat());
+      continue;
+    }
     const { a, b } = dimensionPoints(p, d);
     const n = perp(norm(sub(b, a)));
     pts.push(a, b, add(a, mul(n, d.offset)), add(b, mul(n, d.offset)));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, dimensionGeometry, dimensionPoints, dimensionText, dimensionValue, formatDimension, formatDimensionValue, makeWall, resolveUnits, unitsOf, type Dimension } from './index.ts';
+import { ProjectStore, createEmptyProject, angularDimensionData, angularDimensionGeometry, dimensionGeometry, dimensionPoints, dimensionText, dimensionValue, formatDimension, formatDimensionValue, makeWall, resolveUnits, unitsOf, type Dimension } from './index.ts';
 
 const LV0 = 'lv_0';
 const close = (a: { x: number; y: number }, b: { x: number; y: number }) => {
@@ -121,5 +121,37 @@ describe('geometria da cota', () => {
     expect(dimensionGeometry({ x: 4, y: 0 }, { x: 0, y: 0 }, 1, 0.01).textRotation).toBe(0);
     expect(dimensionGeometry({ x: 0, y: 0 }, { x: 0, y: 4 }, 1, 0.01).textRotation).toBe(90);
     expect(dimensionGeometry({ x: 0, y: 4 }, { x: 0, y: 0 }, 1, 0.01).textRotation).toBe(90);
+  });
+});
+
+describe('cota angular', () => {
+  const sqrt2 = Math.SQRT1_2;
+  const angular = (side: 'minor' | 'major', to = { x: sqrt2, y: sqrt2 }) =>
+    angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, to, 1.5, side, 'w1:face:hi', 'w2:face:hi');
+
+  it('mede o �ngulo menor em radianos e formata em graus', () => {
+    const s = new ProjectStore(createEmptyProject());
+    const d = dim({ angular: angular('minor'), precision: 1 });
+    expect(dimensionValue(s.project, d)).toBeCloseTo(Math.PI / 4, 9);
+    expect(dimensionText(s.project, d, unitsOf(s.project))).toContain('45');
+  });
+
+  it('o lado maior usa o suplemento e espelha a segunda dire��o', () => {
+    const a = angular('major');
+    expect(a.value).toBeCloseTo((3 * Math.PI) / 4, 9);
+    expect(a.to.x).toBeCloseTo(-sqrt2, 9);
+    expect(a.to.y).toBeCloseTo(-sqrt2, 9);
+  });
+
+  it('gera arco, chamadas, marcas e texto leg�vel', () => {
+    const g = angularDimensionGeometry(dim({ angular: angular('minor') }), 8)!;
+    expect(g.arc).toHaveLength(9);
+    expect(g.start.x).toBeCloseTo(1.5, 9);
+    expect(g.start.y).toBeCloseTo(0, 9);
+    expect(g.extensions).toHaveLength(2);
+    expect(g.ticks).toHaveLength(2);
+    expect(g.textAt.x).toBeGreaterThan(0);
+    expect(g.textAt.y).toBeGreaterThan(0.5);
+    expect(Number.isFinite(g.textRotation)).toBe(true);
   });
 });

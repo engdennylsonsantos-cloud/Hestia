@@ -647,6 +647,10 @@ svg { display: block; }
 .snap-btn:hover { background: var(--sheet); }
 .snap-btn[aria-expanded='true'] { box-shadow: 0 0 0 2px var(--accent-soft); }
 .snap-btn--disabled { opacity: 0.65; border-color: var(--line); color: var(--fg-soft); }
+.angle-group { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.angle-group-title { font-family: var(--font-mono); font-size: 10px; color: var(--fg-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+.angle-group .angle-preset { max-width: 64px; padding: 1px 4px; font-size: 11px; height: 22px; }
+.angle-group .angle-custom { width: 58px; padding: 1px 4px; font-size: 11px; height: 22px; }
 .snap-status-tag { font-family: var(--font-mono); font-size: 10px; padding: 1px 4px; border-radius: 3px; font-weight: 600; }
 .snap-status-tag.off { background: rgba(220, 53, 69, 0.15); color: #dc3545; }
 .snap-count { color: var(--fg-soft); }

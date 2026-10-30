@@ -175,15 +175,37 @@ export interface DimensionRef {
 }
 
 /**
- * Cota alinhada entre `a` e `b` (decisão 0019). O valor é a distância entre os pontos resolvidos (com `refs`, os da parede).
- * `offset` é a distância da linha de cota ao segmento a–b, em metros, no lado da normal esquerda de a→b.
+ * Cota angular: duas referências (chaves do Alinhar) e a geometria já resolvida para o desenho.
+ * O valor é em radianos; `from`/`to` são as direções (unitárias) das referências a partir de `center`.
+ * `side` guarda se o usuário escolheu o ângulo menor ou o maior.
  */
+export interface AngularDimension {
+  /** Chave da feição do Alinhar (ex.: `w1:face:hi`), para reencontrar a referência. */
+  refA: string;
+  refB: string;
+  center: Vec2;
+  from: Vec2;
+  to: Vec2;
+  radius: number;
+  side: 'minor' | 'major';
+  /** Ângulo em radianos. */
+  value: number;
+  /** Texto fixo que substitui o valor medido. */
+  text?: string;
+  textHeight?: number;
+  precision?: 0 | 1 | 2 | 3;
+  tickStyle?: 'slash' | 'arrow' | 'dot';
+}
+
+/** Cota alinhada entre `a` e `b` (decisão 0019). O valor é a distância entre os pontos resolvidos. */
 export interface Dimension {
   id: Id;
   a: Vec2;
   b: Vec2;
   offset: number;
   refs?: { a?: DimensionRef; b?: DimensionRef };
+  /** Quando presente, a cota é angular e `a`/`b` guardam o centro e um ponto de apoio. */
+  angular?: AngularDimension;
   /** Texto fixo que substitui o valor medido no desenho; vazio ou ausente mostra o valor medido. */
   text?: string;
   /** Direção de medida. Ausente mantém compatibilidade com cotas alinhadas antigas. */

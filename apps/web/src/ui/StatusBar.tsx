@@ -20,6 +20,7 @@ const SNAP: Record<string, string> = {
   nearest: 'Sobre a parede',
   alignment: 'Alinhamento',
   ortho: 'Ortogonal',
+  polar: 'Polar',
   grid: 'Grade',
 };
 

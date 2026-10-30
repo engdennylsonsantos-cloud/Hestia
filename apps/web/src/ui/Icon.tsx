@@ -47,6 +47,7 @@ const R: Record<string, string> = {
   stairrun: p('s1', 'M6 3H26V29H6Z') + p('ln', 'M6 9H26M6 14H26M6 19H26M6 24H26') + p('ac', 'M16 27V9') + p('fa', 'M12 11L16 5L20 11Z'),
   room: p('s1', 'M3 3H29V29H3Z') + p('bl', 'M7 11H25V25H7Z') + p('ln', 'M7 11L25 25M25 11L7 25'),
   dimension: p('ln', 'M5 6V24M27 6V24M5 18H27') + p('ac', 'M3 20L7 16M25 20L29 16') + '<text class="ic-tx" x="16" y="15" text-anchor="middle">12</text>',
+  angularDimension: p('ac', 'M5 26H28M5 26L25 7') + p('ac ic-ds', 'M22 26A17 17 0 0 0 18 14') + '<text class="ic-tx" x="22" y="18" text-anchor="middle">30°</text>',
   text: p('ln2', 'M6 27L16 5L26 27M10 20H22'),
   detailLine: p('ln2', 'M4 24L11 9L18 21L27 7') + p('ac', 'M3 27H29'),
   filledRegion: p('bl', 'M5 5H27V27H5Z') + p('ln', 'M5 5L27 27M27 5L5 27'),

@@ -70,6 +70,8 @@ export abstract class ToolBase implements Tool {
     const levels = levelsIn(levelId);
     // Aberturas entram na captura com cantos, centro e ombreiras; na inserção de abertura (só paredes) ficam de fora.
     const openings = extra.onWallsOnly ? [] : levels.flatMap((l) => openingSnapGeometry(project, l, visible));
+    const options = this.env.options();
+    const angle = options.angleMode;
     return {
       project,
       levelId,
@@ -77,8 +79,10 @@ export abstract class ToolBase implements Tool {
       underlayLevelId: under,
       mpp: this.env.metersPerPixel(),
       gridStep: this.env.gridStep(),
-      orthoLock: this.env.options().orthoLock,
-      snap: this.env.options().snap,
+      orthoLock: options.orthoLock || angle?.ortho === true,
+      polar: angle?.polar === true,
+      polarIncrementDeg: angle?.polarIncrementDeg,
+      snap: options.snap,
       ...extra,
       // Vértices dos pisos do nível entram sempre; os pontos que a ferramenta passa (contorno em construção) somam-se a eles.
       extraPoints: [...levels.flatMap((l) => floorVertices(project, l)), ...openings.flatMap((g) => g.points), ...(extra.extraPoints ?? [])],

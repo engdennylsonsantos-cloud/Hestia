@@ -1,6 +1,7 @@
 import { add, boxOf, dist, dot, sub, type Vec2 } from '@hestia/geom';
 import { ceilingOutline, frameOfWall } from '@hestia/engine';
-import { formatQuantity, isCeiling, isFloor, isOpening, isRamp, isRoof, isSlab, isStair, isWall, unitsOf, type Id, type ResolvedUnits } from '@hestia/model';
+import { angularDimensionGeometry, formatQuantity, isCeiling, isFloor, isOpening, isRamp, isRoof, isSlab, isStair, isWall, unitsOf, type Id, type ResolvedUnits } from '@hestia/model';
+import { resolveAngularDimension } from '@hestia/engine';
 import { ToolBase } from './base.ts';
 import { ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews } from './edit.ts';
 import { genericAt, idsInBox, pickAt } from './pick.ts';
@@ -313,7 +314,14 @@ export class SelectTool extends ToolBase {
     if (this.mode === 'dimtext') {
       this.dimTextAt = p.raw;
       const d = viewAnnotationsOf(pr, this.env.levelId(), this.planId()).dimensions.find((x) => x.id === this.dimTextGrip);
-      if (d) { const pts = dimensionPoints(pr, d); const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4); this.items = [{ kind: 'line', a: { x: (g.line[0].x + g.line[1].x) / 2, y: (g.line[0].y + g.line[1].y) / 2 }, b: p.raw, dashed: true }]; }
+      if (d) {
+        if (d.angular) {
+          const g = angularDimensionGeometry(resolveAngularDimension(pr, this.env.levelId(), d));
+          if (g) this.items = [{ kind: 'line', a: g.textAt, b: p.raw, dashed: true }];
+        } else {
+          const pts = dimensionPoints(pr, d); const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4); this.items = [{ kind: 'line', a: { x: (g.line[0].x + g.line[1].x) / 2, y: (g.line[0].y + g.line[1].y) / 2 }, b: p.raw, dashed: true }];
+        }
+      }
     }
     switch (this.mode) {
       case 'window': {

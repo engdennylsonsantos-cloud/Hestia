@@ -1,4 +1,5 @@
-import { dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, levelDimensions, levelRoomSeparators, levelTexts, planAnnotationsOf, unitsOf, type AreaPlan, type AreaPlanAnnotations, type Id, type Project, type TextNote } from '@hestia/model';
+import { angularDimensionGeometry, dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, levelDimensions, levelRoomSeparators, levelTexts, planAnnotationsOf, unitsOf, type AreaPlan, type AreaPlanAnnotations, type Id, type Project, type TextNote } from '@hestia/model';
+import { resolveAngularDimension } from '@hestia/engine';
 import type { Vec2 } from '@hestia/geom';
 import type { Viewport } from '../viewport.ts';
 import { quadradoEm } from './marcadores.ts';
@@ -192,11 +193,21 @@ export function noteOps(p: Project, levelId: Id, pt: PlanPaint, look: NoteLook, 
   // Trechos curtos (valor maior que o trecho) saem com rótulo afastado; `lane` alterna as alturas entre vizinhos.
   let lane = 0;
   for (const d of dimensions) {
-    const { a, b } = dimensionPoints(p, d);
     const textMm = d.textHeight ?? DIM_TEXT_MM;
+    const c = picked(d.id) ? look.select : color;
+    if (d.angular) {
+      const rd = resolveAngularDimension(p, levelId, d);
+      const g = angularDimensionGeometry(rd);
+      if (!g) continue;
+      out.strokes.push({ pts: g.arc, closed: false, ...corte, color: c, alpha: 1 });
+      for (const seg of g.extensions) out.strokes.push({ pts: [...seg], closed: false, ...projecao, color: c, alpha: 1 });
+      for (const seg of g.ticks) out.strokes.push({ pts: [...seg], closed: false, ...corte, color: c, alpha: 1 });
+      out.labels.push({ ...noteLabel(g.textAt, dimensionText(p, rd, unitsOf(p)), textMm, scale, g.textRotation), ...(picked(d.id) ? { color: c } : {}) });
+      continue;
+    }
+    const { a, b } = dimensionPoints(p, d);
     const base = dimensionGeometry(a, b, d.offset, mPerMm, textMm);
     const g = d.textAt ? dimensionGeometry(a, b, d.offset, mPerMm, textMm, d.textAt) : base;
-    const c = picked(d.id) ? look.select : color;
     for (const seg of [g.line, ...g.extensions]) out.strokes.push({ pts: [...seg], closed: false, ...corte, color: c, alpha: 1 });
     out.strokes.push(...dimensionMarkStrokes(g, d.tickStyle ?? 'slash', mPerMm, c, corte));
     if (d.textAt && Math.hypot(d.textAt.x - base.textAt.x, d.textAt.y - base.textAt.y) > 0.002) out.strokes.push({ pts: [{ x: (g.line[0].x + g.line[1].x) / 2, y: (g.line[0].y + g.line[1].y) / 2 }, d.textAt], closed: false, ...projecao, color: c, alpha: 1 });
@@ -304,8 +315,17 @@ export function annotationHighlightOps(
   // Cotas: o hover cerca o valor (a seleção já muda a cor da cota em `noteOps`).
   for (const d of a.dimensions) {
     if (hover !== d.id || selected.has(d.id)) continue;
-    const { a: pa, b: pb } = dimensionPoints(p, d);
     const textMm = d.textHeight ?? DIM_TEXT_MM;
+    if (d.angular) {
+      const rd = resolveAngularDimension(p, levelId, d);
+      const g = angularDimensionGeometry(rd);
+      if (!g) continue;
+      const bloco = textBlockModel({ text: dimensionText(p, rd, unitsOf(p)), height: textMm }, scale);
+      out.fills.push({ polygons: [[blocoEm(g.textAt, bloco.w, bloco.h, g.textRotation, folga)]], color: hoverColor, alpha: HOVER_ALPHA });
+      out.strokes.push({ pts: blocoEm(g.textAt, bloco.w, bloco.h, g.textRotation, folga), closed: true, widthPx: 1.2, color: hoverColor, alpha: 0.7 });
+      continue;
+    }
+    const { a: pa, b: pb } = dimensionPoints(p, d);
     const g = dimensionGeometry(pa, pb, d.offset, mPerMm, textMm, d.textAt);
     const bloco = textBlockModel({ text: dimensionText(p, d, unitsOf(p)), height: textMm }, scale);
     out.fills.push({ polygons: [[blocoEm(g.textAt, bloco.w, bloco.h, g.textRotation, folga)]], color: hoverColor, alpha: HOVER_ALPHA });

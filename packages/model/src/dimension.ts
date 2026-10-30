@@ -22,6 +22,7 @@ export const roundMm = (m: number): number => Math.round(m * 1000) / 1000;
  * eixo acompanha a parede e a outra fica na linha guardada — é o que mantém reta uma cadeia de um lado da planta.
  */
 export function dimensionPoints(p: Pick<Project, 'elements'>, d: Dimension): { a: Vec2; b: Vec2 } {
+  if (d.angular) return { a: d.angular.center, b: add(d.angular.center, mul(d.angular.to, d.angular.radius)) };
   const at = (ref: DimensionRef | undefined, fallback: Vec2): Vec2 => {
     const w = ref ? p.elements[ref.wallId] : undefined;
     if (!ref || !isWall(w)) return fallback;
@@ -37,8 +38,9 @@ export function dimensionPoints(p: Pick<Project, 'elements'>, d: Dimension): { a
   return { a, b };
 }
 
-/** Valor da cota em metros, arredondado a 1 mm. */
+/** Valor da cota em metros, arredondado a 1 mm; em cota angular, o ângulo em radianos. */
 export function dimensionValue(p: Pick<Project, 'elements'>, d: Dimension): number {
+  if (d.angular) return d.angular.value;
   const { a, b } = dimensionPoints(p, d);
   return roundMm(len(sub(b, a)));
 }
@@ -51,6 +53,10 @@ export const formatDimensionValue = (m: number, units = defaultUnits()): string 
  * unidade explícita de arquivos antigos (m, cm ou mm) continua valendo. precision sobrepõe as casas.
  */
 export function formatDimension(d: Dimension, meters: number, units = defaultUnits()): string {
+  if (d.angular) {
+    const text = formatQuantity(units, 'angle', d.angular.value, { decimals: d.precision ?? d.angular.precision, withUnit: !d.suffix });
+    return `${d.prefix ?? ''}${text}${d.suffix ?? ''}`;
+  }
   const unit = d.unit && d.unit !== 'project' ? d.unit : undefined;
   const text = formatQuantity(units, 'length', meters, { unit, decimals: d.precision, withUnit: !d.suffix });
   return `${d.prefix ?? ''}${text}${d.suffix ?? ''}`;
@@ -75,6 +81,66 @@ export interface DimensionGeometry {
   textRotation: number;
   /** Comprimento medido, em metros. */
   length: number;
+}
+
+/** Geometria de uma cota angular: arco, chamadas, marcas e posição do texto. */
+export interface AngularDimensionGeometry {
+  center: Vec2;
+  start: Vec2;
+  end: Vec2;
+  arc: Vec2[];
+  extensions: [[Vec2, Vec2], [Vec2, Vec2]];
+  ticks: [[Vec2, Vec2], [Vec2, Vec2]];
+  textAt: Vec2;
+  textRotation: number;
+  value: number;
+}
+
+/** Geometria da cota angular a partir do centro, das direções unitárias e do raio. */
+export function angularDimensionGeometry(d: Dimension, segments = 24): AngularDimensionGeometry | null {
+  const a = d.angular;
+  if (!a || !(a.radius > 0)) return null;
+  const angleA = Math.atan2(a.from.y, a.from.x);
+  const angleB = Math.atan2(a.to.y, a.to.x);
+  let delta = angleB - angleA;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta <= -Math.PI) delta += Math.PI * 2;
+  const pointAt = (angle: number, radius: number): Vec2 => ({ x: a.center.x + Math.cos(angle) * radius, y: a.center.y + Math.sin(angle) * radius });
+  const arc: Vec2[] = [];
+  for (let i = 0; i <= segments; i++) arc.push(pointAt(angleA + (delta * i) / segments, a.radius));
+  const start = arc[0]!;
+  const end = arc[arc.length - 1]!;
+  const over = Math.max(0.08, a.radius * 0.08);
+  const tick = Math.max(0.04, a.radius * 0.05);
+  const tickAt = (angle: number, point: Vec2): [Vec2, Vec2] => {
+    const p = { x: -Math.sin(angle), y: Math.cos(angle) };
+    return [{ x: point.x - p.x * tick, y: point.y - p.y * tick }, { x: point.x + p.x * tick, y: point.y + p.y * tick }];
+  };
+  const mid = angleA + delta / 2;
+  const textAt = d.textAt ?? pointAt(mid, a.radius + Math.max(0.12, a.radius * 0.12));
+  const rotationRaw = (mid * 180) / Math.PI;
+  const textRotation = rotationRaw > 90 || rotationRaw <= -90 ? rotationRaw + 180 : rotationRaw;
+  return {
+    center: a.center,
+    start,
+    end,
+    arc,
+    extensions: [
+      [a.center, pointAt(angleA, a.radius + over)],
+      [a.center, pointAt(angleB, a.radius + over)],
+    ],
+    ticks: [tickAt(angleA, start), tickAt(angleB, end)],
+    textAt,
+    textRotation,
+    value: Math.abs(delta),
+  };
+}
+
+/** Cota angular pronta para virar anotação. */
+export function angularDimensionData(center: Vec2, from: Vec2, to: Vec2, radius: number, side: 'minor' | 'major', refA: string, refB: string): import('./types.ts').AngularDimension {
+  const minor = Math.acos(Math.max(-1, Math.min(1, from.x * to.x + from.y * to.y)));
+  if (side === 'minor') return { refA, refB, center, from, to, radius, side, value: minor };
+  return { refA, refB, center, from, to: { x: -to.x, y: -to.y }, radius, side, value: Math.PI - minor };
 }
 
 /**

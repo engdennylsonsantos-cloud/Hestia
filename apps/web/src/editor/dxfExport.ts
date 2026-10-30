@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- o DXF da planta de área reúne o modelo, as anotações e as camadas de área no mesmo arquivo. */
 import { openingSymbolPaths, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, resolveLevel, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
+import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, resolveLevel, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, resolveAngularDimension, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
 import { areaPlanProfile, buildPlanGeometry, climbWalk, levelBox, LIGHT, openingPlanWorldPaths, ownerOf, planViewOf, resolverZoom, risersInClimbOrder, roofFootprint, roomLabelAt, roomNameText, spiralByComponent, spiralPostRing, stairCut, type PlanOps, type PlanProfile, type PlanView, type StairCut } from '@hestia/render';
 import {
   dxfEscapeText,
@@ -25,7 +25,7 @@ import {
   type DxfSymbolPath,
   type DxfViewState,
 } from '@hestia/io';
-import { areaPlanOf, DIM_TEXT_MM, dimensionGeometry, dimensionPoints, dimensionText, openingTypeById, unitsOf, GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, planAnnotationsOf, sectionGraphicsOf, sectionPoints, sectionTitleOf, type AreaPlan, type GraphicsCategory, type Id, type Project } from '@hestia/model';
+import { areaPlanOf, angularDimensionGeometry, DIM_TEXT_MM, dimensionGeometry, dimensionPoints, dimensionText, openingTypeById, unitsOf, GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, planAnnotationsOf, sectionGraphicsOf, sectionPoints, sectionTitleOf, type AreaPlan, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 /**
@@ -385,10 +385,19 @@ function areaAnnotationRecords(p: Project, plan: AreaPlan, ops: PlanOps): string
   const rendered = new Set(ops.labels.map((l) => l.text).filter((x): x is string => !!x));
   const mPerMm = plan.scale / 1000;
   for (const d of a.dimensions) {
-    const value = dimensionText(p, d, unitsOf(p));
+    const rd = d.angular ? resolveAngularDimension(p, plan.levelId, d) : d;
+    const value = dimensionText(p, rd, unitsOf(p));
     if (rendered.has(value)) continue;
-    const { a: pa, b: pb } = dimensionPoints(p, d);
     const textMm = d.textHeight ?? DIM_TEXT_MM;
+    if (d.angular) {
+      const g = angularDimensionGeometry(rd);
+      if (!g) continue;
+      for (let i = 1; i < g.arc.length; i++) line('ANOTACOES', g.arc[i - 1]!, g.arc[i]!);
+      for (const seg of [...g.extensions, ...g.ticks]) line('ANOTACOES', seg[0], seg[1]);
+      text('ANOTACOES_TEXTO', rd.textAt ?? g.textAt, (textMm * plan.scale) / 1000, value, g.textRotation);
+      continue;
+    }
+    const { a: pa, b: pb } = dimensionPoints(p, d);
     const g = dimensionGeometry(pa, pb, d.offset, mPerMm, textMm, d.textAt);
     for (const seg of [g.line, ...g.extensions, ...g.ticks]) line('ANOTACOES', seg[0], seg[1]);
     text('ANOTACOES_TEXTO', g.textAt, (textMm * plan.scale) / 1000, value, g.textRotation);

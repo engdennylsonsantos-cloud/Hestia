@@ -60,6 +60,7 @@ export const TAB_ANOTAR: RibbonTab = {
       'cota',
       t('Cota', 'Dimension'),
       tool('dimension', 'large', { label: t('Alinhada', 'Aligned') }),
+      tool('angularDimension', 'large', { label: t('Angular', 'Angular') }),
       act('cotasAuto'),
       stack(soonS(t('Cota de elevação', 'Spot Elevation'), 'dimension'), soonS(t('Coordenada de ponto', 'Spot Coordinate'), 'soon'), soonS(t('Inclinação de ponto', 'Spot Slope'), 'soon')),
     ),

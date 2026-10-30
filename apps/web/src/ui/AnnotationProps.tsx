@@ -16,6 +16,7 @@ import {
   type TextNote,
 } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
+import { resolveAngularDimension } from '@hestia/engine';
 import { useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { useUnits } from './useUnits.ts';
@@ -117,6 +118,28 @@ export function AnnotationProps({ dim, text, line, region, tag, planId }: NotaSe
   const levelId = useUi((s) => s.levelId);
   const nota = (c: AnnotationCommand): void => editor.store.exec(comPlanoDaVista(c, planId));
   if (dim) {
+    if (dim.angular) {
+      const shown = resolveAngularDimension(p, levelId, dim);
+      const a = shown.angular!;
+      const patchAngular = (patch: Partial<typeof a>): void => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { angular: { ...a, ...patch } } }));
+      return (
+        <Group title="Cota angular">
+          <Row label="Valor"><span className="val">{formatDimension(shown, 0, units)}</span></Row>
+          <Row label="Texto" htmlFor="p-dtext">
+            <TextField id="p-dtext" value={dim.text ?? ''} placeholder={formatDimension(shown, 0, units)} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { text: v.trim() === '' ? undefined : v } }))} />
+          </Row>
+          <Row label="Lado"><select className="select" value={a.side} onChange={(e) => {
+            const side = e.target.value as 'minor' | 'major';
+            patchAngular({ side, to: { x: -a.to.x, y: -a.to.y }, value: Math.PI - a.value });
+          }}><option value="minor">Menor</option><option value="major">Maior</option></select></Row>
+          <Row label="Raio" htmlFor="p-dradius"><NumField id="p-dradius" value={a.radius} decimals={2} quantity="length" min={0.01} onCommit={(v) => patchAngular({ radius: v })} /></Row>
+          <Row label="Casas decimais"><select className="select" value={dim.precision ?? 2} onChange={(e) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { precision: Number(e.target.value) as 0 | 1 | 2 | 3 } }))}><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></Row>
+          <Row label="Altura do texto" htmlFor="p-dheight">{/* units-ok: altura em mm, como no campo da cota linear */}<NumField id="p-dheight" value={dim.textHeight ?? 2.5} decimals={1} unit="mm" min={0.5} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { textHeight: v } }))} /></Row>
+          <Row label="Marca"><select className="select" value={dim.tickStyle ?? 'slash'} onChange={(e) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { tickStyle: e.target.value as Dimension['tickStyle'] } }))}><option value="slash">Traço</option><option value="arrow">Seta</option><option value="dot">Ponto</option></select></Row>
+          <div className="prow"><span className="soft">A cota angular mede o encontro de duas referências e não move paredes. Texto vazio mostra o valor medido.</span></div>
+        </Group>
+      );
+    }
     return (
       <Group title="Cota">
         <Row label="Valor"><span className="val">{formatDimension(dim, dimensionValue(p, dim), units)}</span></Row>

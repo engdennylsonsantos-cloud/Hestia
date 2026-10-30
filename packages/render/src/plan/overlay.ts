@@ -49,6 +49,8 @@ export function snapMarker(inf: Inference, theme: PlanTheme): StrokeOp[] {
       return [mk([P(-h, h), P(h, h)], false), mk([P(0, h), P(0, -h * 0.6)], false)];
     case 'grid':
       return [fino([P(-h * 0.6, 0), P(h * 0.6, 0)]), fino([P(0, -h * 0.6), P(0, h * 0.6)])];
+    case 'polar':
+      return [fino([P(-h * 0.8, 0), P(h * 0.8, 0)]), fino([P(-h * 0.3, -h * 0.3), P(h * 0.3, h * 0.3)])];
     default:
       return [];
   }
@@ -64,6 +66,7 @@ const SNAP_TOOLTIPS: Record<string, string> = {
   nearest: 'Na parede',
   alignment: 'Alinhamento',
   ortho: 'Ortogonal',
+  polar: 'Polar',
   center: 'Centro do arco',
   tangent: 'Tangente ao arco',
 };

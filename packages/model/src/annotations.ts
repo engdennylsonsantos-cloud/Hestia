@@ -43,6 +43,15 @@ const finite = (v: Vec2): boolean => Number.isFinite(v.x) && Number.isFinite(v.y
 
 /** Motivo de recusa de uma cota, ou null. */
 export function dimensionIssue(d: Dimension): string | null {
+  if (d.angular) {
+    const a = d.angular;
+    if (!a.refA || !a.refB) return 'A cota angular precisa de duas referências.';
+    if (!finite(a.center) || !finite(a.from) || !finite(a.to)) return 'A geometria da cota angular precisa de pontos finitos.';
+    if (!(Number.isFinite(a.radius) && a.radius > 0)) return 'O raio da cota angular deve ser maior que zero.';
+    if (!(Number.isFinite(a.value) && a.value >= 0 && a.value <= Math.PI + 1e-9)) return 'O ângulo da cota angular deve estar em radianos entre 0 e π.';
+    if (d.textHeight !== undefined && !(Number.isFinite(d.textHeight) && d.textHeight > 0)) return 'A altura do texto da cota deve ser maior que zero.';
+    return null;
+  }
   if (!finite(d.a) || !finite(d.b)) return 'As coordenadas da cota devem ser números finitos.';
   if (!Number.isFinite(d.offset)) return 'O deslocamento da cota deve ser um número finito.';
   if (d.textAt && !finite(d.textAt)) return 'A posição do texto da cota deve ser finita.';
@@ -303,7 +312,7 @@ export function annotationMoveCommands(p: Pick<Project, 'levels'>, levelId: Id, 
   const out: AnnotationCommand[] = [];
   for (const dim of levelDimensions(p, levelId)) {
     if (!want.has(dim.id)) continue;
-    const moved = { ...dim, a: shift(dim.a), b: shift(dim.b), ...(dim.textAt ? { textAt: shift(dim.textAt) } : {}) };
+    const moved = { ...dim, a: shift(dim.a), b: shift(dim.b), ...(dim.textAt ? { textAt: shift(dim.textAt) } : {}), ...(dim.angular ? { angular: { ...dim.angular, center: shift(dim.angular.center) } } : {}) };
     if (copy) out.push({ type: 'addDimension', levelId, dimension: { ...moved, id: newId('dim'), refs: undefined } });
     else out.push({ type: 'updateDimension', levelId, id: dim.id, patch: { ...moved, refs: undefined } });
   }

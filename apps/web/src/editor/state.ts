@@ -133,12 +133,37 @@ export function setSnap(patch: Partial<SnapOptions>): void {
 
 /** Liga/desliga o modo ortogonal global (F8): só a projeção nos eixos 0°/90° enquanto ativo. */
 export function toggleOrtho(): boolean {
-  const next = !useUi.getState().options.orthoLock;
-  useUi.setState((s) => ({
-    options: { ...s.options, orthoLock: next },
-    status: next ? 'Modo ortogonal ativado (F8): apenas 0°/90°.' : 'Modo ortogonal desativado (F8).',
-  }));
+  const s = useUi.getState();
+  const am = s.options.angleMode ?? { ortho: s.options.orthoLock, polar: false, polarIncrementDeg: 15 };
+  const next = !am.ortho;
+  useUi.setState({
+    options: { ...s.options, orthoLock: next, angleMode: { ...am, ortho: next } },
+    status: next ? 'Orto ativado (F8): apenas 0°/90°.' : 'Orto desativado (F8).',
+  });
   return next;
+}
+
+/** Liga/desliga o rastreamento polar (F10) nos múltiplos do incremento do grupo Orto/Polar. */
+export function togglePolar(): boolean {
+  const s = useUi.getState();
+  const am = s.options.angleMode ?? { ortho: s.options.orthoLock, polar: false, polarIncrementDeg: 15 };
+  const next = !am.polar;
+  useUi.setState({
+    options: { ...s.options, angleMode: { ...am, polar: next } },
+    status: next ? `Polar ativado (F10): múltiplos de ${am.polarIncrementDeg}°.` : 'Polar desativado (F10).',
+  });
+  return next;
+}
+
+/** Incremento polar personalizado em graus (15, 22,5, 30, 45...); valores fora de 0–180 são recusados. */
+export function setPolarIncrement(deg: number): void {
+  if (!Number.isFinite(deg) || deg <= 0 || deg > 180) {
+    useUi.setState({ status: 'O incremento polar deve estar entre 0,1° e 180°.' });
+    return;
+  }
+  const s = useUi.getState();
+  const am = s.options.angleMode ?? { ortho: s.options.orthoLock, polar: false, polarIncrementDeg: 15 };
+  useUi.setState({ options: { ...s.options, angleMode: { ...am, polarIncrementDeg: deg } }, status: `Incremento polar: ${deg}°.` });
 }
 
 /**
@@ -197,6 +222,7 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   openingAnchor: 'center',
   openingClear: 0.1,
   orthoLock: false,
+  angleMode: { ortho: false, polar: false, polarIncrementDeg: 15 },
   arrayCount: 3,
   arrayKind: 'linear',
   arrayAngle: 360,

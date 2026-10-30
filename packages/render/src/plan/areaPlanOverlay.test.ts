@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '@hestia/geom';
-import { DEFAULT_AREA_GRAPHICS, DEFAULT_TAG_FIELDS, ProjectStore, createEmptyProject, makeRoom, makeWall, type AreaPlan, type Project } from '@hestia/model';
+import { DEFAULT_AREA_GRAPHICS, DEFAULT_TAG_FIELDS, ProjectStore, createEmptyProject, makeFloor, makeRoof, makeRoom, makeWall, type AreaPlan, type Project } from '@hestia/model';
 import { resolveLevel } from '@hestia/engine';
 import { buildPlanHoverOverlay, buildPlanLiveOverlay, buildPlanSelectionOverlay, type PlanInput } from './build.ts';
 import { planFrameUpdateOf, type PlanViewState } from './planFrame.ts';
+import { roofSelectionOps } from './roofs.ts';
 import { LIGHT } from './types.ts';
 
 const ring = (pts: Array<[number, number]>): Vec2[] => pts.map(([x, y]) => ({ x, y }));
@@ -45,14 +46,35 @@ const entrada = (p: Project, areaPlan?: AreaPlan, selection: string[] = [], hove
   showGrid: false,
 });
 
-describe('planta de área · sobreposição compartilhada (A1)', () => {
-  it('parede selecionada: mesmas contagens de destaque/alças da planta de piso', () => {
+describe('planta de área · sobreposição compartilhada (A1/F0)', () => {
+  it('parede selecionada: a área mostra 1 destaque + 1 contorno, sem as alças da planta de piso', () => {
     const s = project();
     const piso = buildPlanSelectionOverlay(entrada(s.project, undefined, ['w0']));
     const area = buildPlanSelectionOverlay(entrada(s.project, plan(), ['w0']));
-    expect({ fills: area.fills.length, strokes: area.strokes.length }).toEqual({ fills: piso.fills.length, strokes: piso.strokes.length });
+    expect({ fills: area.fills.length, strokes: area.strokes.length }).toEqual({ fills: 1, strokes: 1 });
+    expect({ fills: piso.fills.length, strokes: piso.strokes.length }).toEqual({ fills: 11, strokes: 11 });
     expect(area.fills.some((f) => f.color === LIGHT.select && f.alpha === 0.26)).toBe(true);
     expect(area.strokes.some((s) => s.widthPx === 2 && s.color === LIGHT.select)).toBe(true);
+  });
+
+  it('piso selecionado: destaque e contorno na área, sem os quadradinhos de vértice', () => {
+    const s = project();
+    s.exec({ type: 'addFloor', floor: makeFloor({ id: 'f1', typeId: 'ft_ceram', levelId: 'lv_0', boundary: ring([[0, 0], [4, 0], [4, 5], [0, 5]]) }) });
+    const piso = buildPlanSelectionOverlay(entrada(s.project, undefined, ['f1']));
+    const area = buildPlanSelectionOverlay(entrada(s.project, plan(), ['f1']));
+    expect({ fills: area.fills.length, strokes: area.strokes.length }).toEqual({ fills: 1, strokes: 1 });
+    expect({ fills: piso.fills.length, strokes: piso.strokes.length }).toEqual({ fills: 5, strokes: 5 });
+  });
+
+  it('telhado selecionado: a área mantém o contorno de seleção e não desenha o símbolo de inclinação', () => {
+    const s = project();
+    s.exec({ type: 'addRoof', roof: makeRoof({ id: 'rf', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: ring([[-0.3, -0.3], [4.3, -0.3], [4.3, 5.3], [-0.3, 5.3]]), heightOffset: 2.8, shape: 'gable', slopePercent: 30, dir: { x: 1, y: 0 } }) });
+    const viewport = { cx: 2, cy: 2.5, zoom: 100, width: 600, height: 400 };
+    const piso = roofSelectionOps(s.project, 'lv_0', ['rf'], null, LIGHT, viewport);
+    const area = roofSelectionOps(s.project, 'lv_0', ['rf'], null, LIGHT, viewport, undefined, undefined, false);
+    expect(piso.fills.filter((f) => f.color === LIGHT.accent).length).toBeGreaterThan(0);
+    expect(area.fills.filter((f) => f.color === LIGHT.accent)).toHaveLength(0);
+    expect(area.strokes.some((st) => st.widthPx === 2 && st.color === LIGHT.select)).toBe(true);
   });
 
   it('hover da parede: preenchimento na planta de área', () => {
@@ -89,7 +111,7 @@ describe('planta de área · sobreposição compartilhada (A1)', () => {
     expect(live.strokes.length).toBeGreaterThan(0);
   });
 
-  it('caminho do app (planFrame): a sobreposição da área é a mesma da planta de piso', () => {
+  it('caminho do app (planFrame): a área usa a sobreposição compartilhada sem alças de modelo', () => {
     const s = project();
     const estado = (over: Partial<PlanViewState> = {}): PlanViewState => ({
       project: s.project,
@@ -112,17 +134,18 @@ describe('planta de área · sobreposição compartilhada (A1)', () => {
     });
     const piso = planFrameUpdateOf(estado());
     const area = planFrameUpdateOf(estado({ areaPlan: plan() }));
-    expect({ fills: area.overlay().fills.length, strokes: area.overlay().strokes.length }).toEqual({ fills: piso.overlay().fills.length, strokes: piso.overlay().strokes.length });
+    expect({ fills: area.overlay().fills.length, strokes: area.overlay().strokes.length }).toEqual({ fills: 1, strokes: 1 });
+    expect({ fills: piso.overlay().fills.length, strokes: piso.overlay().strokes.length }).toEqual({ fills: 11, strokes: 11 });
     expect(area.hover!().fills.length).toBe(piso.hover!().fills.length);
     expect(area.live!().strokes.some((st) => st.dash?.[0] === 7)).toBe(true);
   });
 
-  it('alças: a área mantém as mesmas alças da planta de piso porque o select move o elemento (ver teste em packages/tools)', () => {
+  it('alças: a área não desenha nenhum quadradinho de modelo; a planta de piso continua com os 10 da parede', () => {
     const s = project();
     const piso = buildPlanSelectionOverlay(entrada(s.project, undefined, ['w0']));
     const area = buildPlanSelectionOverlay(entrada(s.project, plan(), ['w0']));
     const alças = (ops: ReturnType<typeof buildPlanSelectionOverlay>): number => ops.fills.filter((f) => f.color === '#ffffff' && f.alpha === 1).length;
-    expect(alças(area)).toBeGreaterThan(0);
-    expect(alças(area)).toBe(alças(piso));
+    expect(alças(area)).toBe(0);
+    expect(alças(piso)).toBe(10);
   });
 });

@@ -397,7 +397,7 @@ export function belowStairOps(stairs: ResolvedStair[], theme: PlanTheme): FloorO
 }
 
 /** Destaque de seleção e de hover das escadas, no padrão dos pisos e lajes (contorno da pegada). */
-export function stairSelectionOps(p: Project, stairs: ResolvedStair[], selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport): FloorOps {
+export function stairSelectionOps(p: Project, stairs: ResolvedStair[], selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport, grips = true): FloorOps {
   const parts = stairs.map((s) => ({ id: s.id, polygon: planFootprint(s) }));
-  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v);
+  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v, grips);
 }

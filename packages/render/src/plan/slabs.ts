@@ -105,9 +105,9 @@ export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: b
 }
 
 /** Destaque de seleção e de hover das lajes (D1), no mesmo padrão dos pisos. */
-export function slabSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport, hidden?: ReadonlySet<Id>): FloorOps {
+export function slabSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport, hidden?: ReadonlySet<Id>, grips = true): FloorOps {
   const parts = lajesDoNivel(p, levelId)
     .filter((s) => !hidden?.has(s.slabId))
     .map((s) => ({ id: s.slabId, polygon: s.polygon }));
-  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v);
+  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v, grips);
 }

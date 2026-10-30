@@ -78,15 +78,17 @@ export function buildPlanSelectionOverlay(input: PlanInput): PlanOps {
     out.labels.push(...o.labels);
   };
 
+  // A planta de área é de análise/anotação: destaca e seleciona o modelo, mas não desenha alças de mover.
+  const alcasDeModelo = input.areaPlan === undefined;
   // Seleção (pisos: destaque próprio; paredes e aberturas em elementHighlight).
-  add(floorSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden));
+  add(floorSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden, alcasDeModelo));
   const rmsel = roomSelectionOps(p, input.levelId, selection, null, theme, hidden);
   out.fills.push(...rmsel.fills);
   out.strokes.push(...rmsel.strokes);
-  add(slabSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden));
-  if (up) add(ceilingSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden));
-  add(roofSelectionOps(p, input.levelId, selection, null, theme, input.viewport, roofHidden, style.paint.roof));
-  add(stairSelectionOps(p, stairs, selection, null, theme, input.viewport));
+  add(slabSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden, alcasDeModelo));
+  if (up) add(ceilingSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden, alcasDeModelo));
+  add(roofSelectionOps(p, input.levelId, selection, null, theme, input.viewport, roofHidden, style.paint.roof, alcasDeModelo));
+  add(stairSelectionOps(p, stairs, selection, null, theme, input.viewport, alcasDeModelo));
   if (selection.length) {
     out.fills.push(...elementHighlight(p, geo, selection, theme.select, 0.26, view));
     for (const id of selection) {
@@ -94,6 +96,7 @@ export function buildPlanSelectionOverlay(input: PlanInput): PlanOps {
       if (!isWall(e) || hidden?.has(id)) continue;
       for (const ring of ringsOf(wallUnion(geo, id, view?.outlineWalls.has(id) === true))) out.strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
       // Alças nas pontas do eixo e nos cantos visíveis (a ponta que se vê): é lá que o arrasto pega a parede.
+      if (!alcasDeModelo) continue;
       const corners = wallEndCorners(p, e);
       for (const pt of [e.a, e.b, ...corners.a, ...corners.b] as Vec2[]) {
         const q = quadradoEm(pt, ALCA_PX);
@@ -114,20 +117,21 @@ export function buildPlanHoverOverlay(input: PlanInput): PlanOps {
   const hover = input.hover;
   if (!hover || input.selection.includes(hover)) return vazio();
   const out = vazio();
+  const alcasDeModelo = input.areaPlan === undefined;
   const add = (o: PlanOps): void => {
     out.fills.push(...o.fills);
     out.strokes.push(...o.strokes);
     out.labels.push(...o.labels);
   };
-  add(floorSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden));
+  add(floorSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden, alcasDeModelo));
   const rmsel = roomSelectionOps(p, input.levelId, [], hover, theme, hidden);
   out.fills.push(...rmsel.fills);
   out.strokes.push(...rmsel.strokes);
-  add(slabSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden));
-  if (up) add(ceilingSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden));
-  add(roofSelectionOps(p, input.levelId, [], hover, theme, input.viewport, roofHidden, style.paint.roof));
-  add(stairSelectionOps(p, stairs, [], hover, theme, input.viewport));
-  add(rampSelectionOps(p, ramps, [], hover, theme, input.viewport));
+  add(slabSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden, alcasDeModelo));
+  if (up) add(ceilingSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden, alcasDeModelo));
+  add(roofSelectionOps(p, input.levelId, [], hover, theme, input.viewport, roofHidden, style.paint.roof, alcasDeModelo));
+  add(stairSelectionOps(p, stairs, [], hover, theme, input.viewport, alcasDeModelo));
+  add(rampSelectionOps(p, ramps, [], hover, theme, input.viewport, alcasDeModelo));
   out.fills.push(...elementHighlight(p, geo, [hover], theme.select, 0.16, view));
   comAnotacoes(out, input, style.scale, { selection: [], hover });
   return out;
@@ -167,6 +171,7 @@ export function buildPlanOverlay(input: PlanInput): PlanOps {
   const { geo, hidden, up, roofHidden, stairs, ramps, view, style } = planContext(input);
   const { selection, hover } = input;
   const out = vazio();
+  const alcasDeModelo = input.areaPlan === undefined;
   const add = (o: PlanOps): void => {
     out.fills.push(...o.fills);
     out.strokes.push(...o.strokes);
@@ -174,15 +179,15 @@ export function buildPlanOverlay(input: PlanInput): PlanOps {
   };
 
   // Hover e seleção (pisos: destaque próprio; paredes e aberturas em elementHighlight).
-  add(floorSelectionOps(p, input.levelId, selection, hover, theme, v, hidden));
+  add(floorSelectionOps(p, input.levelId, selection, hover, theme, v, hidden, alcasDeModelo));
   const rmsel = roomSelectionOps(p, input.levelId, selection, hover, theme, hidden);
   out.fills.push(...rmsel.fills);
   out.strokes.push(...rmsel.strokes);
-  add(slabSelectionOps(p, input.levelId, selection, hover, theme, v, hidden));
-  if (up) add(ceilingSelectionOps(p, input.levelId, selection, hover, theme, v, hidden));
-  add(roofSelectionOps(p, input.levelId, selection, hover, theme, v, roofHidden, style.paint.roof));
-  add(stairSelectionOps(p, stairs, selection, hover, theme, v));
-  add(rampSelectionOps(p, ramps, selection, hover, theme, v));
+  add(slabSelectionOps(p, input.levelId, selection, hover, theme, v, hidden, alcasDeModelo));
+  if (up) add(ceilingSelectionOps(p, input.levelId, selection, hover, theme, v, hidden, alcasDeModelo));
+  add(roofSelectionOps(p, input.levelId, selection, hover, theme, v, roofHidden, style.paint.roof, alcasDeModelo));
+  add(stairSelectionOps(p, stairs, selection, hover, theme, v, alcasDeModelo));
+  add(rampSelectionOps(p, ramps, selection, hover, theme, v, alcasDeModelo));
   if (hover && !selection.includes(hover)) out.fills.push(...elementHighlight(p, geo, [hover], theme.select, 0.16, view));
   if (selection.length) {
     out.fills.push(...elementHighlight(p, geo, selection, theme.select, 0.26, view));
@@ -190,6 +195,7 @@ export function buildPlanOverlay(input: PlanInput): PlanOps {
       const e = p.elements[id];
       if (!isWall(e) || hidden?.has(id)) continue;
       for (const ring of ringsOf(wallUnion(geo, id, view?.outlineWalls.has(id) === true))) out.strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
+      if (!alcasDeModelo) continue;
       const corners = wallEndCorners(p, e);
       for (const pt of [e.a, e.b, ...corners.a, ...corners.b] as Vec2[]) {
         const q = quadradoEm(pt, ALCA_PX);

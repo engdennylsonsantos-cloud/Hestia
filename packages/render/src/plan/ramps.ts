@@ -129,7 +129,7 @@ export function belowRampOps(ramps: ResolvedRamp[], theme: PlanTheme): FloorOps 
 }
 
 /** Destaque de seleção e de hover das rampas, no padrão dos pisos e lajes (contorno da pegada). */
-export function rampSelectionOps(p: Project, ramps: ResolvedRamp[], selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport): FloorOps {
+export function rampSelectionOps(p: Project, ramps: ResolvedRamp[], selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport, grips = true): FloorOps {
   const parts = ramps.map((r) => ({ id: r.id, polygon: rampFootprint(r) }));
-  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v);
+  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v, grips);
 }

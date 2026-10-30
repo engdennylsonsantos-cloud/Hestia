@@ -15,7 +15,11 @@ Data: 2026-10-30
 | `packages/render/src/plan/planFrame.ts` | O subpavimento da área usa `graphics.showBelowLevel` (não a opção global). |
 | `apps/web/src/editor/dxfExport.ts` | DXF da área refeito: modelo nas camadas da planta (`PAREDE`, `ABERTURA`, `ESCADA`, `PISO`, `LAJE`, `TELHADO_PROJECAO`…) + entidades da área em `AMBIENTES_*`, no mesmo R12. |
 | `packages/io/src/dxf.ts` | `DxfLevelGeometry.extraLayers` declara camadas acrescentadas fora do exportador (as de área). |
-| `apps/web/src/ui/AreaPlanProperties.tsx` | Opções “Mostrar escadas e rampas”, “Mostrar telhados (projeção)” e “Mostrar objetos importados”. |
+| `apps/web/src/ui/AreaPlanProperties.tsx` | Opções “Mostrar escadas e rampas”, “Mostrar telhados (projeção)” e “Mostrar objetos importados”; removido o botão “Criar prancha geral”. |
+| `apps/web/src/ui/browser/Views.tsx` | Removida a opção “Criar prancha geral” do menu das plantas de área. |
+| `apps/web/src/editor/areaPlanActions.ts` | Removida `createGeneralAreaSheetAction`; a prancha geral segue o fluxo normal (criar prancha e arrastar a vista). |
+| `apps/web/src/editor/controller.ts` | `AREA_PLAN_TOOLS` agora inclui `room` e `roomsep`: dá para criar ambiente/área e separador na planta de área. |
+| `apps/web/src/ui/ribbon/tabsMain.ts`, `packages/tools/src/registry.ts` | “Separador de ambiente/área” e remoção dos botões “Área”/“Limite de área” que estavam “em breve”. |
 | Testes | `areaPlanGeometry.test.ts` (novo), `areaPlanDxf.test.ts` ampliado, `areaPlanOverlay.test.ts`/`areaPlanSelect.test.ts` com a regra somente leitura. |
 
 A F0 foi integrada junto: na planta de área, `select` não move elemento de modelo, não há alças de modelo, e continuam clique, janela, hover, destaque, fantasmas, anotações e rótulo do ambiente. Na planta de piso, mover e alças seguem iguais.
@@ -29,6 +33,7 @@ A F0 foi integrada junto: na planta de área, `select` não move elemento de mod
 - Pisos/lajes sob `showFloors`; subpavimento sob `showBelowLevel`, incluindo escada/rampa/telhado do nível de baixo.
 - Grades, marcas de corte e anotações da vista (`plan.annotations`) com fallback para as do nível.
 - Ambientes com diagonais, etiqueta configurável, esquema de cor, legenda e quadro, por cima do modelo.
+- Ferramentas de área habilitadas: **Ambiente** (`room`) cria novas áreas e **Separador de ambiente/área** (`roomsep`) fecha/divide circuitos, inclusive na planta de área.
 - Seleção/hover/caixa/fantasmas iguais aos da planta de piso; sem alças de modelo.
 
 ## DXF
@@ -44,7 +49,7 @@ Antes, `opsToDxf` mandava **todo** traço para `AMBIENTES` por heurística de co
 
 - `areaPlanGeometry.test.ts`: 7 testes.
 - `areaPlanDxf.test.ts`: 4 testes; `dxfCad.test.ts`: 9 testes (R12 nos templates).
-- `areaPlanOverlay.test.ts`: 9; `areaPlanSelect.test.ts`: 9; `areaPlan.test.ts`: 19; `planFrame.test.ts`: 21; `areaPlanSheet.test.ts`: 3.
+- `areaPlanOverlay.test.ts`: 9; `areaPlanSelect.test.ts`: 9; `areaPlan.test.ts`: 19; `planFrame.test.ts`: 21; `areaPlanSheet.test.ts`: 3; `areaPlanAnotacao.test.ts`: 8 (ambiente/separador na área).
 - `ouroZoom.test.ts`: 88 testes, **sem diff de hash** — a planta de piso não mudou.
 - `npx tsc --noEmit`: limpo.
 - `npx eslint packages apps/web/src`: 0 erros; 1 warning pré-existente em `OpeningFlipGrips.tsx:70`.

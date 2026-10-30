@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { pickLevel } from './pick3d.ts';
+import { pickDimension, pickLevel } from './pick3d.ts';
 
 /** Câmera de cima sobre a origem, olhando para −z (o raio do centro acerta a linha em y = 0). */
 function cameraDeCima(): THREE.PerspectiveCamera {
@@ -49,5 +49,24 @@ describe('pickLevel: datum de nível na vista 3D', () => {
 
   it('sem datum na cena devolve null', () => {
     expect(pickLevel(new THREE.Scene(), cameraDeCima(), { x: 0, y: 0 })).toBeNull();
+  });
+});
+
+describe('pickDimension: cota entre os eixos das bolhas', () => {
+  it('a etiqueta da cota devolve o intervalo e a posição clicada', () => {
+    const scene = new THREE.Scene();
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }));
+    sprite.position.set(0, 0, 0);
+    sprite.scale.set(2, 1, 1);
+    sprite.userData = { dimension: { levelId: 'lv_0', neighborId: 'lv_1', side: 'above', value: 3 } };
+    scene.add(sprite);
+    const hit = pickDimension(scene, cameraDeCima(), { x: 0, y: 0 });
+    expect(hit).toMatchObject({ levelId: 'lv_0', neighborId: 'lv_1', side: 'above', value: 3 });
+    expect(hit!.ndc.x).toBeCloseTo(0, 5);
+    expect(hit!.ndc.y).toBeCloseTo(0, 5);
+  });
+
+  it('sem cota na cena devolve null', () => {
+    expect(pickDimension(new THREE.Scene(), cameraDeCima(), { x: 0, y: 0 })).toBeNull();
   });
 });

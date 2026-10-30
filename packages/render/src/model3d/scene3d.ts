@@ -4,7 +4,7 @@ import { applyPartialStructure, frameOfWall, resolveCeilings, junctionLevel, res
 import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
 import { DARK, LIGHT } from '../plan/types.ts';
 import { projetoDaJuncao } from '../plan/viewContext.ts';
-import { OrbitCamera } from './orbit.ts';
+import { OrbitCamera, cameraBasis } from './orbit.ts';
 import { firstSurfaceDistance } from './pick3d.ts';
 import { caixasEPrismasDaAbertura, montarAbertura } from './aberturas3d.ts';
 import { arestasDaSilhuetaDeCaixas } from './silhuetaCaixas3d.ts';
@@ -16,7 +16,7 @@ import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
 import { buildGenericSolids } from './genericSolids.ts';
 import { buildCadLines } from './cad3d.ts';
-import { buildLevels, disposeLevels } from './levels3d.ts';
+import { buildLevels, disposeLevels, layoutLevels } from './levels3d.ts';
 import { levelProjectBox } from './levelsData.ts';
 import { buildRampSolids } from './rampSolids.ts';
 import { RealcesDaCena } from './realceDaCena3d.ts';
@@ -52,9 +52,7 @@ const EDGE_ANGLE = 28;
  * Margem (m) em X somada à caixa do datum no "Enquadrar": a bolha e o texto do nível ficam além da obra e não podem
  * sair da vista. Vale para os dois lados (o texto cresce para a esquerda da bolha).
  */
-const MARGEM_ENQUADRAMENTO_NIVEIS = 10;
-/** Margem (m) em Y no enquadramento: o texto do nível pode ficar um pouco à frente da linha. */
-const MARGEM_ENQUADRAMENTO_NIVEIS_Y = 2;
+const MARGEM_ENQUADRAMENTO_NIVEIS = 6;
 /** Fundo do tema, quando `view3d.background` é null. */
 const BACKGROUND = { light: '#dfe7ee', dark: '#14171b' };
 /** Distância da luz em raios do modelo: |(0,7; −0,5; 1,1)|, a posição do sol antes da vista 3D configurável. */
@@ -188,9 +186,10 @@ export class ModelScene {
     this.sun.shadow.normalBias = 0.03;
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
+    // Chão só com sombra: sem cor, o que está abaixo do nível 0 fica visível; a grade continua.
     this.ground = new THREE.Mesh(
       new THREE.PlaneGeometry(400, 400),
-      new THREE.MeshStandardMaterial({ color: 0xe3dfd6, roughness: 1 }),
+      new THREE.ShadowMaterial({ color: 0x000000, opacity: 0.22, transparent: true, depthWrite: false }),
     );
     this.ground.position.z = -0.03;
     this.ground.receiveShadow = true;
@@ -338,8 +337,8 @@ export class ModelScene {
       const cotas = p.levels.map((l) => l.elevation);
       this.caixaEnquadramento.union(
         new THREE.Box3(
-          new THREE.Vector3(b.minX - 3, b.minY - MARGEM_ENQUADRAMENTO_NIVEIS_Y, Math.min(...cotas)),
-          new THREE.Vector3(b.maxX + MARGEM_ENQUADRAMENTO_NIVEIS, b.maxY + MARGEM_ENQUADRAMENTO_NIVEIS_Y, Math.max(...cotas)),
+          new THREE.Vector3(b.minX - MARGEM_ENQUADRAMENTO_NIVEIS, b.minY - MARGEM_ENQUADRAMENTO_NIVEIS, Math.min(...cotas)),
+          new THREE.Vector3(b.maxX + MARGEM_ENQUADRAMENTO_NIVEIS, b.maxY + MARGEM_ENQUADRAMENTO_NIVEIS, Math.max(...cotas)),
         ),
       );
     }
@@ -347,7 +346,6 @@ export class ModelScene {
     const bg = new THREE.Color(view.background ?? (opt.dark ? BACKGROUND.dark : BACKGROUND.light));
     this.ground.visible = view.style !== 'wireframe';
     this.ground.receiveShadow = this.frame.shadows;
-    (this.ground.material as THREE.MeshStandardMaterial).color.set(opt.dark ? 0x2a2f36 : 0xe3dfd6);
     this.scene.background = bg;
     this.scene.fog = new THREE.Fog(bg, 60, 170);
     this.sun.castShadow = this.frame.shadows;
@@ -378,6 +376,7 @@ export class ModelScene {
    * caixa das faixas escolhidas. Fora disso é só uma leitura de dois campos — nada muda com a câmera ou o realce.
    */
   private antesDeDesenhar(renderer: RendererDeQuadro): void {
+    this.layoutNiveis();
     if (!this.frame.shadows) return;
     prepararSombraDoQuadro({
       renderer,
@@ -416,6 +415,7 @@ export class ModelScene {
     grupo.userData = { ...grupo.userData, levels: true };
     this.niveis3d.add(grupo);
     this.niveis = grupo;
+    this.layoutNiveis();
   }
 
   /** Libera geometrias, materiais e texturas do datum anterior; o grupo contêiner continua na cena (vazio). */
@@ -424,6 +424,16 @@ export class ModelScene {
     this.niveis = null;
     this.niveis3d.clear();
     this.niveis3d.userData = { levels: true };
+  }
+
+  /**
+   * Recalcula o datum para a câmera atual. Roda a cada quadro (no `antesDeDesenhar`) para a bolha ficar sempre à
+   * esquerda e o conjunto atrás/à esquerda da obra; a escolha do lado e da ponta tem histerese (ver `layoutLevels`).
+   */
+  private layoutNiveis(): void {
+    if (!this.niveis) return;
+    const { toCamera } = cameraBasis(this.orbit.azimuth, this.orbit.elevation);
+    layoutLevels(this.niveis, this.orbit.camera, toCamera.clone().negate());
   }
 
   /** Faixas verticais da cena (culling por frustum) e quantas existem agora. */

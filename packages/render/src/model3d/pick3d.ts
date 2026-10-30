@@ -31,6 +31,15 @@ export interface LevelHit {
   point: { x: number; y: number; z: number };
 }
 
+/** Cota atingida no 3D: o intervalo e a posição (NDC) do ponto clicado, para abrir o editor ali. */
+export interface DimensionHit {
+  levelId: Id;
+  neighborId: Id;
+  side: 'below' | 'above';
+  value: number;
+  ndc: { x: number; y: number };
+}
+
 /** Tolerância (m) do raio às linhas de nível: o clique não precisa acertar o fio exato. */
 const LIMIAR_LINHA_NIVEL = 0.15;
 
@@ -160,6 +169,35 @@ export function pickLevel(scene: THREE.Object3D, camera: THREE.Camera, ndc: { x:
       const levelId = h.object.userData.levelId as Id | undefined;
       if (!levelId) continue;
       return { kind: 'level', levelId, point: { x: h.point.x, y: h.point.y, z: h.point.z } };
+    }
+  } finally {
+    rc.params.Line.threshold = limiarAnt;
+  }
+  return null;
+}
+
+/**
+ * Cota sob o cursor: procura as linhas/etiquetas com `userData.dimension` e devolve o intervalo e o ponto clicado em NDC.
+ * A etiqueta é um sprite e as linhas de cota têm tolerância; o clique não precisa acertar o pixel exato.
+ */
+export function pickDimension(scene: THREE.Object3D, camera: THREE.Camera, ndc: { x: number; y: number }): DimensionHit | null {
+  scene.updateMatrixWorld(true);
+  const alvos: THREE.Object3D[] = [];
+  scene.traverse((o) => {
+    if (o.userData.dimension) alvos.push(o);
+  });
+  if (!alvos.length) return null;
+  rc.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), camera);
+  const limiarAnt = rc.params.Line.threshold;
+  rc.params.Line.threshold = LIMIAR_LINHA_NIVEL;
+  try {
+    for (const h of rc.intersectObjects(alvos, false)) {
+      const d = h.object.userData.dimension as
+        | { levelId: Id; neighborId: Id; side: 'below' | 'above'; value: number }
+        | undefined;
+      if (!d) continue;
+      const p = h.point.clone().project(camera);
+      return { levelId: d.levelId, neighborId: d.neighborId, side: d.side, value: d.value, ndc: { x: p.x, y: p.y } };
     }
   } finally {
     rc.params.Line.threshold = limiarAnt;

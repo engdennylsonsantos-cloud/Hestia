@@ -223,6 +223,8 @@ function realces(ms: ModelScene): THREE.Mesh[] {
   ms.scene.traverse((o) => {
     if (ehDoNivel(o)) return;
     const m = o as THREE.Mesh;
+    // O chão é um plano transparente (só sombra): não é realce.
+    if (m.isMesh && m.geometry?.type === 'PlaneGeometry') return;
     if (m.isMesh && m.material && (m.material as THREE.Material).transparent && (m.material as THREE.Material).depthWrite === false) out.push(m);
   });
   return out;

@@ -1,17 +1,20 @@
+/* eslint-disable max-lines -- a ferramenta acumula as tres formas (reta/L/U/leque/caracol) e o trajeto livre; extrair depois. */
 import { add, len, mul, sub, type Vec2 } from '@hestia/geom';
 import { stairTopLevel } from '@hestia/model';
-import { SPIRAL_MAX_SWEEP, stairIssuesOf, treadRuleOf, type TreadRule } from '@hestia/engine';
+import { SPIRAL_MAX_SWEEP, optimizeStair, stairIssuesOf, treadRuleOf, type StairFixed, type TreadRule } from '@hestia/engine';
 import { draftStair, stairFromGenerator, stairLimits, type StairCommandResult, type StairCreateOptions } from './stairCommands.ts';
 import { ToolBase } from './base.ts';
 import { parseNumber } from './numeric.ts';
 import { partsPreview, treadItems } from './stairPreview.ts';
 import { componentsFromParts, type StairPart } from './stairSketchState.ts';
-import { DEFAULT_STAIR_RUN_OPTIONS, planStairRun, type StairRunPlan, type StairRunToolOptions } from './stairRunPlan.ts';
+import { DEFAULT_STAIR_RUN_OPTIONS, planStairRun, planStairRunFree, type StairRunPlan, type StairRunToolOptions } from './stairRunPlan.ts';
 import { planSpiralRun, SPIRAL_DEFAULT_INNER, SPIRAL_MIN_SWEEP, wrapAngle, type SpiralPlan } from './stairSpiralRun.ts';
 import { stairTypeForShape } from './stairRunTypes.ts';
+import { StairLiveSession, type StairLiveConfig, type StairLiveEvent } from './stairLiveSession.ts';
 import type { PointerInfo, PreviewItem } from './types.ts';
 
 const START_HINT = 'Escada: clique no centro do 1º espelho. Esc cancela.';
+const FREE_START_HINT = 'Escada livre: clique o ponto inicial (centro do 1º espelho). Esc cancela.';
 const DIRECTION_HINT = 'Escada: clique para dar a direção de subida, ou digite o ângulo em graus (0 = eixo X). Esc cancela o ponto.';
 const SPIRAL_START_HINT = 'Caracol: clique no centro. Esc cancela.';
 const SPIRAL_RADIUS_HINT = 'Caracol: clique no raio externo e no ângulo inicial (ou digite o raio em metros). Backspace volta ao centro.';
@@ -77,9 +80,17 @@ export class StairRunTool extends ToolBase {
   private origin: Vec2 | null = null;
   /** Estado do caracol em criação (só usado na forma `spiral`). */
   private sp: SpiralDraw = emptySpiral();
+  /** Sessão do desenho livre (forma 'free'); criada na primeira necessidade. */
+  private session: StairLiveSession | null = null;
+  /** N e T fixados pelo "Ajustar" (tecla A); limpos ao reiniciar a ferramenta. */
+  private fixed: StairFixed | undefined;
 
   private get opts(): StairRunToolOptions {
     return this.env.options().stairRun ?? DEFAULT_STAIR_RUN_OPTIONS;
+  }
+
+  private get free(): boolean {
+    return this.opts.shape === 'free';
   }
 
   private get spiralOn(): boolean {
@@ -93,21 +104,24 @@ export class StairRunTool extends ToolBase {
 
   protected reset(): void {
     this.origin = null;
+    this.session?.cancel();
+    this.fixed = undefined;
     this.items = [];
     this.inf = null;
     this.sp = emptySpiral();
   }
 
   protected busy(): boolean {
-    return this.origin !== null;
+    return this.origin !== null || (this.session?.state ?? 'IDLE') !== 'IDLE';
   }
 
   override start(): void {
     this.reset();
-    this.env.say(this.spiralOn ? SPIRAL_START_HINT : START_HINT);
+    this.env.say(this.free ? FREE_START_HINT : this.spiralOn ? SPIRAL_START_HINT : START_HINT);
   }
 
   override inputPrompt(): string | null {
+    if (this.free) return this.session?.state === 'ORIGIN' || this.session?.state === 'DRAWING' ? 'Comprimento (m)' : null;
     if (this.spiralOn) {
       if (this.origin === null) return null;
       return this.sp.start === null ? 'Raio externo (m)' : 'Varredura (°)';
@@ -115,7 +129,105 @@ export class StairRunTool extends ToolBase {
     return this.origin !== null ? 'Ângulo (°)' : null;
   }
 
+  /** Enter: no desenho livre conclui (com aviso se faltam espelhos); nos demais, o padrão da base. */
+  override confirm(): void {
+    if (this.free && this.session && this.session.state !== 'IDLE') {
+      this.handleLive(this.session.finish());
+      return;
+    }
+    if (!this.spiralOn) {
+      super.confirm();
+      return;
+    }
+    if (this.origin === null) return;
+    if (this.sp.start === null) {
+      this.env.say(SPIRAL_RADIUS_HINT);
+      return;
+    }
+    this.spiralTrack(this.sp.cursor);
+    this.spiralConfirm();
+  }
+
+  /** Esc: descarta o rascunho da escada livre; um 2º Esc sai da ferramenta (como nas demais). */
+  override cancel(): void {
+    if (this.free && this.busy()) {
+      this.reset();
+      this.items = [];
+      this.env.say(FREE_START_HINT);
+      return;
+    }
+    super.cancel();
+  }
+
+  /** Backspace: no desenho livre volta um ponto; no caracol volta um passo; fora deles, nada. */
+  deleteKey(): boolean {
+    if (this.free) {
+      if (!this.session) return false;
+      const ok = this.session.back();
+      if (ok) {
+        this.items = this.session.preview();
+        this.env.say(this.session.hint());
+      }
+      return ok;
+    }
+    if (!this.spiralOn || this.origin === null) return false;
+    if (this.sp.start !== null) {
+      this.sp = emptySpiral(this.sp.cursor);
+      this.env.say(SPIRAL_RADIUS_HINT);
+      this.items = this.spiralItems();
+      return true;
+    }
+    this.reset();
+    this.env.say(SPIRAL_START_HINT);
+    return true;
+  }
+
+  /**
+   * Tecla A no desenho livre: ajusta N, h e piso à regra de Blondel do tipo (`optimizeStair`), troca o rascunho pelo
+   * trajeto ajustado e diz o que mudou. Não usa `resolveStairs` nem booleanas.
+   */
+  adjust(): boolean {
+    const s = this.session;
+    if (!this.free || !s || s.points.length < 2) return false;
+    const cfg = this.liveConfig();
+    if ('error' in cfg) {
+      this.env.say(cfg.error);
+      return true;
+    }
+    const pts = s.points;
+    const desenho = s.rawPoints();
+    const res = optimizeStair({
+      path: desenho,
+      H: cfg.H,
+      type: cfg.type,
+      width: cfg.width,
+      ...(cfg.landingDepth !== undefined ? { landingDepth: cfg.landingDepth } : {}),
+    });
+    if ('error' in res) {
+      this.env.say(res.error);
+      return true;
+    }
+    const antes = this.fixed;
+    this.fixed = res.fixed;
+    const novo = this.liveSession();
+    if (!novo || !novo.load(res.path)) {
+      this.fixed = antes;
+      const volta = this.liveSession();
+      volta?.load(pts);
+      this.items = volta ? volta.move(pts[pts.length - 1]!, 0) : [];
+      this.env.say('Não foi possível ajustar: o trajeto ajustado fica curto demais ou faz retorno agudo.');
+      return true;
+    }
+    this.items = novo.move(novo.points[novo.points.length - 1]!, 0);
+    this.env.say(res.note);
+    return true;
+  }
+
   override move(p: PointerInfo): void {
+    if (this.free) {
+      this.liveMove(p);
+      return;
+    }
     if (this.spiralOn) {
       if (this.origin === null) {
         this.items = [{ kind: 'point', at: this.snap(p).point }];
@@ -132,6 +244,10 @@ export class StairRunTool extends ToolBase {
   }
 
   override click(p: PointerInfo): void {
+    if (this.free) {
+      this.liveClick(p);
+      return;
+    }
     if (this.spiralOn) {
       this.spiralClick(p);
       return;
@@ -151,40 +267,12 @@ export class StairRunTool extends ToolBase {
     this.create(dir, len(dir));
   }
 
-  /** Enter: no caracol, confirma a varredura atual (com o cursor onde está); nas outras formas, o padrão. */
-  override confirm(): void {
-    if (!this.spiralOn) {
-      super.confirm();
-      return;
-    }
-    if (this.origin === null) return;
-    if (this.sp.start === null) {
-      this.env.say(SPIRAL_RADIUS_HINT);
-      return;
-    }
-    this.spiralTrack(this.sp.cursor);
-    this.spiralConfirm();
-  }
-
-  /** Backspace (e Delete) no caracol volta um passo: da varredura ao raio, do raio ao centro. Fora dele, nada. */
-  deleteKey(): boolean {
-    if (!this.spiralOn || this.origin === null) return false;
-    if (this.sp.start !== null) {
-      this.sp = emptySpiral(this.sp.cursor);
-      this.env.say(SPIRAL_RADIUS_HINT);
-      this.items = this.spiralItems();
-      return true;
-    }
-    this.reset();
-    this.env.say(SPIRAL_START_HINT);
-    return true;
-  }
-
   /**
    * Ângulo digitado (graus, a partir do eixo X) fixa a direção e cria a escada. No caracol: raio externo (m) no 2º passo,
-   * depois a varredura (graus), com o sentido do primeiro movimento ou o da opção.
+   * depois a varredura (graus), com o sentido do primeiro movimento ou o da opção. Na escada livre: o comprimento.
    */
   override type(text: string): boolean {
+    if (this.free) return this.liveType(text);
     if (this.spiralOn) return this.spiralType(text);
     if (this.origin === null) return false;
     const v = parseNumber(text);
@@ -282,6 +370,126 @@ export class StairRunTool extends ToolBase {
     this.env.say(`Escada criada: ${b.risers} espelhos de ${cm(b.riserHeight)} cm, piso ${cm(b.tread)} cm.${extra}${avisoText} Ctrl+Z desfaz.`);
     this.reset();
     return true;
+  }
+
+  // ---------- escada livre (trajeto de cliques) ----------
+
+  /** Dados do cálculo ao vivo a partir das opções e do nível; `error` pelos mesmos motivos do `build`. */
+  private liveConfig(): StairLiveConfig | { error: string } {
+    const p = this.env.project();
+    const typeId = stairTypeForShape(p, this.opts.shape, this.opts.typeId);
+    const type = typeId ? p.stairTypes[typeId] : undefined;
+    if (!type) return { error: 'O projeto não tem tipo de escada.' };
+    const lim = this.limitsNow();
+    if ('error' in lim) return lim;
+    return {
+      H: lim.H,
+      type,
+      width: this.opts.width,
+      ...(this.opts.landingDepth !== undefined ? { landingDepth: this.opts.landingDepth } : {}),
+      ...(this.fixed ? { fixed: this.fixed } : {}),
+    };
+  }
+
+  /** Sessão configurada com as opções atuais, ou null (com a mensagem dita) se faltam dados. */
+  private liveSession(): StairLiveSession | null {
+    const cfg = this.liveConfig();
+    if ('error' in cfg) {
+      this.env.say(cfg.error);
+      return null;
+    }
+    if (!this.session) this.session = new StairLiveSession(cfg);
+    else this.session.configure(cfg);
+    return this.session;
+  }
+
+  private liveFrom(): Vec2 | undefined {
+    const pts = this.session?.points ?? [];
+    return pts[pts.length - 1];
+  }
+
+  private liveMove(p: PointerInfo): void {
+    const inf = this.snap(p, { from: this.liveFrom() });
+    const s = this.liveSession();
+    if (!s) {
+      this.items = [{ kind: 'point', at: inf.point }];
+      return;
+    }
+    this.items = s.move(inf.point, this.env.metersPerPixel());
+  }
+
+  private liveClick(p: PointerInfo): void {
+    const inf = this.snap(p, { from: this.liveFrom() });
+    const s = this.liveSession();
+    if (!s) return;
+    this.handleLive(s.click(inf.point), inf.point);
+  }
+
+  private liveType(text: string): boolean {
+    const s = this.liveSession();
+    if (!s) return false;
+    const v = parseNumber(text);
+    if (v === null) {
+      this.env.say('Valor inválido. Digite o comprimento em metros.');
+      return false;
+    }
+    const ev = s.typeLength(v);
+    this.handleLive(ev);
+    return ev.kind === 'added' || ev.kind === 'done';
+  }
+
+  /** Reage ao resultado de um clique, Enter ou comprimento digitado. */
+  private handleLive(ev: StairLiveEvent, at?: Vec2): void {
+    const s = this.session;
+    if (!s) return;
+    if (ev.kind === 'ignored' || ev.kind === 'warn') {
+      this.env.say(ev.message);
+      return;
+    }
+    if (ev.kind === 'added') {
+      this.items = s.move(at ?? s.points[s.points.length - 1]!, 0);
+      this.env.say(ev.message ? `${ev.message} Enter ou clique conclui; Backspace volta.` : s.hint());
+      return;
+    }
+    this.createFree(ev.path);
+  }
+
+  /** Cria a escada livre do trajeto em UMA transação "Criar escada" (Ctrl+Z desfaz); recusa mantém o rascunho. */
+  private createFree(path: Vec2[]): void {
+    const cfg = this.liveConfig();
+    if ('error' in cfg) {
+      this.env.say(cfg.error);
+      return;
+    }
+    const plan = planStairRunFree({ path, H: cfg.H, type: cfg.type, options: this.opts, ...(this.fixed ? { fixed: this.fixed } : {}) });
+    if ('error' in plan) {
+      // Mantém o rascunho (volta a DRAWING com os pontos) para o usuário corrigir com Backspace ou mexendo o último ponto.
+      const s = this.session;
+      s?.load(path);
+      this.items = s ? s.move(path[path.length - 1]!, 0) : [];
+      this.env.say(`Não é possível criar a escada: ${plan.error} Backspace volta um ponto.`);
+      return;
+    }
+    const comps = componentsFromParts(plan.parts);
+    const out: { r?: StairCommandResult } = {};
+    this.env.transaction('Criar escada', () => {
+      out.r = stairFromGenerator(this.env, comps, { ...this.creation(), generatedBy: 'free', ...(plan.path ? { freePath: plan.path } : {}) });
+    });
+    const r = out.r;
+    if (!r || 'error' in r) {
+      this.env.say(`Não é possível criar a escada: ${r?.error ?? 'falha ao gravar.'}`);
+      return;
+    }
+    const aviso = stairIssuesOf(this.env.project(), r.id).find((i) => i.stairId === r.id && i.severity === 'warning' && !(plan.note && i.code === 'stair-risers-count'));
+    const runs = plan.runs ?? 0;
+    const landings = plan.landings ?? 0;
+    const extra = plan.note ? ` ${plan.note}` : '';
+    const avisoText = aviso ? ` Aviso: ${aviso.message}` : '';
+    this.env.say(
+      `Escada criada: ${plan.risers} espelhos de ${cm(plan.riserHeight)} cm, piso ${cm(plan.tread)} cm, ${runs} ${runs === 1 ? 'lance' : 'lances'}, ${landings} ${landings === 1 ? 'patamar' : 'patamares'}.${extra}${avisoText} Ctrl+Z desfaz.`,
+    );
+    this.reset();
+    this.items = [];
   }
 
   // ---------- caracol (3 cliques) ----------

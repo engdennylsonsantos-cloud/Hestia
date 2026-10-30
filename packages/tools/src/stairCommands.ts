@@ -1,3 +1,4 @@
+import type { Vec2 } from '@hestia/geom';
 import { isStair, defaultStairTypeId, makeStair, newId, stairBaseZ, stairTopZ, unitsOf, type Id, type Project, type Stair, type StairGenerator, type StairLanding, type StairRun } from '@hestia/model';
 import type { ToolEnv } from './types.ts';
 import { analyzeDraft, partsFromComponents, type DraftReport, type StairLimits } from './stairSketchState.ts';
@@ -12,6 +13,10 @@ export interface StairCreateOptions {
   height?: number;
   mark?: string;
   comments?: string;
+  /** Escada livre: trajeto de cliques gravado no modelo. */
+  freePath?: Vec2[];
+  /** Escada livre: índices do trajeto com patamar forçado. */
+  manualLandings?: number[];
 }
 
 export type StairCommandResult = { id: Id; report: DraftReport } | { error: string };
@@ -71,6 +76,8 @@ export function createStairFromComponents(env: ToolEnv, components: Array<StairR
     components,
       mark: opts.mark ?? '',
       comments: opts.comments ?? '',
+    ...(opts.freePath ? { freePath: opts.freePath } : {}),
+    ...(opts.manualLandings?.length ? { manualLandings: opts.manualLandings } : {}),
   });
   env.exec({ type: 'addStair', stair });
   env.setSelection([id]);

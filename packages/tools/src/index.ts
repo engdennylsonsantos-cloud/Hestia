@@ -47,6 +47,8 @@ export * from './stairPick.ts';
 export * from './stairCommands.ts';
 export { StairTool, isStairTool, type StairStatus } from './stairTool.ts';
 export * from './stairRunPlan.ts';
+export * from './stairLiveMessages.ts';
+export * from './stairLiveSession.ts';
 export * from './rampOptions.ts';
 export * from './rampCommands.ts';
 export * from './rampPick.ts';

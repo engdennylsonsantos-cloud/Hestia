@@ -173,8 +173,19 @@ export const tagsOfPlan = (plan: Pick<AreaPlan, 'tags'>): RoomTag[] => plan.tags
 /** Anotações vazias de uma planta de área. */
 export const emptyPlanAnnotations = (): AreaPlanAnnotations => ({ dimensions: [], texts: [], detailLines: [], detailRegions: [], tags: [] });
 
-/** Anotações da planta, ou conjunto vazio (o chamador decide se cai nas do nível). */
-export const planAnnotationsOf = (plan: Pick<AreaPlan, 'annotations'>): AreaPlanAnnotations => plan.annotations ?? emptyPlanAnnotations();
+/** Regra única de anotações: `annotations === undefined` herda as do nível; definido (inclusive `{}`) é conjunto próprio. */
+export const planOwnsAnnotations = (plan: Pick<AreaPlan, 'annotations'>): boolean => plan.annotations !== undefined;
+
+/**
+ * Anotações da planta normalizadas: listas ausentes viram `[]` (então `{}` é "próprio e vazio"). Devolve a mesma
+ * referência quando já está completo. Sem conjunto próprio devolve vazio (o chamador decide se cai nas do nível).
+ */
+export const planAnnotationsOf = (plan: Pick<AreaPlan, 'annotations'>): AreaPlanAnnotations => {
+  const a: Partial<AreaPlanAnnotations> | undefined = plan.annotations;
+  if (a === undefined) return emptyPlanAnnotations();
+  if (a.dimensions && a.texts && a.detailLines && a.detailRegions && a.tags) return a as AreaPlanAnnotations;
+  return { dimensions: a.dimensions ?? [], texts: a.texts ?? [], detailLines: a.detailLines ?? [], detailRegions: a.detailRegions ?? [], tags: a.tags ?? [] };
+};
 
 /** Cópia das anotações da planta: os comandos nunca compartilham os arrays da origem. */
 export const copyPlanAnnotations = (a: AreaPlanAnnotations): AreaPlanAnnotations => ({

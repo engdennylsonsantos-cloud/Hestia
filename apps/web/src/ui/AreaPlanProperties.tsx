@@ -7,8 +7,11 @@ import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 
 const say = (status: string): void => useUi.setState({ status });
 
-/** Painel da planta de área quando nada está selecionado: gráficos, cor e etiquetas. */
-export function AreaPlanProperties({ plan }: { plan: AreaPlan }): ReactElement {
+/**
+ * Controles do perfil da vista de área (escala, visibilidade, estilo, rótulos, legenda/prancha),
+ * mostrados dentro do painel comum de propriedades de vista como sobrescritas da vista.
+ */
+export function AreaProfileGroups({ plan }: { plan: AreaPlan }): ReactElement {
   const p: Project = useProject();
   // `showGrids`/`showSectionMarks` são opcionais no modelo; ausentes valem desligados.
   const g = plan.graphics;
@@ -17,7 +20,7 @@ export function AreaPlanProperties({ plan }: { plan: AreaPlan }): ReactElement {
   const rooms = Object.values(p.elements).filter((e) => e.kind === 'room' && e.levelId === plan.levelId).length;
   return (
     <>
-      <Group title="Planta de área">
+      <Group title="Perfil da vista (planta de área)">
         <Row label="Nome" htmlFor="ap-name">
           <TextField id="ap-name" value={plan.name} onCommit={(v) => editor.store.exec({ type: 'updateAreaPlan', id: plan.id, patch: { name: v } }, 'Renomear planta de área')} />
         </Row>

@@ -1,16 +1,27 @@
 import { useRef, useState, type ReactElement } from 'react';
-import { areaPlansOf, formatQuantity, projectSheets, type Element, type SectionView } from '@hestia/model';
+import { areaPlansOf, formatQuantity, projectSheets, type Element, type SectionView, type SheetViewSource } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { duplicateSheetCommand, addSheetAction } from '../../editor/sheetActions.ts';
+import { moveSheetCommand } from '../../editor/sheetNumbering.ts';
+import { beginSheetDrag, endSheetDrag, SHEET_VIEW_MIME } from '../../editor/sheetDrag.ts';
 import { createAreaPlansForLevels, openAreaPlan } from '../../editor/areaPlanActions.ts';
 import { useUi, type DialogKind } from '../../editor/state.ts';
 import { activateView } from '../../editor/viewTabActions.ts';
-import { Node, type MenuItem } from './Tree.tsx';
+import { Node, type DragData, type MenuItem } from './Tree.tsx';
 import { useUnits } from '../useUnits.ts';
 
 /** Seções "Vistas (todas)", "Tabelas/Quantidades (todas)" e "Pranchas (todas)" do navegador, no padrão Revit. */
 
 const say = (status: string): void => useUi.setState({ status });
+
+/** Torna o nó arrastável para a prancha aberta (Revit: arrastar a vista do navegador para o *Sheet*). */
+const dragView = (view: SheetViewSource, label: string): DragData => ({
+  type: SHEET_VIEW_MIME,
+  value: JSON.stringify(view),
+  label,
+  onStart: () => beginSheetDrag({ view, label }),
+  onEnd: endSheetDrag,
+});
 
 /** Corte ou elevação: duplo clique abre; botão direito oferece abrir, renomear e excluir. */
 function SectionNode({ view }: { view: SectionView }): ReactElement {
@@ -52,7 +63,7 @@ function SectionNode({ view }: { view: SectionView }): ReactElement {
     { label: 'Renomear', run: start },
     { label: 'Excluir', run: () => editor.deleteView(view.id), danger: true, sep: true },
   ];
-  return <Node id={`view:${view.id}`} label={label} icon={view.kind === 'section' ? 'section' : 'elevation'} bold={active} title="Duplo clique abre a vista; botão direito: renomear, excluir." onOpen={open} menu={menu} />;
+  return <Node id={`view:${view.id}`} label={label} icon={view.kind === 'section' ? 'section' : 'elevation'} bold={active} title="Duplo clique abre a vista; arraste para a prancha; botão direito: renomear, excluir." onOpen={open} menu={menu} drag={dragView({ kind: 'section', sectionId: view.id }, `${view.kind === 'elevation' ? 'Elevação' : 'Corte'} · ${view.name}`)} />;
 }
 
 export function ViewsTree(): ReactElement {
@@ -76,8 +87,9 @@ export function ViewsTree(): ReactElement {
             label={l.name}
             icon="plan"
             bold={view === 'plan' && planKind === 'floor' && levelId === l.id}
-            title={`Elevação ${formatQuantity(units, 'length', l.elevation)}. Duplo clique abre a planta.`}
+            title={`Elevação ${formatQuantity(units, 'length', l.elevation)}. Duplo clique abre; arraste para a prancha.`}
             onOpen={() => activateView({ kind: 'plan', levelId: l.id })}
+            drag={dragView({ kind: 'plan', levelId: l.id }, `Planta · ${l.name}`)}
             menu={[{ label: 'Abrir', run: () => activateView({ kind: 'plan', levelId: l.id }) }, { label: 'Níveis…', run: () => useUi.setState({ dialog: 'levels' }), sep: true }]}
           />
         ))}
@@ -116,8 +128,9 @@ export function ViewsTree(): ReactElement {
             label={ap.name}
             icon="plan"
             bold={view === 'plan' && planKind === 'area' && areaPlanId === ap.id}
-            title="Planta de área: linhas de referência, etiquetas e quadro. Duplo clique abre."
+            title="Planta de área: linhas de referência, etiquetas e quadro. Duplo clique abre; arraste para a prancha."
             onOpen={() => activateView({ kind: 'plan', levelId: ap.levelId, planKind: 'area', areaPlanId: ap.id })}
+            drag={dragView({ kind: 'areaPlan', planId: ap.id }, `Área · ${ap.name}`)}
             menu={[
               { label: 'Abrir', run: () => activateView({ kind: 'plan', levelId: ap.levelId, planKind: 'area', areaPlanId: ap.id }) },
               { label: 'Excluir', run: () => editor.store.exec({ type: 'removeAreaPlan', id: ap.id }, 'Excluir planta de área'), danger: true, sep: true },
@@ -126,7 +139,7 @@ export function ViewsTree(): ReactElement {
         ))}
       </Node>
       <Node id="g:3d" label="Vistas 3D (3D View)" group open>
-        <Node id="v:3d" label="Modelo 3D" icon="cube" bold={view === '3d'} onOpen={() => activateView({ kind: '3d' })} menu={[{ label: 'Abrir', run: () => activateView({ kind: '3d' }) }]} />
+        <Node id="v:3d" label="Modelo 3D" icon="cube" bold={view === '3d'} onOpen={() => activateView({ kind: '3d' })} menu={[{ label: 'Abrir', run: () => activateView({ kind: '3d' }) }]} drag={dragView({ kind: '3d' }, 'Modelo 3D')} />
       </Node>
       <Node id="g:elev" label="Elevações (Elevação de edifício)" group menu={genMenu} empty="Nenhuma elevação. Botão direito: Gerar elevações.">
         {elevations.length ? elevations.map((v) => <SectionNode key={v.id} view={v} />) : undefined}
@@ -182,6 +195,12 @@ export function SheetsTree(): ReactElement {
   const view = useUi((s) => s.view);
   const sheetId = useUi((s) => s.sheetId);
   const sheets = projectSheets(p);
+  /** Troca a prancha com a vizinha; no limite, avisa na barra de status. */
+  const move = (id: string, delta: -1 | 1): void => {
+    const cmd = moveSheetCommand(p, id, delta);
+    if (!cmd) return say(delta < 0 ? 'A prancha já está no início da lista.' : 'A prancha já está no fim da lista.');
+    sheetAction(() => editor.store.exec(cmd, delta < 0 ? 'Mover prancha para cima' : 'Mover prancha para baixo'), delta < 0 ? 'Prancha movida para cima.' : 'Prancha movida para baixo.');
+  };
   return (
     <Node
       id="g:sheets"
@@ -190,21 +209,27 @@ export function SheetsTree(): ReactElement {
       group
       open
       empty="Nenhuma prancha. Botão direito: Nova prancha."
-      menu={[{ label: 'Nova prancha', run: () => sheetAction(() => openSheet(addSheetAction(editor.store)), 'Prancha criada.') }]}
+      menu={[
+        { label: 'Nova prancha', run: () => sheetAction(() => openSheet(addSheetAction(editor.store)), 'Prancha criada.') },
+        { label: 'Renumerar pranchas…', disabled: sheets.length === 0, run: () => useUi.setState({ dialog: 'renumberSheets', dialogArg: null }) },
+      ]}
     >
       {sheets.length
-        ? sheets.map((sh) => (
+        ? sheets.map((sh, i) => (
             <Node
               key={sh.id}
               id={`sheet:${sh.id}`}
               label={`${sh.number} - ${sh.name}`}
               icon="sheet"
               bold={view === 'sheet' && sheetId === sh.id}
-              title={`Folha ${sh.size}. Duplo clique abre.`}
+              title={`Folha ${sh.size}${sh.discipline ? ` · ${sh.discipline}` : ''}. Duplo clique abre.`}
               onOpen={() => openSheet(sh.id)}
               menu={[
                 { label: 'Abrir', run: () => openSheet(sh.id) },
                 { label: 'Propriedades da prancha…', run: () => useUi.setState({ dialog: 'sheet', dialogArg: sh.id }) },
+                { label: 'Mover para cima', disabled: i === 0, run: () => move(sh.id, -1), sep: true },
+                { label: 'Mover para baixo', disabled: i === sheets.length - 1, run: () => move(sh.id, 1) },
+                { label: 'Emitir revisão…', run: () => useUi.setState({ dialog: 'revision', dialogArg: sh.id }) },
                 { label: 'Duplicar', sep: true, run: () => sheetAction(() => { const c = duplicateSheetCommand(p, sh.id); if (c) editor.store.exec(c, 'Duplicar prancha'); }, 'Prancha duplicada.') },
                 { label: 'Excluir', danger: true, run: () => sheetAction(() => editor.store.exec({ type: 'removeSheet', id: sh.id }, 'Excluir prancha'), 'Prancha excluída.') },
               ]}

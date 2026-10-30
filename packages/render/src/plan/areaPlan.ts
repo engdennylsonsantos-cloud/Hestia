@@ -277,7 +277,8 @@ export function areaPlanTagOps(p: Project, plan: AreaPlan, scale: number, hidden
     const tag = plan.tags.find((t) => t.roomId === room.id);
     if (tag && !tag.visible) continue;
     const ref = referenceAt(room, r);
-    let at = room.labelPosition ?? tag?.at ?? ref;
+    // A etiqueta da vista (`RoomTag.at`) é a posição explícita desta planta e vence o rótulo global do modelo.
+    let at = tag?.at ?? room.labelPosition ?? ref;
     const rotation = room.labelRotation ?? (tag?.orientation === 'vertical' ? 90 : 0);
     const draft: RoomTag = tag ?? {
       id: `auto:${room.id}`,

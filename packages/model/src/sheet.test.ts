@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, emptyTitleBlock, sheetDimsMm, sheetInnerBox, sheetIssue, sheetOf, viewportIssue, type Sheet, type SheetViewport } from './index.ts';
+import { LABEL_DEFAULT_MM, ProjectStore, createEmptyProject, emptyTitleBlock, projectSheets, sheetDimsMm, sheetInnerBox, sheetIssue, sheetOf, viewportAnchor, viewportBox, viewportClipped, viewportFrameVisible, viewportIssue, viewportLabel, viewportOffset, type Sheet, type SheetViewport } from './index.ts';
 
 const LV0 = 'lv_0';
 const titleBlock = emptyTitleBlock();
@@ -98,5 +98,82 @@ describe('persistência', () => {
     const back = JSON.parse(JSON.stringify(s.project));
     expect(sheetOf(back, 'sh1')).toEqual(sheetOf(s.project, 'sh1'));
     expect(sheetOf(JSON.parse(JSON.stringify(createEmptyProject())), 'sh1')).toBeUndefined();
+  });
+});
+
+describe('editor de layout: deslocamento, recorte e legenda', () => {
+  it('campos do editor são opcionais: vista antiga vale centrada, recortada e com legenda', () => {
+    const v = vp('v1');
+    expect(viewportOffset(v)).toEqual({ x: 0, y: 0 });
+    expect(viewportClipped(v)).toBe(true);
+    expect(viewportFrameVisible(v)).toBe(true);
+    expect(viewportLabel(v)).toEqual({ show: true, sizeMm: LABEL_DEFAULT_MM, scaleBar: false, rule: true });
+    expect(viewportBox(v)).toEqual({ x: 20, y: 20, w: 150, h: 100 });
+  });
+
+  it('recusa deslocamento não finito e legenda de tamanho zero (pt-BR)', () => {
+    expect(viewportIssue(sheet('s'), vp('v', { offset: { x: Number.NaN, y: 0 } }))).toMatch(/deslocamento/);
+    expect(viewportIssue(sheet('s'), vp('v', { label: { sizeMm: 0 } }))).toMatch(/legenda/);
+    expect(viewportIssue(sheet('s'), vp('v', { offset: { x: 10, y: -5 }, clip: false, frame: false }))).toBeNull();
+  });
+
+  it('grava deslocamento, recorte, moldura, legenda e trava com um passo de desfazer', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addSheet', sheet: sheet('sh1', { viewports: [vp('v1')] }) });
+    s.exec({
+      type: 'updateViewport',
+      sheetId: 'sh1',
+      id: 'v1',
+      patch: { offset: { x: 12, y: -4 }, clip: false, frame: false, label: { show: false, scaleBar: true }, locked: true },
+    });
+    const v = sheetOf(s.project, 'sh1')!.viewports[0]!;
+    expect(v.offset).toEqual({ x: 12, y: -4 });
+    expect(v.clip).toBe(false);
+    expect(v.label).toEqual({ show: false, scaleBar: true });
+    expect(v.locked).toBe(true);
+    s.undo();
+    expect(sheetOf(s.project, 'sh1')!.viewports[0]!.offset).toBeUndefined();
+  });
+
+  it('ordem das pranchas: aplica a lista e mantém as não citadas no fim; recusa repetida ou inexistente', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addSheet', sheet: sheet('sh1', { number: 'A-101' }) });
+    s.exec({ type: 'addSheet', sheet: sheet('sh2', { number: 'A-102' }) });
+    s.exec({ type: 'addSheet', sheet: sheet('sh3', { number: 'A-103' }) });
+    s.exec({ type: 'setSheetOrder', ids: ['sh3', 'sh1'] });
+    expect(projectSheets(s.project).map((x) => x.id)).toEqual(['sh3', 'sh1', 'sh2']);
+    s.undo();
+    expect(projectSheets(s.project).map((x) => x.id)).toEqual(['sh1', 'sh2', 'sh3']);
+    expect(() => s.exec({ type: 'setSheetOrder', ids: ['sh1', 'sh1'] })).toThrow(/repetida/);
+    expect(() => s.exec({ type: 'setSheetOrder', ids: ['nada'] })).toThrow(/inexistente/);
+  });
+
+  it('revisões e disciplina da prancha vão no arquivo', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({
+      type: 'addSheet',
+      sheet: sheet('sh1', {
+        discipline: 'Arquitetura',
+        revisions: [{ tag: '0', date: '2026-10-30', description: 'Emissão inicial' }],
+      }),
+    });
+    const back = JSON.parse(JSON.stringify(s.project));
+    expect(sheetOf(back, 'sh1')!.revisions).toEqual([{ tag: '0', date: '2026-10-30', description: 'Emissão inicial' }]);
+    expect(sheetOf(back, 'sh1')!.discipline).toBe('Arquitetura');
+  });
+});
+
+describe('âncora do conteúdo (redimensionar sem mover o desenho)', () => {
+  it('sem âncora vale o centro da caixa + offset; com âncora, ela manda', () => {
+    const v = vp('v1');
+    expect(viewportAnchor(v)).toEqual({ x: 95, y: 70 });
+    expect(viewportAnchor({ ...v, offset: { x: 5, y: -3 } })).toEqual({ x: 100, y: 67 });
+    expect(viewportAnchor({ ...v, anchor: { x: 1, y: 2 } })).toEqual({ x: 1, y: 2 });
+    expect(viewportAnchor({ ...v, anchor: { x: 1, y: 2 }, offset: { x: 50, y: 50 } })).toEqual({ x: 1, y: 2 });
+  });
+
+  it('recusa âncora não finita e aceita âncora fora da caixa', () => {
+    expect(viewportIssue(sheet('s'), vp('v', { anchor: { x: Number.NaN, y: 0 } }))).toMatch(/âncora/);
+    expect(viewportIssue(sheet('s'), vp('v', { anchor: { x: -50, y: 500 } }))).toBeNull();
   });
 });

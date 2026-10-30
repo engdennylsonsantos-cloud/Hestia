@@ -4,8 +4,10 @@ import type { PlanDrawList, PlanTheme } from '../plan/types.ts';
 import { hatchPartsOf } from './hatch.ts';
 import type { SheetPoint, ViewportParts } from './types.ts';
 import type { SheetViewport } from '@hestia/model';
+import { viewportAnchor } from '@hestia/model';
 
-type VpBox = Pick<SheetViewport, 'at' | 'size' | 'scale'>;
+type VpBox = Pick<SheetViewport, 'at' | 'size' | 'scale'> & Partial<Pick<SheetViewport, 'offset' | 'anchor'>>;
+type ToPaperBox = Pick<SheetViewport, 'at' | 'size'> & Partial<Pick<SheetViewport, 'offset' | 'anchor'>>;
 
 /**
  * Conversão do mundo (m) e das listas de desenho da tela para a folha (mm de papel). A vista é montada com zoom
@@ -43,9 +45,17 @@ export function viewMappingOf(v: Pick<VpBox, 'size' | 'scale'>, centre: Vec2): V
   };
 }
 
-/** Mundo → folha: a caixa da vista (`at`, `size`) fica centrada no centro de `m`. */
-export const toPaper = (vp: Pick<VpBox, 'at' | 'size'>, m: ViewMapping) =>
-  (q: Vec2): SheetPoint => ({ x: vp.at.x + vp.size.w / 2 + (q.x - m.cx) * m.k, y: vp.at.y + vp.size.h / 2 + (q.y - m.cy) * m.k });
+/**
+ * Mundo → folha: o centro do desenho cai na âncora da vista (mm de papel). A âncora é o que permite redimensionar a
+ * caixa sem mover o desenho; sem ela, vale o centro da caixa mais o `offset` (arquivos antigos).
+ */
+export const toPaper = (vp: ToPaperBox, m: ViewMapping) => {
+  const a = viewportAnchor(vp);
+  return (q: Vec2): SheetPoint => ({
+    x: a.x + (q.x - m.cx) * m.k,
+    y: a.y + (q.y - m.cy) * m.k,
+  });
+};
 
 /** Ponto de rótulo com deslocamento de tela: a tela tem y para baixo, o papel para cima. */
 const shifted = (p: SheetPoint, dx: number, dy: number): SheetPoint => ({ x: p.x + dx * SCREEN_PX_MM, y: p.y - dy * SCREEN_PX_MM });

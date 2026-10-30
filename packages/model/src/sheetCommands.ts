@@ -10,13 +10,21 @@ export type SheetCommand =
   | { type: 'addSheet'; sheet: Sheet }
   | { type: 'updateSheet'; id: Id; patch: Partial<Omit<Sheet, 'id' | 'viewports'>> }
   | { type: 'removeSheet'; id: Id }
+  | { type: 'setSheetOrder'; ids: Id[] }
   | { type: 'addViewport'; sheetId: Id; viewport: SheetViewport }
   | { type: 'updateViewport'; sheetId: Id; id: Id; patch: Partial<Omit<SheetViewport, 'id'>> }
   | { type: 'removeViewport'; sheetId: Id; id: Id };
 
+/** Remove as viewports cuja fonte não existe mais (usado ao apagar planta de área ou nível, no mesmo comando). */
+export function dropOrphanViewports(p: Project): void {
+  if (!p.sheets?.some((s) => s.viewports.some((v) => viewSourceIssue(p, v.view)))) return;
+  p.sheets = p.sheets.map((s) => (s.viewports.some((v) => viewSourceIssue(p, v.view)) ? { ...s, viewports: s.viewports.filter((v) => !viewSourceIssue(p, v.view)) } : s));
+}
+
 /** Motivo de recusa de uma fonte de vista (nível ou seção que precisa existir), ou null. */
-export function viewSourceIssue(p: Pick<Project, 'levels' | 'views'>, view: SheetViewSource): string | null {
+export function viewSourceIssue(p: Pick<Project, 'levels' | 'views'> & Partial<Pick<Project, 'areaPlans'>>, view: SheetViewSource): string | null {
   if (view.kind === 'plan' && !p.levels.some((l) => l.id === view.levelId)) return 'Nível inexistente';
+  if (view.kind === 'areaPlan' && !(p.areaPlans ?? []).some((a) => a.id === view.planId)) return 'Planta de área inexistente';
   if (view.kind === 'section' && !p.views.some((v) => v.id === view.sectionId)) return 'Vista de corte inexistente';
   return null;
 }
@@ -56,6 +64,16 @@ export function applySheetCommand(p: Project, c: SheetCommand): void {
     case 'removeSheet': {
       sheetRef(p, c.id);
       setSheets(p, projectSheets(p).filter((s) => s.id !== c.id));
+      break;
+    }
+    case 'setSheetOrder': {
+      const all = projectSheets(p);
+      if (new Set(c.ids).size !== c.ids.length) throw new Error('Prancha repetida na ordem.');
+      for (const id of c.ids) if (!all.some((s) => s.id === id)) throw new Error('Prancha inexistente na ordem.');
+      const byId = new Map(all.map((s) => [s.id, s]));
+      const ordered = c.ids.map((id) => byId.get(id)!);
+      // Pranchas não citadas (ex.: criadas por outro caminho) ficam no fim, na ordem atual.
+      setSheets(p, [...ordered, ...all.filter((s) => !c.ids.includes(s.id))]);
       break;
     }
     case 'addViewport': {

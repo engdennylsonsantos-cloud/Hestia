@@ -41,7 +41,7 @@ export { openingTagLabels } from './plan/openingTags.ts';
 // Pranchas (decisão 0022): lista de desenho da folha em mm de papel, para a tela e o PDF.
 export * from './sheet/types.ts';
 export * from './sheet/build.ts';
-export { STAMP_H, STAMP_W } from './sheet/frame.ts';
+export { STAMP_H, STAMP_W, captionOf, stampHeightOf } from './sheet/frame.ts';
 // Ambientes (decisão 0018, 0037): nome e centro de cada ambiente, o mesmo texto da planta de piso e do DXF.
 export { roomFullText, roomLabelAt, roomNameText } from './plan/rooms.ts';
 export { areaPlanLegendOps, areaPlanRoomOps, areaPlanTableOps, areaPlanTagOps, labelGhostOps, referenceAt, referenceSegments, roomTagLines, tagBoxModel } from './plan/areaPlan.ts';

@@ -49,7 +49,7 @@ import { CeilingProperties } from './CeilingProperties.tsx';
 import { StairProperties } from './StairProperties.tsx';
 import { RampProperties } from './RampProperties.tsx';
 import { RoomProperties } from './RoomProperties.tsx';
-import { AreaPlanProperties, activeAreaPlan } from './AreaPlanProperties.tsx';
+import { AreaProfileGroups, activeAreaPlan } from './AreaPlanProperties.tsx';
 import { GenericProps, selectionLabel } from './GenericProps.tsx';
 import { CadProps } from './CadProps.tsx';
 import { GridProperties } from './GridProperties.tsx';
@@ -337,8 +337,9 @@ function ViewProps(): ReactElement {
   const section = s.view === 'section' ? p.views.find((v) => v.id === s.sectionId) : undefined;
   // A planta de cobertura mostra as mesmas propriedades da de piso do nível; só o nome do tipo muda.
   const roof = s.view === 'plan' && s.planKind === 'roof';
-  const title = s.view === 'plan' ? `${roof ? 'Planta de cobertura' : 'Planta'} · ${lvl?.name ?? ''}` : s.view === 'section' ? `${section?.kind === 'elevation' ? 'Elevação' : 'Corte'} · ${section?.name ?? ''}` : 'Modelo 3D';
-  const kindLabel = s.view === 'plan' ? (roof ? 'Planta de cobertura' : 'Planta de piso') : s.view === 'section' ? (section?.kind === 'elevation' ? 'Elevação' : 'Corte') : 'Modelo 3D';
+  const areaPlan = s.view === 'plan' && s.planKind === 'area' ? activeAreaPlan(p, s.areaPlanId) : undefined;
+  const title = s.view === 'plan' ? areaPlan ? `${areaPlan.name} · ${lvl?.name ?? ''}` : `${roof ? 'Planta de cobertura' : 'Planta'} · ${lvl?.name ?? ''}` : s.view === 'section' ? `${section?.kind === 'elevation' ? 'Elevação' : 'Corte'} · ${section?.name ?? ''}` : 'Modelo 3D';
+  const kindLabel = s.view === 'plan' ? (areaPlan ? 'Planta de área' : roof ? 'Planta de cobertura' : 'Planta de piso') : s.view === 'section' ? (section?.kind === 'elevation' ? 'Elevação' : 'Corte') : 'Modelo 3D';
   return (
     <>
       <div className="rv-stick">
@@ -371,6 +372,7 @@ function ViewProps(): ReactElement {
         </Row>
         <div className="prow"><span /><button className="chiplink" onClick={() => useUi.setState({ dialog: 'levels' })}>Editar níveis…</button></div>
       </Group>
+      {areaPlan ? <AreaProfileGroups key={`ap-${areaPlan.id}`} plan={areaPlan} /> : null}
       {s.view === 'plan' && <ViewRangeGroup key={`vr-${s.levelId}`} levelId={s.levelId} />}
       {s.view === 'plan' && <LevelGraphicsGroup key={`lg-${s.levelId}`} levelId={s.levelId} />}
       {s.view === '3d' && <View3DGroup />}
@@ -412,7 +414,6 @@ export function Properties(): ReactElement {
   const kinds = [walls, ops, floors, slabs, ceilings, roofs, stairs, ramps, rooms, generics, cads].filter((g) => g.length > 0).length;
   const tool = useUi((s) => s.tool);
   const placing = count === 0 && hasPlacementProperties(tool);
-  const areaPlan = count === 0 && !placing && planId ? activeAreaPlan(p, planId) : undefined;
   const perim = usePerimeter();
   // Nível selecionado no 3D: só ocupa o painel quando não há elementos na seleção nem ferramenta em colocação.
   const selectedLevel = useUi((s) => s.selectedLevel);
@@ -440,7 +441,6 @@ export function Properties(): ReactElement {
           : note ? <AnnotationProps dim={note.dim} text={note.text} line={note.line} region={note.region} tag={note.tag} planId={planId} />
           : view ? <SectionViewProps view={view} />
           : nivelSelecionado ? <LevelProps />
-          : areaPlan ? <AreaPlanProperties plan={areaPlan} />
           : count > 0 ? (
           <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso, laje, telhado, escada, rampa ou ambiente) para editar propriedades.</div>
         ) : (

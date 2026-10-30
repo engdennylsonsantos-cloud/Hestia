@@ -21,7 +21,8 @@ export type ActionId =
   | 'materials' | 'levels' | 'lineWeights' | 'units' | 'shortcutsConfig' | 'shortcuts' | 'importCad'
   | 'schedWalls' | 'schedFloors' | 'schedSlabs' | 'schedCeilings' | 'schedRoofs' | 'schedStairs' | 'schedRooms' | 'schedOpenings'
   | 'stairSketch' | 'stairTypes' | 'rampTypes' | 'schedRamps' | 'propsSide' | 'browserSide' | 'resetDock' | 'tagAll' | 'wallTags' | 'editPerimeter'
-  | 'copySelection' | 'cutSelection' | 'pasteAligned' | 'createSimilar';
+  | 'copySelection' | 'cutSelection' | 'pasteAligned' | 'createSimilar'
+  | 'addViewSheet' | 'publishSheets' | 'sheetsPerLevel';
 
 export type RibbonItem =
   /** Ferramenta do editor: o clique chama `editor.setTool`; mostra o atalho no tooltip. */

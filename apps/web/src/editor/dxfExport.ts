@@ -31,7 +31,7 @@ import {
   type DxfViewState,
 } from '@hestia/io';
 import { areaPlanOf, openingTypeById, GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, isCad, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, unitsOf, type CadDrawing, type DxfLayerStyle, type GraphicsCategory, type Id, type Project } from '@hestia/model';
-import { AREA_LAYER_NAMES, areaLayerStyleOf } from './dxfAreaPlan.ts';
+import { AREA_LAYER_NAMES, areaLayerStyleOf, areaPlanDxf as areaPlanDxfOf } from './dxfAreaPlan.ts';
 
 /**
  * Região de um piso ou laje para o DXF (F7.1, 0023 §6): a região resolvida pela junção quando houve corte; sem corte, a camada
@@ -514,6 +514,18 @@ export function sectionDxfGeometryOf(p: Project, sectionId: Id, units?: DxfUnit)
 /** Texto DXF do corte/elevação, com as camadas e as larguras de linha da vista. */
 export function sectionDxf(p: Project, sectionId: Id, units?: DxfUnit): string {
   return exportSectionDxf(p, sectionId, sectionDxfGeometryOf(p, sectionId, units));
+}
+
+/** Vista de planta exportável: a planta de piso do nível ou uma planta de área (perfil + anotações próprias). */
+export interface PlanViewRef {
+  levelId: Id;
+  areaPlanId?: Id | null;
+  showRoofProjection?: boolean;
+}
+
+/** Ponto único de exportação do DXF de uma planta: a de área segue o perfil da vista; a de piso é inalterada. */
+export function viewDxf(p: Project, v: PlanViewRef): string {
+  return v.areaPlanId ? areaPlanDxfOf(p, v.areaPlanId) : planDxf(p, v.levelId, v.showRoofProjection ?? true);
 }
 
 

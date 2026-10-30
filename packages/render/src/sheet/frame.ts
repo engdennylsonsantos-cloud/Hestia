@@ -1,5 +1,5 @@
 import type { Project, Sheet, SheetViewport, SheetViewSource } from '@hestia/model';
-import { sectionTitleOf, sheetInnerBox, areaPlanOf } from '@hestia/model';
+import { sectionTitleOf, sheetInnerBox, areaPlanOf, viewportFrameVisible, viewportLabel } from '@hestia/model';
 import { emptyParts, type ViewportParts } from './types.ts';
 
 /** Altura das linhas do carimbo e largura da caixa (mm de papel). */
@@ -12,6 +12,13 @@ const paperInk = '#16181c';
 const FRAME_MM = 0.5;
 const VIEW_MM = 0.25;
 const LINE_MM = 0.25;
+/** Barra de escala gráfica: 20 mm em 4 segmentos de 5 mm, 1,6 mm de altura. */
+const SCALE_BAR_MM = 20;
+const SCALE_BAR_SEGMENTS = 4;
+const SCALE_BAR_H_MM = 1.6;
+const SCALE_BAR_GAP_MM = 3;
+/** Largura média de um caractere (fração da altura), a mesma estimativa de `plan/dimLabels.ts`. */
+const CHAR_W = 0.6;
 
 const rectPts = (x0: number, y0: number, x1: number, y1: number) => [
   { x: x0, y: y0 },
@@ -43,6 +50,23 @@ function scalesLine(s: Sheet): string {
   return set.map((k) => `1:${k}`).join(' · ');
 }
 
+/** Altura total do carimbo, já contando a tabela de revisões (uma linha por revisão, acima do bloco). */
+export const stampHeightOf = (s: Pick<Sheet, 'revisions'>): number => STAMP_H + (s.revisions?.length ?? 0) * STAMP_ROW;
+
+/** Barra de escala gráfica de 20 mm: 4 segmentos de 5 mm, preenchimento alternado e contorno fino. */
+function scaleBarParts(out: ViewportParts, x0: number, yBase: number): void {
+  const seg = SCALE_BAR_MM / SCALE_BAR_SEGMENTS;
+  const top = yBase + SCALE_BAR_H_MM;
+  for (let i = 0; i < SCALE_BAR_SEGMENTS; i += 2) {
+    out.fills.push({ polygons: [[rectPts(x0 + i * seg, yBase, x0 + (i + 1) * seg, top)]], color: paperInk });
+  }
+  out.paths.push({ pts: rectPts(x0, yBase, x0 + SCALE_BAR_MM, top), closed: true, widthMm: VIEW_MM, color: paperInk });
+  for (let i = 1; i < SCALE_BAR_SEGMENTS; i++) {
+    const x = x0 + i * seg;
+    out.paths.push({ pts: [{ x, y: yBase }, { x, y: top }], closed: false, widthMm: LINE_MM, color: paperInk });
+  }
+}
+
 /**
  * Moldura, legenda de cada vista e carimbo, em mm de papel. Fica por cima das vistas (o carimbo tem fundo branco e
  * cobre o que estiver sob ele).
@@ -52,27 +76,53 @@ export function furnitureParts(p: Project, s: Sheet): ViewportParts {
   const box = sheetInnerBox(s);
   out.paths.push({ pts: rectPts(box.x0, box.y0, box.x1, box.y1), closed: true, widthMm: FRAME_MM, color: paperInk });
   for (const v of s.viewports) {
-    out.paths.push({ pts: rectPts(v.at.x, v.at.y, v.at.x + v.size.w, v.at.y + v.size.h), closed: true, widthMm: VIEW_MM, color: paperInk });
-    out.texts.push({ at: { x: v.at.x, y: v.at.y - 3.5 }, text: captionOf(p, v.view, v), sizeMm: 2.5, rotation: 0, center: false, color: paperInk });
+    // Moldura e legenda são opcionais por vista (Revit: *Crop Region* e *View Title*).
+    if (viewportFrameVisible(v)) {
+      out.paths.push({ pts: rectPts(v.at.x, v.at.y, v.at.x + v.size.w, v.at.y + v.size.h), closed: true, widthMm: VIEW_MM, color: paperInk });
+    }
+    const label = viewportLabel(v);
+    if (!label.show) continue;
+    const caption = captionOf(p, v.view, v);
+    const yBase = v.at.y - 3.5;
+    out.texts.push({ at: { x: v.at.x, y: yBase }, text: caption, sizeMm: label.sizeMm, rotation: 0, center: false, color: paperInk });
+    if (label.rule) {
+      // Linha do Revit sob o texto: metade da caixa, no mínimo 20 mm, nunca maior que a caixa.
+      const w = Math.min(v.size.w, Math.max(20, v.size.w / 2));
+      out.paths.push({ pts: [{ x: v.at.x, y: yBase - 1 }, { x: v.at.x + w, y: yBase - 1 }], closed: false, widthMm: VIEW_MM, color: paperInk });
+    }
+    if (label.scaleBar) scaleBarParts(out, v.at.x + caption.length * label.sizeMm * CHAR_W + SCALE_BAR_GAP_MM, yBase);
   }
   const tb = s.titleBlock;
   const x0 = box.x1 - STAMP_W;
   const y0 = box.y0;
-  const top = y0 + STAMP_H;
+  const top = y0 + stampHeightOf(s);
+  /** Topo do carimbo clássico; a tabela de revisões fica logo acima, entre `top` e `stampTop`. */
+  const stampTop = y0 + STAMP_H;
   out.fills.push({ polygons: [[rectPts(x0, y0, box.x1, top)]], color: '#ffffff' });
   out.paths.push({ pts: rectPts(x0, y0, box.x1, top), closed: true, widthMm: FRAME_MM, color: paperInk });
   for (let i = 1; i <= 4; i++) {
-    const y = top - STAMP_HEAD - (i - 1) * STAMP_ROW;
+    const y = stampTop - STAMP_HEAD - (i - 1) * STAMP_ROW;
     out.paths.push({ pts: [{ x: x0, y }, { x: box.x1, y }], closed: false, widthMm: LINE_MM, color: paperInk });
   }
   const text = (x: number, y: number, t: string, size = 2.5) => out.texts.push({ at: { x, y }, text: t, sizeMm: size, rotation: 0, center: false, color: paperInk });
-  text(x0 + 3, top - 8, `${s.number}  ${s.name}`, 4.5);
-  const row = (i: number) => top - STAMP_HEAD - (i - 1) * STAMP_ROW - 5;
+  // Disciplina entra no cabeçalho, ao lado do número e do nome da prancha.
+  const head = s.discipline?.trim() ? `${s.number}  ${s.name}  ·  ${s.discipline.trim()}` : `${s.number}  ${s.name}`;
+  text(x0 + 3, stampTop - 8, head, 4.5);
+  const row = (i: number) => stampTop - STAMP_HEAD - (i - 1) * STAMP_ROW - 5;
   text(x0 + 3, row(1), `Projeto: ${tb.project}`);
   text(x0 + 3, row(2), `Cliente: ${tb.client}`);
   text(x0 + 3, row(3), `Autor: ${tb.author}`);
   text(x0 + 62, row(3), `Data: ${tb.date}`);
   text(x0 + 3, row(4), `Revisão: ${tb.revision}`);
   text(x0 + 62, row(4), `Escala: ${tb.scaleNote?.trim() ? tb.scaleNote : scalesLine(s)}`);
+  // Tabela de revisões ACIMA do carimbo: uma linha por revisão, com separador sob cada uma.
+  const revisions = s.revisions ?? [];
+  revisions.forEach((r, i) => {
+    const bottom = top - (i + 1) * STAMP_ROW;
+    text(x0 + 3, bottom + 3, `Rev. ${r.tag}`, 2.2);
+    text(x0 + 22, bottom + 3, r.date, 2.2);
+    text(x0 + 48, bottom + 3, r.description, 2.2);
+    out.paths.push({ pts: [{ x: x0, y: bottom }, { x: box.x1, y: bottom }], closed: false, widthMm: LINE_MM, color: paperInk });
+  });
   return out;
 }

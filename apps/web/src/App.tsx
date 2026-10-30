@@ -20,6 +20,9 @@ import { ViewportCanvas } from './ui/ViewportCanvas.tsx';
 import { SheetView } from './ui/SheetView.tsx';
 import { SheetDialog } from './ui/dialogs/SheetDialog.tsx';
 import { AddViewDialog } from './ui/dialogs/AddViewDialog.tsx';
+import { RenumberSheetsDialog } from './ui/dialogs/RenumberSheetsDialog.tsx';
+import { RevisionDialog } from './ui/dialogs/RevisionDialog.tsx';
+import { PublishDialog } from './ui/dialogs/PublishDialog.tsx';
 import { AutoCotaDialog } from './ui/dialogs/AutoCotaDialog.tsx';
 import { MaterialsDialog } from './ui/dialogs/MaterialsDialog.tsx';
 import { LevelsDialog, OpeningTypeDialog, ShortcutsDialog, StartDialog } from './ui/dialogs/OtherDialogs.tsx';
@@ -117,6 +120,12 @@ function Dialogs(): ReactElement | null {
       return arg ? <SheetDialog sheetId={arg} /> : null;
     case 'addView':
       return arg ? <AddViewDialog sheetId={arg} /> : null;
+    case 'renumberSheets':
+      return <RenumberSheetsDialog />;
+    case 'publish':
+      return <PublishDialog />;
+    case 'revision':
+      return arg ? <RevisionDialog sheetId={arg} /> : null;
     case 'graphicsVisibility':
       return arg ? <GraphicsVisibilityDialog target={arg} /> : null;
     case 'lineWeights':

@@ -328,6 +328,8 @@ export function labelOf(c: Command): string {
       return 'Mover vista da prancha';
     case 'removeViewport':
       return 'Excluir vista da prancha';
+    case 'setSheetOrder':
+      return 'Reordenar pranchas';
     case 'addGrid':
       return 'Criar grade';
     case 'updateGrid':

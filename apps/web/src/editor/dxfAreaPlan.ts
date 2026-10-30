@@ -5,8 +5,8 @@
  */
 import type { Vec2 } from '@hestia/geom';
 import { resolveAngularDimension, resolveLevel, resolveRoofs } from '@hestia/engine';
-import { areaPlanProfile, buildPlanGeometry, levelBox, LIGHT, resolverZoom, roofFootprint, type PlanOps, type PlanProfile } from '@hestia/render';
-import { angularDimensionGeometry, areaPlanOf, DIM_TEXT_MM, dimensionGeometry, dimensionPoints, dimensionText, planAnnotationsOf, unitsOf, type AreaPlan, type DxfLayerLineType, type DxfLayerStyle, type Id, type Project } from '@hestia/model';
+import { areaPlanProfile, buildPlanGeometry, drawnAnnotations, levelBox, LIGHT, resolverZoom, roofFootprint, type PlanOps, type PlanProfile } from '@hestia/render';
+import { angularDimensionGeometry, areaPlanOf, DIM_TEXT_MM, dimensionGeometry, dimensionPoints, dimensionText, unitsOf, type AreaPlan, type DxfLayerLineType, type DxfLayerStyle, type Id, type Project } from '@hestia/model';
 import { dxfDocOf, DXF_LINE_WEIGHT_DEFAULT, writeDxf2000, type DxfDoc, type DxfDocEntity, type DxfDocLayer, type DxfLevelGeometry, type DxfUnit } from '@hestia/io';
 import { dxfGeometryOf } from './dxfExport.ts';
 
@@ -61,7 +61,7 @@ const samePoint = (a: Vec2, b: Vec2): boolean => Math.abs(a.x - b.x) < 1e-6 && M
  * render da área passou a incluí-las; o que ainda não estiver nas operações entra aqui, sem duplicar.
  */
 function areaAnnotationEntities(p: Project, plan: AreaPlan, ops: PlanOps): DxfDocEntity[] {
-  const a = planAnnotationsOf(plan);
+  const a = drawnAnnotations(p, plan.levelId, plan);
   if (a.dimensions.length + a.texts.length + a.detailLines.length + a.detailRegions.length === 0) return [];
   const out: DxfDocEntity[] = [];
   const line = (layer: string, start: Vec2, end: Vec2): void => {

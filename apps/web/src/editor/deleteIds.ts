@@ -39,20 +39,23 @@ function deletePlanSelectionIn(store: ProjectStore, planId: Id, ids: Id[]): void
     ...a.tags.map((x) => x.id),
   ]);
   const removedAnnotations = annotationIds.size - (next.dimensions.length + next.texts.length + next.detailLines.length + next.detailRegions.length + next.tags.length);
+  // Etiquetas de ambiente (RoomTag) são da vista e ficam em `plan.tags`, fora de `annotations`.
+  const tags = plan.tags.filter((t) => want.has(t.id)).map((t) => t.id);
   const rooms = ids.filter((id) => isRoom(store.project.elements[id]));
   const separators = levelRoomSeparators(store.project, plan.levelId).filter((r) => want.has(r.id)).map((r) => r.id);
-  if (removedAnnotations === 0 && rooms.length === 0 && separators.length === 0) {
-    useUi.setState({ status: 'Na planta de área dá para excluir ambientes, separadores e anotações; paredes e demais elementos de modelo continuam bloqueados.' });
+  if (removedAnnotations === 0 && tags.length === 0 && rooms.length === 0 && separators.length === 0) {
+    useUi.setState({ status: 'Na planta de área dá para excluir ambientes, separadores, etiquetas e anotações; paredes e demais elementos de modelo continuam bloqueados.' });
     return;
   }
   const commands: Command[] = [];
   if (removedAnnotations > 0) commands.push({ type: 'updateAreaPlan', id: planId, patch: { annotations: next } });
+  for (const id of tags) commands.push({ type: 'removeRoomTag', planId, id });
   if (rooms.length > 0) commands.push({ type: 'deleteElements', ids: rooms });
   for (const id of separators) commands.push({ type: 'removeRoomSeparator', levelId: plan.levelId, id });
   const preview = areaMergePreview(store.project, plan.levelId, commands, removesCircuit(store.project, plan.levelId, ids));
   if (!preview) {
     executar(store, commands);
-    useUi.setState({ status: rooms.length > 0 ? 'Ambiente excluído.' : separators.length > 0 ? 'Separador excluído.' : 'Anotações excluídas da planta de área.' });
+    useUi.setState({ status: rooms.length > 0 ? 'Ambiente excluído.' : separators.length > 0 ? 'Separador excluído.' : tags.length > 0 ? 'Etiqueta excluída.' : 'Anotações excluídas da planta de área.' });
     return;
   }
   return (async () => {

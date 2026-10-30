@@ -28,7 +28,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('configuração de atalhos', () => {
+// `vi.resetModules()` + import dinâmico é caro sob a suíte completa; o timeout padrão de 5 s estoura com carga.
+describe('configuração de atalhos', { timeout: 20_000 }, () => {
   // A primeira importação transforma o módulo inteiro (lenta sob carga): aquece antes, para os testes não estourarem o tempo.
   beforeAll(async () => {
     await import('./shortcutConfig.ts');
@@ -80,6 +81,17 @@ describe('configuração de atalhos', () => {
     expect(m.useAtalhos.getState().mapa.unidades).toBe('PU');
     m.restaurarAtalho('unidades');
     expect(m.useAtalhos.getState().mapa.unidades).toBe('UN');
+  });
+
+  it('Criar semelhante começa em CS (Revit) e VS (simples) e pode ser reatribuído e restaurado', async () => {
+    const m = await carrega(memoria());
+    expect(m.useAtalhos.getState().mapa.createSimilar).toBe('CS');
+    expect(m.atribuirAtalho('createSimilar', 'CX').ok).toBe(true);
+    expect(m.useAtalhos.getState().mapa.createSimilar).toBe('CX');
+    m.restaurarAtalho('createSimilar');
+    expect(m.useAtalhos.getState().mapa.createSimilar).toBe('CS');
+    m.trocarPerfil('simples');
+    expect(m.useAtalhos.getState().mapa.createSimilar).toBe('VS');
   });
 
   it('trocar para o perfil simples usa as letras de uma tecla', async () => {

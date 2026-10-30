@@ -80,6 +80,7 @@ export const I18N = {
     // Modificadores
     tool_move: 'Mover',
     tool_copy: 'Copiar',
+    tool_paste: 'Colar',
     tool_rotate: 'Rotacionar',
     tool_mirror: 'Espelhar',
     tool_array: 'Matriz',
@@ -371,6 +372,7 @@ export const I18N = {
     // Modifiers
     tool_move: 'Move',
     tool_copy: 'Copy',
+    tool_paste: 'Paste',
     tool_rotate: 'Rotate',
     tool_mirror: 'Mirror',
     tool_array: 'Array',
@@ -629,5 +631,6 @@ export function toolLabel(toolId: ToolId, lang: Lang): string {
 export function nomeComandoLang(cmd: string, lang: Lang): string {
   if (cmd === 'atalhos') return lang === 'pt' ? 'Atalhos de teclado' : 'Keyboard shortcuts';
   if (cmd === 'unidades') return lang === 'pt' ? 'Unidades do projeto' : 'Project Units';
+  if (cmd === 'createSimilar') return lang === 'pt' ? 'Criar semelhante' : 'Create Similar';
   return toolLabel(cmd as ToolId, lang);
 }

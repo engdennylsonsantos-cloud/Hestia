@@ -59,6 +59,11 @@ describe('nome de comando de atalho (diálogos de atalhos)', () => {
     expect(nomeComandoLang('unidades', 'en')).toBe('Project Units');
   });
 
+  it('Criar semelhante tem nome nos dois idiomas', () => {
+    expect(nomeComandoLang('createSimilar', 'pt')).toBe('Criar semelhante');
+    expect(nomeComandoLang('createSimilar', 'en')).toBe('Create Similar');
+  });
+
   it('os textos novos da rampa (Livre, Ajustar) existem nos dois idiomas', () => {
     for (const k of ['ramp_shape_free', 'ramp_adjust', 'ramp_adjust_title'] as const) {
       expect(I18N.pt[k]).toBeTruthy();

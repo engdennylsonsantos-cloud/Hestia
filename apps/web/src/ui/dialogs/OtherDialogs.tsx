@@ -135,7 +135,7 @@ const KEYS: Array<[string, string]> = [
   ['Espaço', 'Inverte a dobradiça ao inserir porta; segurar e arrastar move a vista'],
   ['Shift', 'Trava em 0°/90° ao desenhar; soma à seleção'],
   ['Alt (ao arrastar uma ponta)', 'Inverte quem acompanha: solta o canto simples, leva todas as paredes de um nó'],
-  ['Ctrl+C / Ctrl+V', 'Copiar e colar na mesma posição, inclusive em outro nível'],
+  ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copiar, recortar e colar seguindo o cursor (o colar acompanha o mouse até o clique)'],
   ['Del', 'Exclui a seleção'],
   ['Ctrl+Z / Ctrl+Y', 'Desfazer / Refazer'],
   ['Ctrl+S', 'Salvar'],

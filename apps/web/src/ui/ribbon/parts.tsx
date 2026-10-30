@@ -32,8 +32,9 @@ const SOON_EN = 'not available yet';
 function useFace(entry: RibbonItem, ctx: RibbonCtx, lang: Lang): Face {
   const item = entry.kind === 'split' ? entry.main : entry;
   const toolId = item.kind === 'tool' ? item.tool : null;
+  const atalhoDe = toolId ?? (item.kind === 'action' ? ACTIONS[item.action].shortcut : undefined);
   const active = useUi((s) => toolId !== null && s.tool === toolId);
-  const sc = useAtalhos((s) => (toolId ? s.mapa[toolId] : undefined));
+  const sc = useAtalhos((s) => (atalhoDe ? s.mapa[atalhoDe] : undefined));
   const face = faceBase(item, ctx, lang, active, sc);
   const noEsboco = estadoNoEsboco(item, ctx);
   if (!noEsboco) return face;
@@ -58,7 +59,8 @@ function faceBase(item: RibbonItem, ctx: RibbonCtx, lang: Lang, active: boolean,
       const label = txt(item.label ?? def.label, lang);
       const why = def.disabled?.(ctx) || false;
       const hint = def.hint ? `\n${txt(def.hint, lang)}` : '';
-      return { icon: def.icon, label, title: `${label}${hint}${why ? `\n— ${txt(why, lang)}` : ''}`, on: def.pressed?.(ctx) ?? false, soon: false, disabled: why !== false, onClick: def.run };
+      const atalho = def.shortcut ? sc : def.keys;
+      return { icon: def.icon, label, title: `${label}${atalho ? ` (${atalho})` : ''}${hint}${why ? `\n— ${txt(why, lang)}` : ''}`, on: def.pressed?.(ctx) ?? false, soon: false, disabled: why !== false, onClick: def.run };
     }
     case 'option': {
       const label = txt(item.label, lang);

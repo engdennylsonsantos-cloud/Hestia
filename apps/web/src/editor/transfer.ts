@@ -39,6 +39,11 @@ export class Transfer {
     return this.clip !== null;
   }
 
+  /** Buffer atual, para o Colar com prévia (null sem cópia). */
+  clipBuffer(): ClipBuffer | null {
+    return this.clip;
+  }
+
   /** Ids que Copiar levaria da seleção (paredes, pisos, lajes, telhados, escadas, rampas, ambientes e aberturas hospedadas). */
   copyableIds(p: Project, ids: readonly Id[]): Id[] {
     return copyableIdsOf(p, ids);
@@ -52,7 +57,7 @@ export class Transfer {
       return false;
     }
     this.clip = next;
-    useUi.setState({ status: `${describe(counts(next))} copiado(s). Ctrl+V cola alinhado no nível ativo.` });
+    useUi.setState({ status: `${describe(counts(next))} copiado(s). Ctrl+V cola seguindo o cursor.` });
     return true;
   }
 

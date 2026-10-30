@@ -45,8 +45,9 @@ describe('faixa guiada por dados', () => {
   it('toda ferramenta do registro aparece na faixa (nenhuma ficou sem acesso)', () => {
     const naFaixa = new Set(leaves(allPanels().flatMap((p) => p.items)).flatMap((it) => (it.kind === 'tool' ? [it.tool] : [])));
     const ctx = ['wall', 'roofarrow', 'slope', 'attachroof', 'detachroof', 'rehost', 'roomsep'] as const;
-    // Pendente: o modo de perímetro ainda não tem botão de criação na faixa (abre por `perimeterActions.begin`).
-    const pendente = ['perimeter'] as const;
+    // Pendente: o modo de perímetro não tem botão de criação na faixa (abre por `perimeterActions.begin`).
+    // Colar também não é ferramenta da faixa: é o modo transitório do botão Colar/Ctrl+V.
+    const pendente = ['perimeter', 'paste'] as const;
     for (const id of Object.keys(TOOL_LABEL)) {
       if ((ctx as readonly string[]).includes(id) || (pendente as readonly string[]).includes(id)) continue;
       expect(naFaixa.has(id as never), id).toBe(true);
@@ -137,6 +138,13 @@ describe('copiar, recortar, colar e criar semelhante na faixa', () => {
   const comParede = { ...p, elements: { w1: { id: 'w1', kind: 'wall', typeId: 'wt_alv14' } } } as unknown as Project;
   const comJanela = { ...p, elements: { j1: { id: 'j1', kind: 'window', typeId: 'jan_120' } } } as unknown as Project;
   const ctx = (o: { p?: Project; selection?: string[]; view?: string }): RibbonCtx => ({ p, selection: [], ...o } as unknown as RibbonCtx);
+
+  it('Criar semelhante anuncia o atalho configurável e Copiar/Recortar/Colar anunciam as teclas fixas', () => {
+    expect(ACTIONS.createSimilar.shortcut).toBe('createSimilar');
+    expect(ACTIONS.copySelection.keys).toBe('Ctrl+C');
+    expect(ACTIONS.cutSelection.keys).toBe('Ctrl+X');
+    expect(ACTIONS.pasteAligned.keys).toBe('Ctrl+V');
+  });
 
   it('as quatro ações estão na faixa', () => {
     const acoes = leaves(allPanels().flatMap((pn) => pn.items)).flatMap((it) => (it.kind === 'action' ? [it.action] : []));

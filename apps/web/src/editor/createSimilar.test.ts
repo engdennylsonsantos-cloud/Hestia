@@ -140,7 +140,7 @@ describe('startCreateSimilar (liga a ferramenta e grava o tipo)', () => {
     editor.load(s.project, 'teste.hestia.json');
     useUi.setState({ selection: ['w1'] });
 
-    expect(startCreateSimilar()).toBe(true);
+    expect(startCreateSimilar(s.project, (id) => editor.setTool(id))).toBe(true);
     expect(useUi.getState().options.wallTypeId).toBe('wt_alv9');
     expect(useUi.getState().tool).toBe('wall');
   });
@@ -151,7 +151,7 @@ describe('startCreateSimilar (liga a ferramenta e grava o tipo)', () => {
     editor.load(s.project, 'teste.hestia.json');
     useUi.setState({ selection: ['r1'] });
 
-    expect(startCreateSimilar()).toBe(false);
+    expect(startCreateSimilar(s.project, (id) => editor.setTool(id))).toBe(false);
     expect(useUi.getState().tool).toBe('select');
     expect(useUi.getState().options.wallTypeId).toBe(DEFAULT_OPTIONS.wallTypeId);
   });

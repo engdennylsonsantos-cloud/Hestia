@@ -26,6 +26,14 @@ describe('transferência do editor (copiar, colar alinhado, mesmo tipo)', () => 
     expect(wallsOnLevel(s.project, 'lv_1')).toHaveLength(1);
   });
 
+  it('o buffer fica disponível para o Colar com prévia', () => {
+    const s = setup();
+    const t = new Transfer();
+    expect(t.clipBuffer()).toBeNull();
+    t.copy(s.project, ['A']);
+    expect(t.clipBuffer()?.walls.map((w) => w.id)).toEqual(['A']);
+  });
+
   it('copiar sem parede mantém o buffer anterior', () => {
     const s = setup();
     const t = new Transfer();

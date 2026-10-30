@@ -9,6 +9,8 @@ describe('sequências de comando (perfis)', () => {
     expect(comandoDaSequencia('wa', PERFIL_REVIT)).toBe('wall');
     expect(comandoDaSequencia('RM', PERFIL_REVIT)).toBe('room');
     expect(comandoDaSequencia('TH', PERFIL_REVIT)).toBe('rehost');
+    expect(comandoDaSequencia('CS', PERFIL_REVIT)).toBe('createSimilar');
+    expect(comandoDaSequencia('VS', PERFIL_SIMPLES)).toBe('createSimilar');
   });
 
   it('o perfil simples mantém as letras de uma tecla', () => {
@@ -28,9 +30,10 @@ describe('sequências de comando (perfis)', () => {
 describe('perfis de atalho', () => {
   const perfis = Object.keys(SHORTCUT_PROFILES) as ShortcutProfile[];
 
-  it('todo comando com ferramenta (exceto Selecionar e Perímetro) tem atalho nos dois perfis', () => {
+  it('todo comando com ferramenta (exceto Selecionar, Perímetro e Colar) tem atalho nos dois perfis', () => {
     // O perímetro não tem tecla: abre-se pelas ferramentas Telhado, Piso, Laje e Forro.
-    const ferramentas = Object.keys(TOOL_LABEL).filter((id) => id !== 'select' && id !== 'perimeter');
+    // Colar é um modo transitório (Ctrl+V ou o botão Colar), não uma ferramenta da faixa: fica sem sequência de letras.
+    const ferramentas = Object.keys(TOOL_LABEL).filter((id) => id !== 'select' && id !== 'perimeter' && id !== 'paste');
     for (const perfil of perfis) {
       for (const id of ferramentas) expect(SHORTCUT_PROFILES[perfil][id as keyof typeof TOOL_LABEL], `${perfil}:${id}`).toBeTruthy();
     }
@@ -43,6 +46,11 @@ describe('perfis de atalho', () => {
 
   it('o Perímetro não tem tecla em nenhum perfil (modo aberto pela ferramenta do elemento)', () => {
     for (const perfil of perfis) expect(SHORTCUT_PROFILES[perfil].perimeter).toBeUndefined();
+  });
+
+  it('o Colar não tem sequência de letras (é Ctrl+V) e não entra na configuração de atalhos', () => {
+    for (const perfil of perfis) expect(SHORTCUT_PROFILES[perfil].paste).toBeUndefined();
+    expect(COMANDOS_COM_ATALHO).not.toContain('paste');
   });
 
   it('nenhum perfil tem conflito de sequência', () => {

@@ -1,5 +1,5 @@
 import { isCeiling, isFloor, isOpening, isRamp, isRoof, isRoom, isSlab, isStair, isWall, type Element, type Id, type Project, type Ramp } from '@hestia/model';
-import type { PerimeterModifyKind, ToolOptions } from '@hestia/tools';
+import type { PerimeterModifyKind, ShortcutCommand, ToolOptions } from '@hestia/tools';
 import { tagAllNotTagged } from '../../editor/tagActions.ts';
 import { addMissingTagsAction } from '../../editor/areaPlanActions.ts';
 import { editor } from '../../editor/controller.ts';
@@ -50,6 +50,10 @@ export interface ActionDef {
   icon: string;
   /** Explicação em uma frase (segunda linha do tooltip). */
   hint?: Txt;
+  /** Comando de atalho por sequência (ex.: Criar semelhante = CS); o tooltip mostra a tecla atual. */
+  shortcut?: ShortcutCommand;
+  /** Atalho fixo com modificador (ex.: Ctrl+X), mostrado no tooltip sem entrar na configuração de sequências. */
+  keys?: string;
   run: () => void;
   pressed?: (c: RibbonCtx) => boolean;
   /** Devolve o motivo quando a ação não pode rodar agora; `false` quando pode. */
@@ -200,7 +204,8 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     label: t('Criar semelhante', 'Create Similar'),
     icon: 'copy',
     hint: t('Ativa a ferramenta do elemento selecionado, já com o tipo dele.', 'Starts the tool of the selected element with its type.'),
-    run: () => { startCreateSimilar(); },
+    shortcut: 'createSimilar',
+    run: () => { startCreateSimilar(editor.project, (id) => editor.setTool(id)); },
     disabled: (c) => (createSimilarTarget(c.p, c.selection)
       ? false
       : t('Selecione um elemento de um só tipo (parede, porta, janela, piso, laje, forro ou telhado).', 'Select one element of a single type (wall, door, window, floor, slab, ceiling or roof).')),
@@ -225,8 +230,9 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
   copySelection: {
     label: t('Copiar', 'Copy'),
     icon: 'copy',
-    hint: t('Copia a seleção; Ctrl+V cola alinhado no nível ativo.', 'Copies the selection; Ctrl+V pastes aligned in the active level.'),
-    run: () => { transfer.copy(editor.project, useUi.getState().selection); },
+    hint: t('Copia a seleção; Ctrl+V cola seguindo o cursor.', 'Copies the selection; Ctrl+V pastes following the cursor.'),
+    keys: 'Ctrl+C',
+    run: () => { editor.copySelection(); },
     disabled: (c) => {
       if (c.selection.length === 0) return noSel(c);
       return transfer.copyableIds(c.p, c.selection).length === 0 ? naoTransferivel('Copiar') : false;
@@ -234,34 +240,26 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
   },
   cutSelection: {
     label: t('Recortar', 'Cut'),
-    icon: 'cut',
-    hint: t('Copia e apaga a seleção; Ctrl+V cola no nível ativo.', 'Copies and deletes the selection; Ctrl+V pastes in the active level.'),
-    run: () => {
-      const st = useUi.getState();
-      const ids = transfer.copyableIds(editor.project, st.selection);
-      if (st.selection.some((id) => !ids.includes(id))) {
-        useUi.setState({ status: 'Recortar só vale para paredes, pisos, lajes, telhados, escadas, rampas, ambientes e aberturas hospedadas (com a parede selecionada).' });
-        return;
-      }
-      if (!transfer.copy(editor.project, st.selection)) return;
-      editor.deleteSelection();
-      useUi.setState({ status: 'Recortado(s). Ctrl+V cola no nível ativo.' });
-    },
+    icon: 'cutscissors',
+    hint: t('Copia e apaga a seleção; Ctrl+V cola seguindo o cursor.', 'Copies and deletes the selection; Ctrl+V pastes following the cursor.'),
+    keys: 'Ctrl+X',
+    run: () => { editor.cutSelection(); },
     disabled: (c) => {
       if (c.selection.length === 0) return noSel(c);
-      // `copyableIds` inclui as aberturas hospedadas (que não estavam selecionadas): compare id a id, nunca o tamanho.
-      const ids = transfer.copyableIds(c.p, c.selection);
-      return c.selection.some((id) => !ids.includes(id)) ? naoTransferivel('Recortar') : false;
+      return editor.canCutSelection(c.selection, c.p) ? false : naoTransferivel('Recortar');
     },
   },
   pasteAligned: {
     label: t('Colar', 'Paste'),
     icon: 'paste',
-    hint: t('Cola o copiado nas mesmas coordenadas, no nível ativo.', 'Pastes what was copied at the same coordinates in the active level.'),
-    run: () => { transfer.paste(editor.store, useUi.getState().levelId); },
-    disabled: (c) => (c.view === 'sheet'
-      ? t('Não vale para pranchas.', 'Not available for sheets.')
-      : !transfer.hasClip() ? t('Nada copiado ainda. Use Copiar ou Ctrl+C.', 'Nothing copied yet. Use Copy or Ctrl+C.') : false),
+    hint: t('Cola o copiado seguindo o cursor; clique para posicionar.', 'Pastes what was copied following the cursor; click to place it.'),
+    keys: 'Ctrl+V',
+    run: () => { editor.pasteAligned(); },
+    disabled: (c) => {
+      if (c.view === 'sheet') return t('Não vale para pranchas.', 'Not available for sheets.');
+      if (c.view !== 'plan') return t('Só em planta.', 'Plan views only.');
+      return transfer.hasClip() ? false : t('Nada copiado ainda. Use Copiar ou Ctrl+C.', 'Nothing copied yet. Use Copy or Ctrl+C.');
+    },
   },
   delete: {
     label: t('Excluir', 'Delete'),
@@ -330,6 +328,7 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     label: t('Unidades do projeto', 'Project Units'),
     icon: 'type',
     hint: t('Unidades de comprimento, área, volume, ângulo e inclinação do projeto.', 'Project units for length, area, volume, angle and slope.'),
+    shortcut: 'unidades',
     run: openDialog('units'),
   },
   shortcutsConfig: { label: t('Atalhos de teclado…', 'Keyboard Shortcuts…'), icon: 'help', run: openDialog('shortcutsConfig') },

@@ -34,8 +34,9 @@ import { DetailLineTool } from './detailLineTool.ts';
 import { DetailRegionTool } from './detailRegionTool.ts';
 import { TagTool } from './tagTool.ts';
 import { GridTool } from './gridTool.ts';
+import { PasteTool } from './pasteTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'ceiling' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'ramp' | 'dimension' | 'grid' | 'text' | 'room' | 'roomsep' | 'detailLine' | 'filledRegion' | 'tag' | 'perimeter';
+export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'ceiling' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'ramp' | 'dimension' | 'grid' | 'text' | 'room' | 'roomsep' | 'detailLine' | 'filledRegion' | 'tag' | 'perimeter' | 'paste';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
   { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'stair', 'stairrun', 'ramp', 'room'] },
@@ -49,6 +50,8 @@ export function createTool(id: ToolId, env: ToolEnv, perimeterTarget: SketchTarg
   switch (id) {
     case 'select':
       return new SelectTool(env);
+    case 'paste':
+      return new PasteTool(env);
     case 'perimeter':
       return new PerimeterTool(env, perimeterTarget);
     case 'wall':
@@ -130,6 +133,7 @@ export function createTool(id: ToolId, env: ToolEnv, perimeterTarget: SketchTarg
 
 export const TOOL_LABEL: Record<ToolId, string> = {
   select: 'Selecionar',
+  paste: 'Colar',
   wall: 'Parede',
   floor: 'Piso',
   slab: 'Laje',

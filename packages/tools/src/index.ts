@@ -13,6 +13,7 @@ export * from './registry.ts';
 export { ToolBase } from './base.ts';
 export * from './wallGeom.ts';
 export * from './clipboard.ts';
+export * from './pasteTool.ts';
 export * from './lengthEdit.ts';
 export * from './hostedLoss.ts';
 export * from './hostedGuard.ts';

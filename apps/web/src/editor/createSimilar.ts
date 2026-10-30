@@ -1,6 +1,5 @@
 import type { Element, Id, Project } from '@hestia/model';
 import type { ToolId } from '@hestia/tools';
-import { editor } from './controller.ts';
 import { useUi } from './state.ts';
 
 /** Opção de `ToolOptions` que guarda o tipo de cada ferramenta de criação. */
@@ -56,12 +55,13 @@ export function createSimilarTarget(p: Project, selection: readonly Id[]): Creat
 
 /**
  * "Criar semelhante": ativa a ferramenta do tipo do elemento selecionado, já com o tipo dele escolhido nas opções.
+ * Recebe o `setTool` do editor para não depender do controlador (e não criar ciclo de importação com ele).
  * Devolve false (sem mexer na ferramenta nem nas opções) quando a seleção não tem alvo.
  */
-export function startCreateSimilar(): boolean {
-  const alvo = createSimilarTarget(editor.project, useUi.getState().selection);
+export function startCreateSimilar(p: Project, setTool: (id: ToolId) => void): boolean {
+  const alvo = createSimilarTarget(p, useUi.getState().selection);
   if (!alvo) return false;
   useUi.setState((s) => ({ options: { ...s.options, [alvo.option]: alvo.typeId } }));
-  editor.setTool(alvo.tool);
+  setTool(alvo.tool);
   return true;
 }

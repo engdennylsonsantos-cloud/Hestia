@@ -101,7 +101,7 @@ export function executaComandoDoMenu(id: string, view: MenuView, camera: Camera3
     case 'properties': useUi.setState((s) => ({ propsOpen: !s.propsOpen })); return;
     case 'delete': editor.deleteSelection(); return;
     case 'selectAllView': editor.selectAllOfSelectedType(); return;
-    case 'createSimilar': startCreateSimilar(); return;
+    case 'createSimilar': startCreateSimilar(editor.project, (id) => editor.setTool(id)); return;
     case EDITAR_PERIMETRO_ID: editarPerimetroSelecionado(); return;
     default:
   }

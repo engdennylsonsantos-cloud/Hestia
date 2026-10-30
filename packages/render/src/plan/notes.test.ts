@@ -122,4 +122,30 @@ describe('anotações na planta', () => {
     expect(ops.labels[0]!.text).toContain('90');
     expect(ops.strokes.length).toBeGreaterThanOrEqual(5);
   });
+
+  it('cota angular reflexa: arco > 180° segmentado e texto no meio do arco longo', () => {
+    const s = new ProjectStore(createEmptyProject());
+    const deg = Math.PI / 180;
+    const to = { x: Math.cos(72.7 * deg), y: Math.sin(72.7 * deg) };
+    const reflex = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, to, 2, 'reflex', 'a', 'b', 'major');
+    s.exec({ type: 'addDimension', levelId: LV0, dimension: { id: 'ang', a: { x: 0, y: 0 }, b: { x: reflex.to.x * 2, y: reflex.to.y * 2 }, offset: 0, angular: reflex, precision: 1 } });
+    const ops = noteOps(s.project, LV0, defaultPaint('annotation', ZOOM), LOOK, SCALE);
+    expect(ops.labels).toHaveLength(1);
+    expect(ops.labels[0]!.text).toContain('252,7');
+    // O arco reflexo tem mais segmentos que o de 180° e o texto fica no meio dele (126,35°).
+    const arc = ops.strokes.reduce((best, x) => (x.pts.length > best.pts.length ? x : best));
+    expect(arc.pts.length).toBeGreaterThan(30);
+    let sweep = 0;
+    for (let i = 1; i < arc.pts.length; i++) {
+      const a = arc.pts[i - 1]!;
+      const b = arc.pts[i]!;
+      let d = Math.atan2(b.y, b.x) - Math.atan2(a.y, a.x);
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d <= -Math.PI) d += Math.PI * 2;
+      sweep += d;
+    }
+    expect(Math.abs(sweep)).toBeCloseTo(252.7 * deg, 6);
+    const mid = ops.labels[0]!.at;
+    expect((Math.atan2(mid.y, mid.x) * 180) / Math.PI).toBeCloseTo(126.35, 6);
+  });
 });

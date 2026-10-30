@@ -187,6 +187,8 @@ export interface ToolOptions {
   dimensionSuffix?: string;
   dimensionTextHeight?: number;
   dimensionTickStyle?: 'slash' | 'arrow' | 'dot';
+  /** Cota angular: lado escolhido pela barra de opções (`auto` = cursor). Ausente = `auto`. */
+  angularDimensionSide?: 'auto' | 'minor' | 'major' | 'reflex';
   tagProperty?: 'type' | 'name' | 'mark' | 'level' | 'width' | 'height';
   tagLeader?: boolean;
   tagOrientation?: 'horizontal' | 'vertical';

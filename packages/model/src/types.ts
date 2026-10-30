@@ -174,10 +174,13 @@ export interface DimensionRef {
   axis?: 'x' | 'y';
 }
 
+/** Lado da cota angular: menor (0..π), maior (suplementar, 0..π) ou a volta reflexa (π..2π). */
+export type AngularDimensionSide = 'minor' | 'major' | 'reflex';
+
 /**
  * Cota angular: duas referências (chaves do Alinhar) e a geometria já resolvida para o desenho.
  * O valor é em radianos; `from`/`to` são as direções (unitárias) das referências a partir de `center`.
- * `side` guarda se o usuário escolheu o ângulo menor ou o maior.
+ * `side` guarda se o usuário escolheu o ângulo menor, o maior ou a volta (arco reflexo > π).
  */
 export interface AngularDimension {
   /** Chave da feição do Alinhar (ex.: `w1:face:hi`), para reencontrar a referência. */
@@ -187,8 +190,13 @@ export interface AngularDimension {
   from: Vec2;
   to: Vec2;
   radius: number;
-  side: 'minor' | 'major';
-  /** Ângulo em radianos. */
+  side: AngularDimensionSide;
+  /**
+   * Só na volta: qual lado ela complementa (`minor` ou `major`). Ausente = `minor`, o que mantém os arquivos
+   * antigos e as cotas criadas antes do modo reflexo válidos.
+   */
+  base?: 'minor' | 'major';
+  /** Ângulo em radianos; em `reflex`, fica em (π, 2π]. */
   value: number;
   /** Texto fixo que substitui o valor medido. */
   text?: string;

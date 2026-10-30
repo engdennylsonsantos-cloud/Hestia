@@ -5,6 +5,8 @@ import {
   formatDimension,
   newId,
   unitsOf,
+  type AngularDimension,
+  type AngularDimensionSide,
   type Dimension,
   type Project,
 } from '@hestia/model';
@@ -58,7 +60,7 @@ function intersection(a: Vec2, da: Vec2, b: Vec2, db: Vec2): Vec2 | null {
 export class AngularDimensionTool extends ToolBase {
   readonly id = 'angularDimension';
   readonly label = 'Cota angular';
-  readonly hint = 'Cota angular: clique na primeira referência, depois na segunda. Mova o cursor para escolher o lado e o raio do arco e clique. Tab alterna a referência.';
+  readonly hint = 'Cota angular: clique na primeira referência, depois na segunda. Mova o cursor para escolher o lado e o raio do arco e clique. A opção Ângulo permite medir a volta (360° − ângulo). Tab alterna a referência.';
   private refA: AlignFeature | null = null;
   private refB: AlignFeature | null = null;
   private hover: AlignFeature[] = [];
@@ -144,12 +146,19 @@ export class AngularDimensionTool extends ToolBase {
     return Math.abs(wrapPi(cursorAngle - angleOf(from))) <= minor ? 'minor' : 'major';
   }
 
+  /** Dados da cota no lado escolhido: `auto` segue o cursor; `reflex` complementa o lado sob o cursor. */
+  private angularData(g: { center: Vec2; a: RefLine; b: RefLine }, radius: number, cursor: Vec2): AngularDimension {
+    const base = this.sideAt(g.center, g.a.to, g.b.to, cursor);
+    const chosen = this.env.options().angularDimensionSide ?? 'auto';
+    const side: AngularDimensionSide = chosen === 'auto' ? base : chosen;
+    return angularDimensionData(g.center, g.a.to, g.b.to, radius, side, this.refA!.key, this.refB!.key, base);
+  }
+
   private makePreview(cursor: Vec2): void {
     const g = this.geometry();
     if (!g) { this.previewDim = null; return; }
     const radius = Math.max(MIN_RADIUS, dist(cursor, g.center));
-    const side = this.sideAt(g.center, g.a.to, g.b.to, cursor);
-    const angular = angularDimensionData(g.center, g.a.to, g.b.to, radius, side, this.refA!.key, this.refB!.key);
+    const angular = this.angularData(g, radius, cursor);
     const o = this.env.options();
     const dim: Dimension = {
       id: 'preview-angular',
@@ -212,8 +221,7 @@ export class AngularDimensionTool extends ToolBase {
       const g = this.geometry();
       if (!g || !this.previewDim?.angular) { this.env.say('As referências não formam um ângulo.'); return; }
       const radius = Math.max(MIN_RADIUS, dist(p.raw, g.center));
-      const side = this.sideAt(g.center, g.a.to, g.b.to, p.raw);
-      const angular = angularDimensionData(g.center, g.a.to, g.b.to, radius, side, this.refA!.key, this.refB!.key);
+      const angular = this.angularData(g, radius, p.raw);
       const o = this.env.options();
       const dimension: Dimension = {
         id: newId('dim'),

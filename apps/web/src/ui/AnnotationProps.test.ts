@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ProjectStore, areaPlanOf, createEmptyProject, levelDimensions, levelTexts, makeWall, planAnnotationsOf, type Dimension } from '@hestia/model';
+import { ProjectStore, areaPlanOf, angularDimensionData, createEmptyProject, levelDimensions, levelTexts, makeWall, planAnnotationsOf, type Dimension } from '@hestia/model';
 import { createAreaPlanAction } from '../editor/areaPlanActions.ts';
 import { editor } from '../editor/controller.ts';
 import { deleteSelectionIn } from '../editor/deleteIds.ts';
 import { useUi } from '../editor/state.ts';
-import { AnnotationProps, selectedNote, updateTextIn } from './AnnotationProps.tsx';
+import { AnnotationProps, angularSidePatch, selectedNote, updateTextIn } from './AnnotationProps.tsx';
 
 // O painel real assina o projeto pelo editor; no teste basta o projeto atual (sem `getServerSnapshot` no render de servidor).
 vi.mock('../editor/controller.ts', async (importOriginal) => {
@@ -99,5 +99,58 @@ describe('anotações da planta de área no painel', () => {
     const html = renderToStaticMarkup(createElement(AnnotationProps, { dim }));
     expect(html).toContain('400,0 cm');
     expect(html).toContain('value="project" selected=""');
+  });
+});
+
+describe('cota angular: lado Volta', () => {
+  const deg = Math.PI / 180;
+
+  it('de Maior (107,3°) para Volta (252,7°) recalcula valor e direção sem mover paredes', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'w1', typeId: 'wt_alv14', levelId: LV0, a: { x: -3, y: 0 }, b: { x: 3, y: 0 } }) });
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'w2', typeId: 'wt_alv14', levelId: LV0, a: { x: -3 * Math.cos(72.7 * deg), y: -3 * Math.sin(72.7 * deg) }, b: { x: 3 * Math.cos(72.7 * deg), y: 3 * Math.sin(72.7 * deg) } }) });
+    const wallsBefore = { w1: s.project.elements['w1'], w2: s.project.elements['w2'] };
+    const to = { x: Math.cos(72.7 * deg), y: Math.sin(72.7 * deg) };
+    const major = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, to, 1.5, 'major', 'w1:eixo', 'w2:eixo');
+    s.exec({ type: 'addDimension', levelId: LV0, dimension: { id: 'dang', a: { x: 0, y: 0 }, b: { x: major.to.x * 1.5, y: major.to.y * 1.5 }, offset: 0, angular: major } });
+
+    const patch = angularSidePatch(major, 'reflex');
+    expect(patch.side).toBe('reflex');
+    expect(patch.base).toBe('major');
+    expect(patch.value).toBeCloseTo(252.7 * deg, 9);
+    expect(patch.to).toEqual(major.to);
+
+    s.exec({ type: 'updateDimension', levelId: LV0, id: 'dang', patch: { angular: { ...major, ...patch } } });
+    const saved = levelDimensions(s.project, LV0)[0]!;
+    expect(saved.angular!.value).toBeCloseTo(252.7 * deg, 9);
+    expect(saved.angular!.side).toBe('reflex');
+    expect(s.project.elements['w1']).toEqual(wallsBefore.w1);
+    expect(s.project.elements['w2']).toEqual(wallsBefore.w2);
+
+    // Voltar para o lado que a volta complementa recupera o Maior original (107,3°).
+    const back = angularSidePatch(saved.angular!, 'major');
+    expect(back.value).toBeCloseTo(107.3 * deg, 9);
+    expect(back.to).toEqual(major.to);
+  });
+
+  it('de Menor (72,7°) para Volta dá 287,3° (2π − θ)', () => {
+    const to = { x: Math.cos(72.7 * deg), y: Math.sin(72.7 * deg) };
+    const minor = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, to, 1.5, 'minor', 'a', 'b');
+    const patch = angularSidePatch(minor, 'reflex');
+    expect(patch.base).toBe('minor');
+    expect(patch.value).toBeCloseTo(287.3 * deg, 9);
+  });
+
+  it('o seletor Lado oferece a Volta (360° − ângulo)', () => {
+    const dim: Dimension = {
+      id: 'dang',
+      a: { x: 0, y: 0 },
+      b: { x: 0, y: 2 },
+      offset: 0,
+      angular: angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, 2, 'minor', 'a', 'b'),
+    };
+    const html = renderToStaticMarkup(createElement(AnnotationProps, { dim }));
+    expect(html).toContain('Volta (360° − ângulo)');
+    expect(html).toContain('value="minor" selected=""');
   });
 });

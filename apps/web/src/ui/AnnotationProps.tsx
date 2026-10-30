@@ -6,6 +6,8 @@ import {
   levelDimensions,
   levelTexts,
   planAnnotationsOf,
+  type AngularDimension,
+  type AngularDimensionSide,
   type AnnotationCommand,
   type DetailLine,
   type DetailRegion,
@@ -111,6 +113,26 @@ function TextAreaField({ id, value, onCommit }: { id?: string; value: string; on
   );
 }
 
+/**
+ * Mudança de `angular` ao trocar o lado (Menor/Maior/Volta). A volta complementa o lado atual (2π − valor) e guarda
+ * em `base` qual lado ela complementa, para voltar sem perder a referência. Só `to`/`value`/`side`/`base` mudam:
+ * as referências de parede ficam intactas e nenhuma parede se move.
+ */
+export function angularSidePatch(a: AngularDimension, side: AngularDimensionSide): Partial<AngularDimension> {
+  if (side === a.side) return {};
+  const flip = (v: { x: number; y: number }): { x: number; y: number } => ({ x: -v.x, y: -v.y });
+  if (side === 'reflex') {
+    const base = a.side === 'reflex' ? a.base ?? 'minor' : a.side;
+    return { side, base, to: a.to, value: Math.PI * 2 - a.value };
+  }
+  if (a.side === 'reflex') {
+    const base = a.base ?? 'minor';
+    if (side === base) return { side, base: undefined, to: a.to, value: Math.PI * 2 - a.value };
+    return { side, base: undefined, to: flip(a.to), value: a.value - Math.PI };
+  }
+  return { side, to: flip(a.to), value: Math.PI - a.value };
+}
+
 /** Propriedades da cota (valor só leitura, deslocamento da linha) e do texto (caixa, moldura, posição e estilo). */
 export function AnnotationProps({ dim, text, line, region, tag, planId }: NotaSelecionada & { planId?: Id | null }): ReactElement {
   const p = useProject();
@@ -128,10 +150,7 @@ export function AnnotationProps({ dim, text, line, region, tag, planId }: NotaSe
           <Row label="Texto" htmlFor="p-dtext">
             <TextField id="p-dtext" value={dim.text ?? ''} placeholder={formatDimension(shown, 0, units)} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { text: v.trim() === '' ? undefined : v } }))} />
           </Row>
-          <Row label="Lado"><select className="select" value={a.side} onChange={(e) => {
-            const side = e.target.value as 'minor' | 'major';
-            patchAngular({ side, to: { x: -a.to.x, y: -a.to.y }, value: Math.PI - a.value });
-          }}><option value="minor">Menor</option><option value="major">Maior</option></select></Row>
+          <Row label="Lado"><select className="select" value={a.side} onChange={(e) => patchAngular(angularSidePatch(a, e.target.value as AngularDimensionSide))}><option value="minor">Menor</option><option value="major">Maior</option><option value="reflex">Volta (360° − ângulo)</option></select></Row>
           <Row label="Raio" htmlFor="p-dradius"><NumField id="p-dradius" value={a.radius} decimals={2} quantity="length" min={0.01} onCommit={(v) => patchAngular({ radius: v })} /></Row>
           <Row label="Casas decimais"><select className="select" value={dim.precision ?? 2} onChange={(e) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { precision: Number(e.target.value) as 0 | 1 | 2 | 3 } }))}><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></Row>
           <Row label="Altura do texto" htmlFor="p-dheight">{/* units-ok: altura em mm, como no campo da cota linear */}<NumField id="p-dheight" value={dim.textHeight ?? 2.5} decimals={1} unit="mm" min={0.5} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { textHeight: v } }))} /></Row>

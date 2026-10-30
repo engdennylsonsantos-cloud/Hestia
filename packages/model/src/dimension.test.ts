@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, angularDimensionData, angularDimensionGeometry, dimensionGeometry, dimensionPoints, dimensionText, dimensionValue, formatDimension, formatDimensionValue, makeWall, resolveUnits, unitsOf, type Dimension } from './index.ts';
+import { ProjectStore, createEmptyProject, angularDimensionData, angularDimensionGeometry, dimensionGeometry, dimensionIssue, dimensionPoints, dimensionText, dimensionValue, formatDimension, formatDimensionValue, makeWall, resolveUnits, unitsOf, type Dimension } from './index.ts';
 
 const LV0 = 'lv_0';
 const close = (a: { x: number; y: number }, b: { x: number; y: number }) => {
@@ -153,5 +153,49 @@ describe('cota angular', () => {
     expect(g.textAt.x).toBeGreaterThan(0);
     expect(g.textAt.y).toBeGreaterThan(0.5);
     expect(Number.isFinite(g.textRotation)).toBe(true);
+  });
+
+  it('volta complementa o lado maior: 107,3° vira 252,7° e desenha o arco longo', () => {
+    const s = new ProjectStore(createEmptyProject());
+    const deg = Math.PI / 180;
+    const to = { x: Math.cos(72.7 * deg), y: Math.sin(72.7 * deg) };
+    const major = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, to, 1.5, 'major', 'w1:face:hi', 'w2:face:hi');
+    expect(major.value).toBeCloseTo(107.3 * deg, 9);
+    const reflex = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, to, 1.5, 'reflex', 'w1:face:hi', 'w2:face:hi', 'major');
+    expect(reflex.value).toBeCloseTo(252.7 * deg, 9);
+    expect(reflex.base).toBe('major');
+    expect(dimensionText(s.project, dim({ angular: reflex, precision: 1 }), unitsOf(s.project))).toContain('252,7');
+
+    const g = angularDimensionGeometry(dim({ angular: reflex }), 8)!;
+    expect(g.value).toBeCloseTo(252.7 * deg, 9);
+    expect(g.value).toBeGreaterThan(Math.PI);
+    // O texto fica no meio do arco longo (126,35°), não no meio do suplemento.
+    expect((Math.atan2(g.textAt.y, g.textAt.x) * 180) / Math.PI).toBeCloseTo(126.35, 6);
+    expect(g.textRotation).toBeGreaterThan(-90);
+    expect(g.textRotation).toBeLessThanOrEqual(90);
+  });
+
+  it('volta complementa o lado menor: 72,7° vira 287,3° (2π − θ)', () => {
+    const deg = Math.PI / 180;
+    const to = { x: Math.cos(72.7 * deg), y: Math.sin(72.7 * deg) };
+    const minor = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, to, 1.5, 'minor', 'a', 'b');
+    const reflex = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, to, 1.5, 'reflex', 'a', 'b');
+    expect(minor.value).toBeCloseTo(72.7 * deg, 9);
+    expect(reflex.value).toBeCloseTo(287.3 * deg, 9);
+    expect(reflex.base).toBe('minor');
+    const g = angularDimensionGeometry(dim({ angular: reflex }), 8)!;
+    expect(g.value).toBeCloseTo(287.3 * deg, 9);
+    // Arco no sentido contrário ao menor: 0° → −287,3° (o primeiro passo desce).
+    expect(g.arc[1]!.y).toBeLessThan(0);
+  });
+
+  it('dimensionIssue aceita a volta > π e recusa volta ≤ π e menor/maior > π', () => {
+    const deg = Math.PI / 180;
+    const base = { id: 'd1', a: { x: 0, y: 0 }, b: { x: 1.5, y: 0 }, offset: 0 };
+    const reflex = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: Math.cos(72.7 * deg), y: Math.sin(72.7 * deg) }, 1.5, 'reflex', 'a', 'b', 'major');
+    expect(dimensionIssue({ ...base, angular: reflex })).toBeNull();
+    expect(dimensionIssue({ ...base, angular: { ...reflex, value: Math.PI } })).not.toBeNull();
+    expect(dimensionIssue({ ...base, angular: { ...reflex, value: 3 * Math.PI } })).not.toBeNull();
+    expect(dimensionIssue({ ...base, angular: { ...reflex, side: 'major', value: 252.7 * deg } })).not.toBeNull();
   });
 });

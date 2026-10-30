@@ -48,7 +48,13 @@ export function dimensionIssue(d: Dimension): string | null {
     if (!a.refA || !a.refB) return 'A cota angular precisa de duas referências.';
     if (!finite(a.center) || !finite(a.from) || !finite(a.to)) return 'A geometria da cota angular precisa de pontos finitos.';
     if (!(Number.isFinite(a.radius) && a.radius > 0)) return 'O raio da cota angular deve ser maior que zero.';
-    if (!(Number.isFinite(a.value) && a.value >= 0 && a.value <= Math.PI + 1e-9)) return 'O ângulo da cota angular deve estar em radianos entre 0 e π.';
+    const twoPi = Math.PI * 2;
+    if (!(Number.isFinite(a.value) && a.value >= 0 && a.value <= twoPi + 1e-9)) return 'O ângulo da cota angular deve estar em radianos entre 0 e 2π.';
+    if (a.side === 'reflex') {
+      if (!(a.value > Math.PI + 1e-9 && a.value <= twoPi + 1e-9)) return 'A volta da cota angular deve medir mais de 180° e no máximo 360°.';
+    } else if (a.value > Math.PI + 1e-9) {
+      return 'O ângulo da cota angular deve estar em radianos entre 0 e π.';
+    }
     if (d.textHeight !== undefined && !(Number.isFinite(d.textHeight) && d.textHeight > 0)) return 'A altura do texto da cota deve ser maior que zero.';
     return null;
   }

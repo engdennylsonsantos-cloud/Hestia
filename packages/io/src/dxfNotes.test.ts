@@ -90,4 +90,23 @@ describe('anotações no DXF da planta', () => {
     expect(notes.lines.length).toBeGreaterThanOrEqual(28);
     expect(notes.texts.filter((t) => t.layer === DXF_LAYER_COTAS).map((t) => t.text)[0]).toContain('90');
   });
+
+  it('volta reflexa: arco longo segmentado no sentido certo e texto em graus', () => {
+    const s = new ProjectStore(createEmptyProject());
+    const deg = Math.PI / 180;
+    const to = { x: Math.cos(72.7 * deg), y: Math.sin(72.7 * deg) };
+    const angular = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, to, 2, 'reflex', 'a', 'b', 'major');
+    s.exec({ type: 'addDimension', levelId: LV0, dimension: { id: 'ang', a: { x: 0, y: 0 }, b: { x: angular.to.x * 2, y: angular.to.y * 2 }, offset: 0, angular, precision: 1 } });
+    const notes = notesDxfOf(s.project, LV0, 100);
+    // 34 segmentos de arco + 2 chamadas + 2 marcas.
+    expect(notes.lines.length).toBeGreaterThanOrEqual(38);
+    const at = notes.texts.filter((t) => t.layer === DXF_LAYER_COTAS)[0]!;
+    expect(at.text).toContain('252,7');
+    expect(at.rotation).toBeGreaterThan(-90);
+    expect(at.rotation).toBeLessThanOrEqual(90);
+    // O primeiro segmento do arco sai de 0° e segue no sentido do arco longo (anti-horário, por cima).
+    const first = notes.lines[0]!;
+    expect(first[0].y).toBeCloseTo(0, 9);
+    expect(first[1].y).toBeGreaterThan(0);
+  });
 });

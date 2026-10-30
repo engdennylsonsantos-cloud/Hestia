@@ -54,6 +54,6 @@ export function resolveAngularDimension(p: Project, _levelId: Id, d: Dimension):
   if (!center) return d;
   const from = orient(ra, center);
   const to = orient(rb, center);
-  const data = angularDimensionData(center, from, to, a.radius, a.side, a.refA, a.refB);
+  const data = angularDimensionData(center, from, to, a.radius, a.side, a.refA, a.refB, a.base);
   return { ...d, a: center, b: add(center, mul(data.to, a.radius)), angular: { ...a, ...data } };
 }

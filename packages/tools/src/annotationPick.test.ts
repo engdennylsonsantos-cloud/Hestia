@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { levelTexts } from '@hestia/model';
-import { annotationAt } from './annotationPick.ts';
+import { ProjectStore, angularDimensionData, angularDimensionGeometry, createEmptyProject, levelDimensions, levelTexts } from '@hestia/model';
+import { annotationAt, annotationIdsInBox } from './annotationPick.ts';
 import { clickAt, makeEnv, tool } from './testEnv.ts';
 
 /** Texto 'Quarto' colocado em (9, 2) m, com a planta na escala padrão; o cursor mede 0,01 m por pixel. */
@@ -36,5 +36,21 @@ describe('seleção de texto: o retângulo do texto, não só a âncora (D1)', (
     const { ctx } = criaTexto();
     expect(annotationAt(ctx.store.project, 'lv_0', { x: 10.5, y: 2 }, MPP)).toBeNull();
     expect(annotationAt(ctx.store.project, 'lv_0', { x: 9.4, y: 2.3 }, MPP)).toBeNull();
+  });
+});
+
+describe('seleção da cota angular reflexa', () => {
+  it('pega pelo arco longo e pelo texto, e entra na janela', () => {
+    const store = new ProjectStore(createEmptyProject());
+    const deg = Math.PI / 180;
+    const to = { x: Math.cos(72.7 * deg), y: Math.sin(72.7 * deg) };
+    const angular = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, to, 2, 'reflex', 'a', 'b', 'major');
+    store.exec({ type: 'addDimension', levelId: 'lv_0', dimension: { id: 'ang', a: { x: 0, y: 0 }, b: { x: angular.to.x * 2, y: angular.to.y * 2 }, offset: 0, angular } });
+    const dim = levelDimensions(store.project, 'lv_0')[0]!;
+    const g = angularDimensionGeometry(dim)!;
+    const arcMid = g.arc[Math.floor(g.arc.length / 2)]!;
+    expect(annotationAt(store.project, 'lv_0', arcMid, MPP)).toEqual({ id: 'ang', kind: 'dimension' });
+    expect(annotationAt(store.project, 'lv_0', g.textAt, MPP)).toEqual({ id: 'ang', kind: 'dimension' });
+    expect(annotationIdsInBox(store.project, 'lv_0', { x: -3, y: -3 }, { x: 3, y: 3 }, MPP)).toContain('ang');
   });
 });

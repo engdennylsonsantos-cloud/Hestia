@@ -1,5 +1,5 @@
 import { add, len, mul, sub, type Vec2 } from '@hestia/geom';
-import { isWall, type Dimension, type DimensionRef, type Project } from './types.ts';
+import { isWall, type AngularDimension, type AngularDimensionSide, type Dimension, type DimensionRef, type Project } from './types.ts';
 import { defaultUnits, type ResolvedUnits } from './units.ts';
 import { formatQuantity } from './unitsFormat.ts';
 
@@ -105,9 +105,13 @@ export function angularDimensionGeometry(d: Dimension, segments = 24): AngularDi
   let delta = angleB - angleA;
   while (delta > Math.PI) delta -= Math.PI * 2;
   while (delta <= -Math.PI) delta += Math.PI * 2;
+  // A volta percorre o arco longo (> π), no sentido contrário ao arco curto: o desenho dos modos menor/maior não muda.
+  if (a.side === 'reflex') delta = delta > 0 ? delta - Math.PI * 2 : delta + Math.PI * 2;
   const pointAt = (angle: number, radius: number): Vec2 => ({ x: a.center.x + Math.cos(angle) * radius, y: a.center.y + Math.sin(angle) * radius });
   const arc: Vec2[] = [];
-  for (let i = 0; i <= segments; i++) arc.push(pointAt(angleA + (delta * i) / segments, a.radius));
+  // Mais segmentos no arco longo para a curvatura não ficar angulosa.
+  const steps = Math.max(segments, Math.ceil(segments * Math.abs(delta) / Math.PI));
+  for (let i = 0; i <= steps; i++) arc.push(pointAt(angleA + (delta * i) / steps, a.radius));
   const start = arc[0]!;
   const end = arc[arc.length - 1]!;
   const over = Math.max(0.08, a.radius * 0.08);
@@ -119,7 +123,9 @@ export function angularDimensionGeometry(d: Dimension, segments = 24): AngularDi
   const mid = angleA + delta / 2;
   const textAt = d.textAt ?? pointAt(mid, a.radius + Math.max(0.12, a.radius * 0.12));
   const rotationRaw = (mid * 180) / Math.PI;
-  const textRotation = rotationRaw > 90 || rotationRaw <= -90 ? rotationRaw + 180 : rotationRaw;
+  let textRotation = rotationRaw;
+  while (textRotation > 90) textRotation -= 180;
+  while (textRotation <= -90) textRotation += 180;
   return {
     center: a.center,
     start,
@@ -136,11 +142,17 @@ export function angularDimensionGeometry(d: Dimension, segments = 24): AngularDi
   };
 }
 
-/** Cota angular pronta para virar anotação. */
-export function angularDimensionData(center: Vec2, from: Vec2, to: Vec2, radius: number, side: 'minor' | 'major', refA: string, refB: string): import('./types.ts').AngularDimension {
+/**
+ * Cota angular pronta para virar anotação. `side` menor/maior mantém o comportamento de sempre. `reflex` é a volta:
+ * complementa o lado `base` (menor ou maior, padrão menor) — 2π − valor do lado complementado — e guarda a direção
+ * desse lado em `to`, para a geometria saber qual arco longo desenhar.
+ */
+export function angularDimensionData(center: Vec2, from: Vec2, to: Vec2, radius: number, side: AngularDimensionSide, refA: string, refB: string, base: 'minor' | 'major' = 'minor'): AngularDimension {
   const minor = Math.acos(Math.max(-1, Math.min(1, from.x * to.x + from.y * to.y)));
   if (side === 'minor') return { refA, refB, center, from, to, radius, side, value: minor };
-  return { refA, refB, center, from, to: { x: -to.x, y: -to.y }, radius, side, value: Math.PI - minor };
+  if (side === 'major') return { refA, refB, center, from, to: { x: -to.x, y: -to.y }, radius, side, value: Math.PI - minor };
+  const complemented = base === 'major' ? { x: -to.x, y: -to.y } : to;
+  return { refA, refB, center, from, to: complemented, radius, side, base, value: Math.PI * 2 - (base === 'major' ? Math.PI - minor : minor) };
 }
 
 /**

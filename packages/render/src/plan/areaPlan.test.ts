@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '@hestia/geom';
 import { ProjectStore, createEmptyProject, makeRoom, makeWall, type AreaPlan, type AreaPlanAnnotations } from '@hestia/model';
 import { resolveRooms, resolveLevel, type ResolvedRoom } from '@hestia/engine';
-import { buildPlanGeometry, planGeometrySelection, type PlanInput } from './build.ts';
+import { buildPlanGeometry, buildPlanSelectionOverlay, planGeometrySelection, type PlanInput } from './build.ts';
 import { DEFAULT_AREA_GRAPHICS, DEFAULT_TAG_FIELDS } from '@hestia/model';
 import { defaultPaint } from './style.ts';
 import { LIGHT } from './types.ts';
-import { areaPlanHighlightOps, areaPlanRoomOps, areaPlanTagOps, roomTagLines, tagBoxModel } from './areaPlan.ts';
+import { areaPlanRoomOps, areaPlanTagOps, roomTagLines, tagBoxModel } from './areaPlan.ts';
 
 const ring = (pts: Array<[number, number]>): Vec2[] => pts.map(([x, y]) => ({ x, y }));
 
@@ -194,7 +194,7 @@ describe('planta de área · desenho', () => {
 
   it('seleção destaca o ambiente com preenchimento e contorno', () => {
     const s = project();
-    const ops = areaPlanHighlightOps(s.project, plan(), ['r1'], null, LIGHT, 50);
+    const ops = buildPlanSelectionOverlay(entrada(s, plan(), ['r1']));
     expect(ops.fills).toHaveLength(1);
     expect(ops.strokes.length).toBeGreaterThan(0);
   });

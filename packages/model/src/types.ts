@@ -12,6 +12,7 @@ import type { DimensionSettings } from './dimensionSettings.ts';
 import type { UnitsSettings } from './units.ts';
 import type { AreaPlan, ColorScheme, RoomCategory } from './areaPlan.ts';
 import type { DxfLayerStyle } from './dxfLayerStyle.ts';
+import type { CadDrawing } from './cad.ts';
 
 export type Id = string;
 export const SCHEMA_VERSION = 21;
@@ -611,7 +612,7 @@ export interface Generic {
   ifcProperties?: IfcProperty[];
 }
 
-export type Element = Wall | Opening | Floor | Slab | Ceiling | Roof | Stair | Ramp | Room | Generic;
+export type Element = Wall | Opening | Floor | Slab | Ceiling | Roof | Stair | Ramp | Room | Generic | CadDrawing;
 
 export interface ProjectDefaults {
   wallTypeId: Id;

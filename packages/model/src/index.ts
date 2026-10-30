@@ -1,5 +1,6 @@
 export * from './types.ts';
 export * from './dxfLayerStyle.ts';
+export * from './cad.ts';
 export * from './priority.ts';
 export * from './termino.ts';
 export * from './membrane.ts';

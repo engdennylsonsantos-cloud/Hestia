@@ -19,6 +19,8 @@ Data: 2026-10-30
 | `apps/web/src/ui/browser/Views.tsx` | Removida a opção “Criar prancha geral” do menu das plantas de área. |
 | `apps/web/src/editor/areaPlanActions.ts` | Removida `createGeneralAreaSheetAction`; a prancha geral segue o fluxo normal (criar prancha e arrastar a vista). |
 | `apps/web/src/editor/controller.ts` | `AREA_PLAN_TOOLS` agora inclui `room` e `roomsep`: dá para criar ambiente/área e separador na planta de área. |
+| `apps/web/src/editor/areaMerge.ts`, `areaMergePrompt.ts`, `ui/dialogs/AreaMergeDialog.tsx` | Regra de fusão de áreas com aviso de confirmação; mantém a maior e apaga as menores junto com a parede/separador. |
+| `packages/tools/src/infer.ts`, `apps/web/src/editor/state.ts`, `ui/OrthoButton.tsx`, `ui/StatusBar.tsx` | Modo ortogonal global com F8, ícone na barra de status e projeção estrita em 0°/90°. |
 | `apps/web/src/ui/ribbon/tabsMain.ts`, `packages/tools/src/registry.ts` | “Separador de ambiente/área” e remoção dos botões “Área”/“Limite de área” que estavam “em breve”. |
 | Testes | `areaPlanGeometry.test.ts` (novo), `areaPlanDxf.test.ts` ampliado, `areaPlanOverlay.test.ts`/`areaPlanSelect.test.ts` com a regra somente leitura. |
 
@@ -35,6 +37,8 @@ A F0 foi integrada junto: na planta de área, `select` não move elemento de mod
 - Ambientes com diagonais, etiqueta configurável, esquema de cor, legenda e quadro, por cima do modelo.
 - Ferramentas de área habilitadas: **Ambiente** (`room`) cria novas áreas e **Separador de ambiente/área** (`roomsep`) fecha/divide circuitos, inclusive na planta de área.
 - **Delete** na planta de área apaga ambiente (área), separador de ambiente/área e anotações da vista; paredes e demais elementos de modelo continuam bloqueados.
+- **Regra de fusão de áreas:** ao apagar uma parede ou separador no fluxo normal, o app simula a remoção. Se dois ou mais ambientes caírem no mesmo circuito, abre um aviso; confirmar apaga a parede/separador e os ambientes menores na mesma transação, mantendo o de maior área; cancelar não altera nada.
+- **Modo ortogonal global (F8):** o botão da barra de status alterna o modo; enquanto ligado, todo ponto de desenho que passa pelo `infer` fica restrito à projeção em 0°/90°. Shift continua como override momentâneo quando o modo está desligado.
 - Seleção/hover/caixa/fantasmas iguais aos da planta de piso; sem alças de modelo.
 
 ## DXF
@@ -50,11 +54,11 @@ Antes, `opsToDxf` mandava **todo** traço para `AMBIENTES` por heurística de co
 
 - `areaPlanGeometry.test.ts`: 7 testes.
 - `areaPlanDxf.test.ts`: 4 testes; `dxfCad.test.ts`: 9 testes (R12 nos templates).
-- `areaPlanOverlay.test.ts`: 9; `areaPlanSelect.test.ts`: 9; `areaPlan.test.ts`: 19; `planFrame.test.ts`: 21; `areaPlanSheet.test.ts`: 3; `areaPlanAnotacao.test.ts`: 8 (ambiente/separador na área); `areaPlanDelete.test.ts`: 4.
+- `areaPlanOverlay.test.ts`: 9; `areaPlanSelect.test.ts`: 9; `areaPlan.test.ts`: 19; `planFrame.test.ts`: 21; `areaPlanSheet.test.ts`: 3; `areaPlanAnotacao.test.ts`: 8 (ambiente/separador na área); `areaPlanDelete.test.ts`: 4; `areaMerge.test.ts`: 3; `areaMergeDelete.test.ts`: 2; `orthoLock.test.ts`: 4; `ortho.test.ts`: 1.
 - `ouroZoom.test.ts`: 88 testes, **sem diff de hash** — a planta de piso não mudou.
 - `npx tsc --noEmit`: limpo.
 - `npx eslint packages apps/web/src`: 0 erros; 1 warning pré-existente em `OpeningFlipGrips.tsx:70`.
-- Suíte completa: **691 arquivos, 7.871 testes, todos passando** (298,03 s), incluindo `ouroZoom.test.ts` (88).
+- Suíte completa: **696 arquivos, 7.881 testes, todos passando** (341,37 s), incluindo `ouroZoom.test.ts` (88).
 
 ## Limitações conhecidas
 
@@ -62,6 +66,8 @@ Antes, `opsToDxf` mandava **todo** traço para `AMBIENTES` por heurística de co
 - `showSectionMarks` e anotações da área no DXF caem nas camadas `AMBIENTES*` (não há camada de anotação por vista no DXF da área); a tela está correta.
 - Objetos importados (`showGeneric`) aparecem na tela, mas não no DXF da área.
 - A projeção de telhado no DXF usa a pegada (`roofProjections`), sem as linhas internas de cumeeira/espigão da tela.
+- A regra de fusão usa a área **antes** da remoção; empate de áreas mantém o ambiente criado primeiro (ordem do nível). Se a remoção abrir o circuito em vez de fundir, não há esse aviso.
+- Com F8 ligado, o `infer` ignora endpoint/alinhamento/grade concorrentes; Shift continua forçando ortogonal quando o modo está desligado.
 - O `roofProjection` antigo do `PlanProfile` continua existindo por compatibilidade, mas a área usa `roofs: 'projection'`.
 
 ## O que falta

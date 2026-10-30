@@ -13,3 +13,4 @@ export * from './pdf/types.ts';
 export { exportSheetsPdf } from './pdf/sheetsPdf.ts';
 export { buildPdf, type PdfPageSpec } from './pdf/pdfWriter.ts';
 export * from './dxfCheck.ts';
+export * from './zip.ts';

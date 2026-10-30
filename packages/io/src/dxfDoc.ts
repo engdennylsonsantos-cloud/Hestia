@@ -13,6 +13,21 @@ import { dxfEscapeText } from './dxfNotes.ts';
 /** Tipos de linha que o escritor grava na tabela LTYPE e referencia nas camadas. */
 export type DxfLineType = 'CONTINUOUS' | 'DASHED';
 
+/**
+ * Unidade de comprimento do arquivo. O documento é SEMPRE montado em metros (a unidade interna do Hestia); o escritor
+ * converte na saída, escalando coordenadas, alturas e padrões de linha e gravando o `$INSUNITS` correspondente.
+ */
+export type DxfUnit = 'mm' | 'cm' | 'm' | 'ft' | 'in';
+
+/** Código do `$INSUNITS` e fator de metros para cada unidade de saída (mm = ×1000, ft = ÷0,3048, in = ÷0,0254). */
+export const DXF_UNITS: Record<DxfUnit, { code: number; scale: number }> = {
+  mm: { code: 4, scale: 1000 },
+  cm: { code: 5, scale: 100 },
+  m: { code: 6, scale: 1 },
+  ft: { code: 2, scale: 1 / 0.3048 },
+  in: { code: 1, scale: 1 / 0.0254 },
+};
+
 /** Camada do documento: nome, cor ACI, tipo de linha e espessura em centésimos de mm (370). */
 export interface DxfDocLayer {
   name: string;
@@ -67,7 +82,7 @@ export interface DxfTextEntity {
 
 export type DxfDocEntity = DxfPolylineEntity | DxfLineEntity | DxfTextEntity;
 
-/** Documento DXF completo: camadas, entidades e, opcionalmente, a extensão do desenho. */
+/** Documento DXF completo: camadas, entidades, a extensão do desenho e a unidade de saída. */
 export interface DxfDoc {
   layers: readonly DxfDocLayer[];
   entities: readonly DxfDocEntity[];
@@ -75,6 +90,8 @@ export interface DxfDoc {
   extMin?: DxfPoint;
   /** Canto superior do desenho ($EXTMAX); ausente = calculado das entidades. */
   extMax?: DxfPoint;
+  /** Unidade de saída do arquivo; ausente = metros. As coordenadas do documento estão sempre em metros. */
+  units?: DxfUnit;
 }
 
 /** Largura de linha padrão do DXF (código 370 = -3, "use a padrão do layer"). */

@@ -42,10 +42,10 @@ import { aceitaCaractereNumerico } from './entradaNumerica.ts';
 
 
 /**
- * Ferramentas que continuam disponíveis na planta de área: a vista é de ANOTAÇÃO. Todo o resto (parede, porta,
- * piso, laje, forro, telhado, escada, ambiente, grades...) é do modelo e fica bloqueado nela.
+ * Ferramentas que continuam disponíveis na planta de área: anotação e as ferramentas de área (ambiente e separador).
+ * O resto (parede, porta, piso, laje, forro, telhado, escada, grade...) é do modelo e fica bloqueado nela.
  */
-export const AREA_PLAN_TOOLS: readonly ToolId[] = ['select', 'measure', 'dimension', 'text', 'tag', 'detailLine', 'filledRegion', 'roomsep'];
+export const AREA_PLAN_TOOLS: readonly ToolId[] = ['select', 'measure', 'dimension', 'text', 'tag', 'detailLine', 'filledRegion', 'room', 'roomsep'];
 
 /** A ferramenta pode rodar na planta de área? */
 export const areaPlanToolAllowed = (id: ToolId): boolean => AREA_PLAN_TOOLS.includes(id);

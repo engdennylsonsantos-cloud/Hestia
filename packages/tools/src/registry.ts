@@ -163,7 +163,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   grid: 'Grade',
   text: 'Texto',
   room: 'Ambiente',
-  roomsep: 'Separador de ambiente',
+  roomsep: 'Separador de ambiente/área',
   detailLine: 'Linha de detalhe',
   filledRegion: 'Região preenchida',
   tag: 'Etiqueta',

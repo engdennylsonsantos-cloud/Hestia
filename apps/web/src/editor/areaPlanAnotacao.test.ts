@@ -32,7 +32,7 @@ function store(): ProjectStore {
 }
 
 /** Abre a planta de área no controlador, com a ferramenta pedida. Devolve o id da planta. */
-function iniciar(tool: 'select' | 'dimension' | 'text' = 'select'): string {
+function iniciar(tool: 'select' | 'dimension' | 'text' | 'room' | 'roomsep' = 'select'): string {
   const s = store();
   const planId = createAreaPlanAction(s, 'lv_0');
   editor.load(s.project, 'teste.hestia.json');
@@ -61,12 +61,29 @@ describe('ferramentas de anotação na planta de área', () => {
     expect(editor.project.levels[0]!.dimensions ?? []).toHaveLength(0);
   });
 
-  it('ferramenta de modelo não entra na planta de área (nem por atalho)', () => {
+  it('ferramenta de modelo não entra na planta de área (nem por atalho); ambiente e separador entram', () => {
     iniciar('select');
     editor.setTool('wall');
     expect(useUi.getState().tool).toBe('select');
+    editor.setTool('room');
+    expect(useUi.getState().tool).toBe('room');
+    editor.setTool('roomsep');
+    expect(useUi.getState().tool).toBe('roomsep');
     editor.setTool('text');
     expect(useUi.getState().tool).toBe('text');
+  });
+
+  it('cria ambiente e separador de área na planta de área', () => {
+    iniciar('room');
+    const antes = Object.values(editor.project.elements).filter((e) => e.kind === 'room').length;
+    cliqueMouse(2, 2.5);
+    const depois = Object.values(editor.project.elements).filter((e) => e.kind === 'room').length;
+    expect(depois).toBe(antes + 1);
+
+    iniciar('roomsep');
+    cliqueMouse(0, 1);
+    cliqueMouse(4, 1);
+    expect(editor.project.levels[0]!.roomSeparators ?? []).toHaveLength(1);
   });
 
   it('cotas automáticas gravam em plan.annotations com o planId, não no nível', () => {

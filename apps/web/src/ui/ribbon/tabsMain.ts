@@ -45,8 +45,6 @@ export const TAB_ARQUITETURA: RibbonTab = {
       t('Ambiente e área', 'Room & Area'),
       tool('room'),
       stack(tool('roomsep', 'small'), soonS(t('Etiquetar ambiente', 'Tag Room'), 'tag')),
-      soon(t('Área', 'Area'), 'room'),
-      stack(soonS(t('Limite de área', 'Area Boundary'), 'roomsep'), soonS(t('Etiqueta de área', 'Tag Area'), 'tag')),
     ),
     panel('abertura', t('Abertura', 'Opening'), soon(t('Por face', 'By Face'), 'opening'), soon(t('Poço', 'Shaft'), 'opening'), soon(t('Parede', 'Wall'), 'opening'), soon(t('Vertical', 'Vertical'), 'opening'), soon(t('Água-furtada', 'Dormer'), 'opening')),
     panel('referencia', t('Referência', 'Datum'), act('levels', 'large', t('Nível', 'Level')), tool('grid', 'large', { label: t('Grade', 'Grid'), icon: 'grid' })),

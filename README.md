@@ -36,3 +36,13 @@ npm run check
 ```
 
 Veja [docs/07-STATUS-V1.md](docs/07-STATUS-V1.md) para o estado atual e o roteiro de teste.
+
+## Licença e contribuições
+
+MIT. Veja [LICENSE](LICENSE). As regras de contribuição, licenciamento e marca
+estão em [CONTRIBUTING.md](CONTRIBUTING.md), [LICENSING.md](LICENSING.md) e
+[NOTICE](NOTICE).
+
+A `main` recebe mudanças por pull request. Rode `npm run check` antes de abrir o
+PR. Para falar de segurança, use o canal privado descrito em
+[SECURITY.md](SECURITY.md).

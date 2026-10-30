@@ -1,0 +1,46 @@
+name: Sugestão
+description: Proponha uma melhoria ou um novo elemento
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qual problema isso resolve?
+      description: Descreva a necessidade, não só a solução.
+    validations:
+      required: true
+  - type: textarea
+    id: proposta
+    attributes:
+      label: O que você propõe?
+      description: Como deveria funcionar na interface e no modelo?
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas consideradas
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      multiple: true
+      options:
+        - Modelo / engine
+        - Render / prancha
+        - Interface
+        - Importação / exportação
+        - Documentação
+        - Outro
+    validations:
+      required: true
+  - type: checkboxes
+    id: checagens
+    attributes:
+      label: Antes de enviar
+      options:
+        - label: Procurei issues e discussões existentes.
+          required: true

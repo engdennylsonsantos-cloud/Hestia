@@ -1,0 +1,59 @@
+name: Bug
+description: Relate um comportamento inesperado no Hestia
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por relatar. Não inclua credenciais, dados de clientes ou projetos reais.
+        Para vulnerabilidades, use **Security → Report a vulnerability**.
+  - type: textarea
+    id: aconteceu
+    attributes:
+      label: O que aconteceu?
+      description: Descreva o comportamento observado.
+      placeholder: "Ex.: ao mover uma parede, a junção em L ficou aberta."
+    validations:
+      required: true
+  - type: textarea
+    id: passos
+    attributes:
+      label: Como reproduzir
+      description: Passo a passo, com o comando ou ferramenta usada.
+      placeholder: |
+        1. Abra o projeto...
+        2. Selecione...
+        3. Mova...
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: O que era esperado?
+    validations:
+      required: true
+  - type: input
+    id: ambiente
+    attributes:
+      label: Ambiente
+      description: Navegador, sistema, GPU/backend e versão do Hestia.
+      placeholder: "Chrome 141 · Windows 11 · WebGL2 · commit abc1234"
+    validations:
+      required: true
+  - type: textarea
+    id: evidencia
+    attributes:
+      label: Evidência
+      description: Prints, logs do console ou um projeto mínimo. Remova dados sensíveis.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checagens
+    attributes:
+      label: Antes de enviar
+      options:
+        - label: Procurei issues existentes e não encontrei duplicata.
+          required: true
+        - label: Não incluí dados sensíveis.
+          required: true

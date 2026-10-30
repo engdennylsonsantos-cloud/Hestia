@@ -151,6 +151,10 @@ function extentsOf(doc: DxfDoc): { min: DxfPoint; max: DxfPoint } {
  * fecha em `0\r\nEOF\r\n`.
  */
 export function writeDxf2000(doc: DxfDoc): string {
+  // O documento é montado em metros; a saída converte para a unidade pedida (ausente = metros).
+  const { code: insUnits, scale } = DXF_UNITS[doc.units ?? 'm'];
+  /** Comprimento em metros gravado na unidade de saída. */
+  const len = (v: number): string => fmt(v * scale);
   const layers = layersOf(doc);
   const { min, max } = extentsOf(doc);
   const dashed = layers.some((l) => l.linetype === 'DASHED') || doc.entities.some((e) => e.kind === 'polyline' && e.dashed === true);
@@ -223,9 +227,9 @@ export function writeDxf2000(doc: DxfDoc): string {
     rec(3, description);
     rec(72, 65);
     rec(73, pattern.length);
-    rec(40, fmt(pattern.reduce((sum, v) => sum + Math.abs(v), 0)));
+    rec(40, len(pattern.reduce((sum, v) => sum + Math.abs(v), 0)));
     for (const v of pattern) {
-      rec(49, fmt(v));
+      rec(49, len(v));
       // R2000+: cada elemento do padrão leva o tipo de elemento (74 = 0, sem forma nem texto).
       rec(74, 0);
     }
@@ -329,9 +333,9 @@ export function writeDxf2000(doc: DxfDoc): string {
     rec(100, 'AcDbBlockBegin');
     rec(2, name);
     rec(70, 0);
-    rec(10, fmt(0));
-    rec(20, fmt(0));
-    rec(30, fmt(0));
+    rec(10, len(0));
+    rec(20, len(0));
+    rec(30, len(0));
     rec(3, name);
     rec(1, '');
     rec(0, 'ENDBLK');
@@ -362,13 +366,13 @@ export function writeDxf2000(doc: DxfDoc): string {
       if (e.dashed === true) rec(6, 'DASHED');
       rec(100, 'AcDb2dPolyline');
       rec(66, 1);
-      rec(10, fmt(0));
-      rec(20, fmt(0));
-      rec(30, fmt(0));
+      rec(10, len(0));
+      rec(20, len(0));
+      rec(30, len(0));
       rec(70, e.closed === true ? 1 : 0);
       if (e.width !== undefined) {
-        rec(40, fmt(e.width));
-        rec(41, fmt(e.width));
+        rec(40, len(e.width));
+        rec(41, len(e.width));
       }
       for (const p of e.points) {
         rec(0, 'VERTEX');
@@ -381,9 +385,9 @@ export function writeDxf2000(doc: DxfDoc): string {
         if (e.dashed === true) rec(6, 'DASHED');
         rec(100, 'AcDbVertex');
         rec(100, 'AcDb2dVertex');
-        rec(10, fmt(p.x));
-        rec(20, fmt(p.y));
-        rec(30, fmt(0));
+        rec(10, len(p.x));
+        rec(20, len(p.y));
+        rec(30, len(0));
         rec(70, 0);
       }
       rec(0, 'SEQEND');
@@ -395,28 +399,28 @@ export function writeDxf2000(doc: DxfDoc): string {
       common(h(), 'LINE');
       if (e.color !== undefined) rec(62, e.color);
       rec(100, 'AcDbLine');
-      rec(10, fmt(e.a.x));
-      rec(20, fmt(e.a.y));
-      rec(30, fmt(0));
-      rec(11, fmt(e.b.x));
-      rec(21, fmt(e.b.y));
-      rec(31, fmt(0));
+      rec(10, len(e.a.x));
+      rec(20, len(e.a.y));
+      rec(30, len(0));
+      rec(11, len(e.b.x));
+      rec(21, len(e.b.y));
+      rec(31, len(0));
     } else {
       common(h(), 'TEXT');
       if (e.color !== undefined) rec(62, e.color);
       rec(100, 'AcDbText');
-      rec(10, fmt(e.at.x));
-      rec(20, fmt(e.at.y));
-      rec(30, fmt(0));
-      rec(40, fmt(e.height));
+      rec(10, len(e.at.x));
+      rec(20, len(e.at.y));
+      rec(30, len(0));
+      rec(40, len(e.height));
       rec(1, dxfEscapeText(e.text));
       rec(50, fmt(e.rotation));
       rec(7, 'Standard');
       if (e.centered === true) {
         rec(72, 1);
-        rec(11, fmt(e.at.x));
-        rec(21, fmt(e.at.y));
-        rec(31, fmt(0));
+        rec(11, len(e.at.x));
+        rec(21, len(e.at.y));
+        rec(31, len(0));
       }
       // O segundo marcador AcDbText fecha o bloco do texto; sem ele o AutoCAD recusa ("Class separator ... expected").
       rec(100, 'AcDbText');
@@ -466,23 +470,23 @@ export function writeDxf2000(doc: DxfDoc): string {
   hrec(9, '$DWGCODEPAGE');
   hrec(3, 'ANSI_1252');
   hrec(9, '$INSBASE');
-  hrec(10, fmt(0));
-  hrec(20, fmt(0));
-  hrec(30, fmt(0));
+  hrec(10, len(0));
+  hrec(20, len(0));
+  hrec(30, len(0));
   hrec(9, '$EXTMIN');
-  hrec(10, fmt(min.x));
-  hrec(20, fmt(min.y));
-  hrec(30, fmt(0));
+  hrec(10, len(min.x));
+  hrec(20, len(min.y));
+  hrec(30, len(0));
   hrec(9, '$EXTMAX');
-  hrec(10, fmt(max.x));
-  hrec(20, fmt(max.y));
-  hrec(30, fmt(0));
+  hrec(10, len(max.x));
+  hrec(20, len(max.y));
+  hrec(30, len(0));
   hrec(9, '$LIMMIN');
-  hrec(10, fmt(0));
-  hrec(20, fmt(0));
+  hrec(10, len(0));
+  hrec(20, len(0));
   hrec(9, '$LIMMAX');
-  hrec(10, fmt(420));
-  hrec(20, fmt(297));
+  hrec(10, len(420));
+  hrec(20, len(297));
   hrec(9, '$LTSCALE');
   hrec(40, fmt(1));
   hrec(9, '$TEXTSTYLE');
@@ -492,7 +496,7 @@ export function writeDxf2000(doc: DxfDoc): string {
   hrec(9, '$CELTYPE');
   hrec(6, 'ByLayer');
   hrec(9, '$INSUNITS');
-  hrec(70, 6);
+  hrec(70, insUnits);
   hrec(9, '$MEASUREMENT');
   hrec(70, 1);
   hrec(9, '$LWDISPLAY');

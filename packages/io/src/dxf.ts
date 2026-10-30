@@ -1,6 +1,6 @@
 import { DXF_LINE_WEIGHTS, DXF_LINE_WEIGHT_DEFAULT, type DxfLayerStyle, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { DXF_LAYER_COTAS, DXF_LAYER_DETALHE, DXF_LAYER_ETIQUETAS, DXF_LAYER_TEXTOS, dxfTextEntity, type DxfNoteText, type DxfNotes } from './dxfNotes.ts';
-import { writeDxf2000, type DxfDoc, type DxfDocEntity, type DxfDocLayer, type DxfLineType } from './dxfDoc.ts';
+import { writeDxf2000, type DxfDoc, type DxfDocEntity, type DxfDocLayer, type DxfLineType, type DxfUnit } from './dxfDoc.ts';
 import { DXF_LAYER_GENERIC } from './dxfGeneric.ts';
 
 /** Ponto em metros: x para a direita, y para cima (planta). */
@@ -127,6 +127,8 @@ export interface DxfLevelGeometry {
    * `dxfLayerStyleOf`, o que mantém os chamadores antigos e os testes.
    */
   layerStyles?: Record<string, DxfLayerStyle>;
+  /** Unidade de saída do arquivo (mm, cm, m, ft ou in); ausente = metros. A geometria continua em metros. */
+  units?: DxfUnit;
   /** Cotas e textos de anotação do nível (decisão 0019): ver `notesDxfOf`. Ausente = nenhum. */
   notes?: DxfNotes;
   /** Marcas de corte/elevação em planta (linhas, setas e rótulos), ver `sectionMarksDxfOf`. Ausente = nenhuma. */
@@ -504,7 +506,7 @@ export function dxfDocOf(project: Project, levelId: Id, geo: DxfLevelGeometry): 
   const all = [...shapes.flatMap((s) => s.pts), ...lines.flatMap((l) => [l.a, l.b]), ...texts.map((t) => t.at)];
   const lo = all.reduce((m, p) => ({ x: Math.min(m.x, p.x), y: Math.min(m.y, p.y) }), { x: 0, y: 0 });
   const hi = all.reduce((m, p) => ({ x: Math.max(m.x, p.x), y: Math.max(m.y, p.y) }), { x: 0, y: 0 });
-  return { layers, entities, extMin: lo, extMax: hi };
+  return { layers, entities, extMin: lo, extMax: hi, ...(geo.units === undefined ? {} : { units: geo.units }) };
 }
 
 /**

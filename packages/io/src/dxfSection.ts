@@ -1,7 +1,7 @@
 import type { DxfLayerStyle, GraphicsCategory, Id, Project } from '@hestia/model';
 import type { DxfPoint, DxfPolygons } from './dxf.ts';
 import { DXF_CATEGORY_COLORS, DXF_LINE_WEIGHT_DEFAULT } from './dxf.ts';
-import { writeDxf2000, type DxfDoc, type DxfDocEntity, type DxfDocLayer } from './dxfDoc.ts';
+import { writeDxf2000, type DxfDoc, type DxfDocEntity, type DxfDocLayer, type DxfUnit } from './dxfDoc.ts';
 
 /**
  * DXF do corte e da elevação (decisão 0015 §2.7). O desenho é (t, z), com z para cima; o peso da categoria na escala da
@@ -35,6 +35,8 @@ export interface DxfSectionGeometry {
   lineWeights?: Partial<Record<string, number>>;
   /** Estilo por camada vindo da tabela editável do projeto; ausente = `dxfSectionLayerStyleOf`. */
   layerStyles?: Record<string, DxfLayerStyle>;
+  /** Unidade de saída do arquivo; ausente = metros. A geometria (t, z) continua em metros. */
+  units?: DxfUnit;
 }
 
 const CATEGORY_LAYER: Record<GraphicsCategory, string> = {
@@ -132,7 +134,7 @@ export function sectionDxfDocOf(geo: DxfSectionGeometry): DxfDoc {
   const all = shapes.flatMap((s) => s.pts);
   const lo = all.reduce((m, p) => ({ x: Math.min(m.x, p.x), y: Math.min(m.y, p.y) }), { x: 0, y: 0 });
   const hi = all.reduce((m, p) => ({ x: Math.max(m.x, p.x), y: Math.max(m.y, p.y) }), { x: 0, y: 0 });
-  return { layers, entities, extMin: lo, extMax: hi };
+  return { layers, entities, extMin: lo, extMax: hi, ...(geo.units === undefined ? {} : { units: geo.units }) };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { writeDxf2000, type DxfDoc } from './dxfDoc.ts';
+import { writeDxf2000, type DxfDoc, type DxfUnit } from './dxfDoc.ts';
 
 /** Par código/valor de um DXF já quebrado em linhas. */
 interface Pair {
@@ -29,6 +29,13 @@ function recordsOf(pairs: Pair[]): Record2000[] {
     else out.at(-1)?.pairs.push(p);
   }
   return out;
+}
+
+/** Valor de uma variável do HEADER: o par logo depois do 9 com o nome. */
+function headerVar(recs: Record2000[], name: string): Pair | undefined {
+  const header = recs.find((r) => r.type === 'SECTION' && r.pairs[0]?.value === 'HEADER')!;
+  const at = header.pairs.findIndex((p) => p.code === 9 && p.value === name);
+  return header.pairs[at + 1];
 }
 
 /** Documento de exemplo da fase 1: três camadas com cores e espessuras diferentes, uma tracejada. */
@@ -137,5 +144,73 @@ describe('writeDxf2000', () => {
     };
     const names = recordsOf(pairsOf(writeDxf2000(doc))).filter((r) => r.type === 'LAYER').map((r) => r.pairs.find((p) => p.code === 2)?.value);
     expect(names).toEqual(['0', 'A', 'B']);
+  });
+});
+
+/** Documento em metros usado nos testes de unidade: tracejado, texto girado, largura e extensão dada. */
+const docEmMetros = (units?: DxfUnit): DxfDoc => ({
+  ...(units === undefined ? {} : { units }),
+  extMin: { x: 1, y: 2 },
+  extMax: { x: 5, y: 8 },
+  layers: [
+    { name: 'CORTE', color: 3, linetype: 'DASHED', lineWeight: 25 },
+    { name: 'TEXTO', color: 7, linetype: 'CONTINUOUS' },
+  ],
+  entities: [
+    { kind: 'line', layer: 'CORTE', a: { x: 1, y: 2 }, b: { x: 3, y: 4 } },
+    { kind: 'polyline', layer: 'CORTE', points: [{ x: 0, y: 0 }, { x: 2, y: 0 }], width: 0.2 },
+    { kind: 'text', layer: 'TEXTO', at: { x: 2, y: 2 }, height: 0.5, text: 'NOTA', rotation: 30 },
+  ],
+});
+
+/** Unidades de saída e o fator metros→unidade de cada uma. */
+const UNIDADES: ReadonlyArray<{ units: DxfUnit; code: number; scale: number }> = [
+  { units: 'mm', code: 4, scale: 1000 },
+  { units: 'cm', code: 5, scale: 100 },
+  { units: 'ft', code: 2, scale: 1 / 0.3048 },
+  { units: 'in', code: 1, scale: 1 / 0.0254 },
+];
+
+describe('writeDxf2000 por unidade', () => {
+  for (const { units, code, scale } of UNIDADES) {
+    it(`escala os comprimentos e grava $INSUNITS em ${units}`, () => {
+      const recs = recordsOf(pairsOf(writeDxf2000(docEmMetros(units))));
+      const valueOf = (r: Record2000, c: number): number => Number(r.pairs.find((p) => p.code === c)!.value);
+
+      const line = recs.find((r) => r.type === 'LINE')!;
+      expect(valueOf(line, 10)).toBeCloseTo(1 * scale, 4);
+      expect(valueOf(line, 20)).toBeCloseTo(2 * scale, 4);
+      expect(valueOf(line, 11)).toBeCloseTo(3 * scale, 4);
+
+      const polyline = recs.find((r) => r.type === 'POLYLINE')!;
+      expect(valueOf(polyline, 40)).toBeCloseTo(0.2 * scale, 4);
+      expect(valueOf(polyline, 41)).toBeCloseTo(0.2 * scale, 4);
+
+      const text = recs.find((r) => r.type === 'TEXT')!;
+      expect(valueOf(text, 40)).toBeCloseTo(0.5 * scale, 4);
+      expect(text.pairs.find((p) => p.code === 50)?.value).toBe('30.000000');
+
+      expect(headerVar(recs, '$INSUNITS')).toEqual({ code: 70, value: String(code) });
+      expect(Number(headerVar(recs, '$EXTMIN')!.value)).toBeCloseTo(1 * scale, 4);
+      expect(Number(headerVar(recs, '$EXTMAX')!.value)).toBeCloseTo(5 * scale, 4);
+
+      const layer = recs.find((r) => r.type === 'LAYER' && r.pairs.some((p) => p.code === 2 && p.value === 'CORTE'))!;
+      expect(layer.pairs.find((p) => p.code === 370)?.value).toBe('25');
+
+      const dashed = recs.find((r) => r.type === 'LTYPE' && r.pairs.some((p) => p.code === 2 && p.value === 'DASHED'))!;
+      expect(valueOf(dashed, 40)).toBeCloseTo(0.375 * scale, 4);
+      const elements = dashed.pairs.filter((p) => p.code === 49).map((p) => Number(p.value));
+      expect(elements).toHaveLength(2);
+      expect(elements[0]).toBeCloseTo(0.25 * scale, 4);
+      expect(elements[1]).toBeCloseTo(-0.125 * scale, 4);
+    });
+  }
+
+  it('sem unidade ou em metros grava exatamente o mesmo arquivo', () => {
+    expect(writeDxf2000(docEmMetros('m'))).toBe(writeDxf2000(docEmMetros(undefined)));
+    expect(writeDxf2000(sample)).toBe(writeDxf2000({ ...sample, units: 'm' }));
+    const recs = recordsOf(pairsOf(writeDxf2000(docEmMetros(undefined))));
+    expect(headerVar(recs, '$INSUNITS')).toEqual({ code: 70, value: '6' });
+    expect(Number(headerVar(recs, '$EXTMIN')!.value)).toBe(1);
   });
 });

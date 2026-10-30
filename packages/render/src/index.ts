@@ -40,7 +40,7 @@ export * from './sheet/types.ts';
 export * from './sheet/build.ts';
 export { STAMP_H, STAMP_W } from './sheet/frame.ts';
 // Ambientes (decisão 0018, 0037): nome e centro de cada ambiente, o mesmo texto da planta de piso e do DXF.
-export { roomLabelAt, roomNameText } from './plan/rooms.ts';
+export { roomFullText, roomLabelAt, roomNameText } from './plan/rooms.ts';
 export { areaPlanHighlightOps, areaPlanLegendOps, areaPlanRoomOps, areaPlanTableOps, areaPlanTagOps, labelGhostOps, referenceAt, referenceSegments, roomTagLines, tagBoxModel } from './plan/areaPlan.ts';
 export * from './plan/sketch.ts';
 // Anotações (textos e cotas): desenho, caixa do texto, moldura e destaque de seleção/hover.

@@ -47,8 +47,8 @@ export interface RampDrawingText {
 export const RAMP_DRAWING_TEXT: Record<'pt' | 'en', RampDrawingText> = {
   pt: {
     run: 'c = {v} m', total: 'L = {v} m', landing: 'Patamar ≥ {v} m', rise: 'h = {v} m',
-    riseMax: 'h = {v} m\nmáx. {m} m ✓', riseMaxUnchecked: 'h = {v} m\nmáx. {m} m ✓ · a conferir',
-    thick: 'e = {v} cm ⟂\n(vertical {m} cm)', headroom: 'Pé-direito livre\nmín. {v} m',
+    riseMax: 'h = {v} m\nmáx. {m} m ✓', riseMaxUnchecked: 'h = {v} m\nmáx. {m} m ✓\na conferir',
+    thick: 'e = {v} cm\n⟂ (vertical\n{m} cm)', headroom: 'Pé-direito\nlivre mín.\n{v} m',
     flight1: 'Lance 1', flight2: 'Lance 2', overLimit: 'Inclinação acima da norma\n(máx. {v})',
     slope: 'i = h ÷ c = {v}', width: 'Largura {v} m', up: 'Sobe', land: 'Patamar',
     capSection: 'Escala vertical ×{k} (esquemático). Lance 1: h {h1} m, c {c1} m. Lance 2: h {h2} m, c {c2} m. Níveis: {levels}.',
@@ -56,8 +56,8 @@ export const RAMP_DRAWING_TEXT: Record<'pt' | 'en', RampDrawingText> = {
   },
   en: {
     run: 'c = {v} m', total: 'L = {v} m', landing: 'Landing ≥ {v} m', rise: 'h = {v} m',
-    riseMax: 'h = {v} m\nmax. {m} m ✓', riseMaxUnchecked: 'h = {v} m\nmax. {m} m ✓ · to be checked',
-    thick: 'e = {v} cm ⟂\n(vertical {m} cm)', headroom: 'Headroom\nmin. {v} m',
+    riseMax: 'h = {v} m\nmax. {m} m ✓', riseMaxUnchecked: 'h = {v} m\nmax. {m} m ✓\nto be checked',
+    thick: 'e = {v} cm\n⟂ (vertical\n{m} cm)', headroom: 'Headroom\nmin. free\n{v} m',
     flight1: 'Flight 1', flight2: 'Flight 2', overLimit: 'Slope above code\n(max. {v})',
     slope: 'i = h ÷ c = {v}', width: 'Width {v} m', up: 'Up', land: 'Landing',
     capSection: 'Vertical scale ×{k} (schematic). Flight 1: h {h1} m, c {c1} m. Flight 2: h {h2} m, c {c2} m. Levels: {levels}.',

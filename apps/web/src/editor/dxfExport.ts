@@ -1,6 +1,6 @@
 import { openingSymbolPaths, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
-import { climbWalk, openingPlanWorldPaths, ownerOf, planViewOf, risersInClimbOrder, roofFootprint, roomLabelAt, roomNameText, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
+import { climbWalk, openingPlanWorldPaths, ownerOf, planViewOf, risersInClimbOrder, roofFootprint, roomFullText, roomLabelAt, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
 import {
   dxfDocOf,
   dxfGenericEntities,
@@ -28,7 +28,7 @@ import {
   type DxfUnit,
   type DxfViewState,
 } from '@hestia/io';
-import { areaPlanOf, openingTypeById, GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, type DxfLayerStyle, type GraphicsCategory, type Id, type Project } from '@hestia/model';
+import { areaPlanOf, openingTypeById, GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, unitsOf, type DxfLayerStyle, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { AREA_LAYER_NAMES, areaLayerStyleOf } from './dxfAreaPlan.ts';
 
 /**
@@ -251,13 +251,13 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
   );
   const roofs = resolveRoofs(p, levelId);
   const jl = junctionLevel(p, levelId);
-  // Ambientes (decisão 0018, 0037): contorno em AMBIENTES e só o nome em AMBIENTES_TEXTO; sem circuito, nada sai.
+  // Ambientes (decisão 0018, 0037): contorno em AMBIENTES e rótulo completo (nome, número, área) em AMBIENTES_TEXTO; sem circuito, nada sai.
   const rooms = shown('room') ? resolveRooms(p, levelId).filter((r) => r.polygon && !hidden.has(r.roomId)) : [];
   const geo: DxfLevelGeometry = {
     rooms: rooms.map((r) => ({ outline: r.polygon![0] ?? [], holes: r.polygon!.slice(1) })),
     roomTexts: rooms.flatMap((r) => {
       const at = roomLabelAt(r);
-      return at ? [{ at, text: roomNameText(r), height: ROOM_TEXT_HEIGHT_M, rotation: 0, layer: DXF_LAYER_ROOM_TEXT }] : [];
+      return at ? [{ at, text: roomFullText(r, unitsOf(p)), height: ROOM_TEXT_HEIGHT_M, rotation: 0, layer: DXF_LAYER_ROOM_TEXT }] : [];
     }),
     clusters: shown('wall') ? view.geo.clusters : [],
     openings,

@@ -4,6 +4,7 @@ import { fmtNum, I18N, useI18n } from '../../editor/i18n.ts';
 import { NumField, TextField } from '../fields.tsx';
 import { applyPreset, matchPreset, STAIR_DIALOG_PRESETS, type StairPresetId } from './stairTypeCalc.ts';
 import { STAIR_FIELD_LIMITS, type StairFieldName, type StairTypeIssue } from './stairTypeForm.ts';
+import { fieldLabelOverride, isStairFieldVisible } from './stairFieldVisibility.ts';
 
 type Dict = Record<keyof typeof I18N.pt, string>;
 
@@ -131,13 +132,16 @@ export function StairTypeSections({ draft, set, onStyle, materials, issues, canG
 
   const setNum = (field: StairFieldName, v: number): void => set({ [field]: v } as Partial<StairType>);
 
-  const row = (field: StairFieldName): ReactElement => {
+  const row = (field: StairFieldName): ReactElement | null => {
+    if (!isStairFieldVisible(draft.runStyle, field)) return null;
     const lim = limitFor(field);
     const msgs = messages(field);
+    const override = fieldLabelOverride(draft.runStyle, field);
+    const label = override ? t[override] : t[FIELD_LABEL[field]];
     return (
       <Fragment key={field}>
         <div className="field-row">
-          <label htmlFor={`stt-${field}`}>{t[FIELD_LABEL[field]]}</label>
+          <label htmlFor={`stt-${field}`}>{label}</label>
           <NumField
             id={`stt-${field}`}
             value={draft[field]}
@@ -209,6 +213,7 @@ export function StairTypeSections({ draft, set, onStyle, materials, issues, canG
 
       <fieldset className="dsec" id="stt-sec-2">
         <legend>{t.stt_sec_calc}</legend>
+        <p className="hint">{t.stt_calc_help_blondel}</p>
         <div className="field-row">
           <label htmlFor="stt-preset">{t.stt_f_preset}</label>
           <select id="stt-preset" className="select" value={presetId} onChange={(e) => applyPresetId(e.target.value as StairPresetId)}>
@@ -224,6 +229,7 @@ export function StairTypeSections({ draft, set, onStyle, materials, issues, canG
         ) : null}
         {applied ? <p className="stt-ref" aria-live="polite">{t.stt_preset_applied}</p> : null}
         <p className="hint">{t.stt_calc_help}</p>
+        {draft.runStyle === 'post' ? <p className="hint">{t.stt_note_post_calc}</p> : null}
         {row('calcRiserFactor')}
         {row('calcTreadFactor')}
         {row('calcTarget')}
@@ -242,37 +248,30 @@ export function StairTypeSections({ draft, set, onStyle, materials, issues, canG
           </select>
         </div>
         <p className="hint">{t[STYLE_DESC[draft.runStyle]]}</p>
-        <div className="field-row">
-          <label htmlFor="stt-materialId">{t.stt_f_materialId}</label>
-          {materialSelect('stt-materialId', 'materialId')}
-        </div>
+        {isStairFieldVisible(draft.runStyle, 'materialId') ? (
+          <div className="field-row">
+            <label htmlFor="stt-materialId">{t[fieldLabelOverride(draft.runStyle, 'materialId') ?? 'stt_f_materialId']}</label>
+            {materialSelect('stt-materialId', 'materialId')}
+          </div>
+        ) : null}
         {noMats ? <div className="vr-error" id="stt-materialId-err">{t.stt_err_no_materials}</div> : null}
-        {draft.runStyle === 'monolithic' ? (
-          <>
-            {row('structuralDepth')}
-            <div className="field-row">
-              <label htmlFor="stt-undersideStyle">{t.stt_f_undersideStyle}</label>
-              <select id="stt-undersideStyle" className="select" value={draft.undersideStyle} onChange={(e) => set({ undersideStyle: e.target.value as StairUndersideStyle })}>
-                {(Object.keys(UNDER_LABEL) as StairUndersideStyle[]).map((k) => <option key={k} value={k}>{t[UNDER_LABEL[k]]}</option>)}
-              </select>
-            </div>
-          </>
+        {row('structuralDepth')}
+        {isStairFieldVisible(draft.runStyle, 'undersideStyle') ? (
+          <div className="field-row">
+            <label htmlFor="stt-undersideStyle">{t.stt_f_undersideStyle}</label>
+            <select id="stt-undersideStyle" className="select" value={draft.undersideStyle} onChange={(e) => set({ undersideStyle: e.target.value as StairUndersideStyle })}>
+              {(Object.keys(UNDER_LABEL) as StairUndersideStyle[]).map((k) => <option key={k} value={k}>{t[UNDER_LABEL[k]]}</option>)}
+            </select>
+          </div>
         ) : null}
-        {draft.runStyle === 'assembled' ? (
-          <>
-            {row('treadThickness')}
-            {row('riserThickness')}
-          </>
-        ) : null}
-        {draft.runStyle === 'post' ? (
-          <>
-            {row('treadThickness')}
-            {row('treadOverlap')}
-            <div className="field-row">
-              <label htmlFor="stt-postMaterialId">{t.stt_f_postMaterialId}</label>
-              {materialSelect('stt-postMaterialId', 'postMaterialId')}
-            </div>
-          </>
+        {row('treadThickness')}
+        {row('riserThickness')}
+        {row('treadOverlap')}
+        {isStairFieldVisible(draft.runStyle, 'postMaterialId') ? (
+          <div className="field-row">
+            <label htmlFor="stt-postMaterialId">{t[fieldLabelOverride(draft.runStyle, 'postMaterialId') ?? 'stt_f_postMaterialId']}</label>
+            {materialSelect('stt-postMaterialId', 'postMaterialId')}
+          </div>
         ) : null}
         {row('landingThickness')}
       </fieldset>

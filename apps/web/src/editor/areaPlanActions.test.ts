@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '@hestia/geom';
 import { areaPlanOf, createEmptyProject, DEFAULT_AREA_GRAPHICS, DEFAULT_TAG_FIELDS, makeRoom, makeWall, ProjectStore, type AreaPlan } from '@hestia/model';
-import { addMissingTagsAction, applyColorSchemeAction, createAreaPlanAction, createGeneralAreaSheetAction, moveRoomLabelAction, openAreaPlan, recenterTagsAction, setPlanGraphicsAction } from './areaPlanActions.ts';
+import { addMissingTagsAction, applyColorSchemeAction, createAreaPlanAction, createGeneralAreaSheetAction, ensureRoomTagAction, moveRoomLabelAction, openAreaPlan, recenterTagsAction, removeRoomTagAction, setPlanGraphicsAction, updateRoomTagAction } from './areaPlanActions.ts';
 
 const ring = (pts: Array<[number, number]>): Vec2[] => pts.map(([x, y]) => ({ x, y }));
 
@@ -93,6 +93,70 @@ describe('ações da planta de área', () => {
     // O nível continua com as dele.
     expect(s.project.levels[0]!.dimensions).toHaveLength(1);
     expect(s.project.levels[0]!.texts).toHaveLength(1);
+  });
+
+  it('garantir a etiqueta cria uma vez e devolve a mesma nas próximas chamadas', () => {
+    const s = store();
+    const id = createAreaPlanAction(s, 'lv_0');
+    const tag = ensureRoomTagAction(s, id, 'r1')!;
+    expect(tag.planId).toBe(id);
+    expect(tag.roomId).toBe('r1');
+    expect(tag.visible).toBe(true);
+    expect(tag.fields).toEqual(DEFAULT_TAG_FIELDS);
+    expect(areaPlanOf(s.project, id)!.tags).toHaveLength(1);
+    // Idempotente: não cria outra etiqueta nem um passo de desfazer.
+    const version = s.version;
+    const again = ensureRoomTagAction(s, id, 'r1')!;
+    expect(again.id).toBe(tag.id);
+    expect(areaPlanOf(s.project, id)!.tags).toHaveLength(1);
+    expect(s.version).toBe(version);
+  });
+
+  it('atualizar a etiqueta grava em plan.tags e não no rótulo do nível', () => {
+    const s = store();
+    const id = createAreaPlanAction(s, 'lv_0');
+    const tag = updateRoomTagAction(s, id, 'r1', { fields: ['name', 'area'], orientation: 'vertical', leader: 'kinked', visible: false, custom: 'Sala de estar' })!;
+    const plan = areaPlanOf(s.project, id)!;
+    expect(plan.tags).toHaveLength(1);
+    expect(plan.tags[0]!.id).toBe(tag.id);
+    expect(plan.tags[0]!.fields).toEqual(['name', 'area']);
+    expect(plan.tags[0]!.orientation).toBe('vertical');
+    expect(plan.tags[0]!.leader).toBe('kinked');
+    expect(plan.tags[0]!.visible).toBe(false);
+    expect(plan.tags[0]!.custom).toBe('Sala de estar');
+    // A posição, rotação e chamada compartilhadas continuam intocadas.
+    const room = s.project.elements.r1 as { labelPosition?: unknown; labelRotation?: unknown; labelLeader?: unknown };
+    expect(room.labelPosition).toBeUndefined();
+    expect(room.labelRotation).toBeUndefined();
+    expect(room.labelLeader).toBeUndefined();
+    expect(s.project.levels[0]!.tags ?? []).toHaveLength(0);
+  });
+
+  it('recusa lista de campos vazia sem criar etiqueta', () => {
+    const s = store();
+    const id = createAreaPlanAction(s, 'lv_0');
+    expect(() => updateRoomTagAction(s, id, 'r1', { fields: [] })).toThrow('ao menos um campo');
+    expect(areaPlanOf(s.project, id)!.tags).toHaveLength(0);
+  });
+
+  it('criação e alteração da etiqueta são um só passo de desfazer', () => {
+    const s = store();
+    const id = createAreaPlanAction(s, 'lv_0');
+    updateRoomTagAction(s, id, 'r1', { fields: ['name'] });
+    expect(areaPlanOf(s.project, id)!.tags[0]!.fields).toEqual(['name']);
+    s.undo();
+    expect(areaPlanOf(s.project, id)!.tags).toHaveLength(0);
+  });
+
+  it('voltar ao padrão remove a etiqueta da vista', () => {
+    const s = store();
+    const id = createAreaPlanAction(s, 'lv_0');
+    ensureRoomTagAction(s, id, 'r1');
+    expect(removeRoomTagAction(s, id, 'r1')).toBe(true);
+    expect(areaPlanOf(s.project, id)!.tags).toHaveLength(0);
+    expect(removeRoomTagAction(s, id, 'r1')).toBe(false);
+    s.undo();
+    expect(areaPlanOf(s.project, id)!.tags).toHaveLength(1);
   });
 
   it('abrir planta antiga (sem annotations) semeia a anotação do nível num passo', () => {

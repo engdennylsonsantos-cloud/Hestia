@@ -1,13 +1,38 @@
 import { useMemo, type ReactElement } from 'react';
 import { resolveRooms, type ResolvedRoom } from '@hestia/engine';
-import { DEFAULT_ROOM_CATEGORIES, roomCeilingHeight, type Id, type Project, type Room } from '@hestia/model';
+import { areaPlanOf, DEFAULT_ROOM_CATEGORIES, roomCeilingHeight, type AreaPlan, type Id, type Project, type Room, type RoomTag, type TagField } from '@hestia/model';
+import { ensureRoomTagAction, removeRoomTagAction, updateRoomTagAction, type RoomTagPatch } from '../editor/areaPlanActions.ts';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
-import { Group, NumField, Row, TextField } from './fields.tsx';
+import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { useFormat } from './useUnits.ts';
 
 
 const ROOM_DEFAULT_COLOR = '#b8c4d4';
+
+const say = (status: string): void => useUi.setState({ status });
+
+/** Campos da etiqueta de ambiente, na ordem em que aparecem no bloco. */
+export const TAG_FIELD_OPTIONS: ReadonlyArray<{ field: TagField; label: string }> = [
+  { field: 'name', label: 'Nome' },
+  { field: 'number', label: 'Número' },
+  { field: 'area', label: 'Área' },
+  { field: 'category', label: 'Categoria' },
+  { field: 'level', label: 'Nível' },
+  { field: 'perimeter', label: 'Perímetro' },
+  { field: 'volume', label: 'Volume' },
+  { field: 'custom', label: 'Personalizado' },
+];
+
+/** Liga ou desliga um campo da etiqueta, mantendo ao menos um (o modelo recusa a lista vazia). */
+export function toggleTagField(fields: readonly TagField[], field: TagField): TagField[] {
+  const on = new Set(fields);
+  if (on.has(field)) {
+    if (on.size === 1) return [...fields];
+    on.delete(field);
+  } else on.add(field);
+  return TAG_FIELD_OPTIONS.map((o) => o.field).filter((f) => on.has(f));
+}
 
 /** Valor comum a todos os selecionados, ou `mixed` quando divergem. */
 function common<T, K>(items: T[], get: (t: T) => K): { value: K; mixed: boolean } {
@@ -27,10 +52,92 @@ export function roomWarning(r: ResolvedRoom): string | null {
   return null;
 }
 
+/**
+ * Etiqueta do ambiente **nesta planta de área** (`plan.tags`). Os ajustes são da vista: não mexem em
+ * `Room.labelPosition` nem no rótulo compartilhado do grupo "Rótulo (todas as vistas)".
+ */
+export function RoomTagGroup({ room, plan, hasCircuit }: { room: Room; plan: AreaPlan; hasCircuit: boolean }): ReactElement {
+  const tag: RoomTag | undefined = plan.tags.find((t) => t.roomId === room.id);
+  const fields = tag?.fields ?? plan.graphics.tagDefault.fields;
+  const orientation = tag?.orientation ?? plan.graphics.tagDefault.orientation;
+  const leader = tag?.leader ?? plan.graphics.tagDefault.leader;
+  const save = (patch: RoomTagPatch): void => {
+    try {
+      if (!updateRoomTagAction(editor.store, plan.id, room.id, patch)) say('O ambiente não tem circuito fechado nesta planta.');
+    } catch (e) {
+      say(e instanceof Error ? e.message : 'Não foi possível alterar a etiqueta.');
+    }
+  };
+  const toggle = (field: TagField): void => {
+    const patch: RoomTagPatch = { fields: toggleTagField(fields, field) };
+    // Ao ligar "Personalizado" sem texto, começa com o nome para o rótulo não desaparecer.
+    if (field === 'custom' && !fields.includes('custom') && !tag?.custom) patch.custom = room.name;
+    save(patch);
+  };
+  return (
+    <Group title="Etiqueta nesta planta de área">
+      {hasCircuit ? (
+        <>
+          <Row label="Campos">
+            <span style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', padding: '2px 4px' }}>
+              {TAG_FIELD_OPTIONS.map((o) => (
+                <Check key={o.field} id={`p-tagfield-${o.field}`} checked={fields.includes(o.field)} disabled={fields.length === 1 && fields.includes(o.field)} onChange={() => toggle(o.field)}>
+                  {o.label}
+                </Check>
+              ))}
+            </span>
+          </Row>
+          {fields.includes('custom') && (
+            <Row label="Texto" htmlFor="p-tagcustom">
+              <TextField id="p-tagcustom" value={tag?.custom ?? ''} placeholder="Texto da etiqueta" onCommit={(v) => save({ custom: v })} />
+            </Row>
+          )}
+          <Row label="Orientação" htmlFor="p-tagorient">
+            <select id="p-tagorient" className="select" value={orientation} onChange={(e) => save({ orientation: e.target.value as RoomTag['orientation'] })}>
+              <option value="horizontal">Horizontal</option>
+              <option value="vertical">Vertical</option>
+            </select>
+          </Row>
+          <Row label="Chamada" htmlFor="p-tagleader">
+            <select id="p-tagleader" className="select" value={leader} onChange={(e) => save({ leader: e.target.value as RoomTag['leader'] })}>
+              <option value="none">Nenhuma</option>
+              <option value="straight">Reta</option>
+              <option value="kinked">Com cotovelo</option>
+              <option value="crossed">Duas linhas cruzadas</option>
+            </select>
+          </Row>
+          <Row label="Visível nesta planta"><Check id="p-tagvisible" checked={tag?.visible ?? true} onChange={(v) => save({ visible: v })} /></Row>
+          <div className="btn-row">
+            <button
+              type="button"
+              className="btn small"
+              onClick={() => {
+                const created = ensureRoomTagAction(editor.store, plan.id, room.id);
+                say(created ? (tag ? 'A etiqueta desta planta já está criada.' : 'Etiqueta criada nesta planta.') : 'O ambiente não tem circuito fechado nesta planta.');
+              }}
+            >
+              Criar/atualizar etiqueta
+            </button>
+            <button type="button" className="btn small" disabled={!tag} onClick={() => say(removeRoomTagAction(editor.store, plan.id, room.id) ? 'Etiqueta voltou ao padrão da planta.' : 'Esta planta já usa o padrão.')}>
+              Voltar ao padrão
+            </button>
+          </div>
+          <div className="hint">Estes ajustes valem só nesta planta de área. A posição do rótulo continua compartilhada em “Rótulo (todas as vistas)”.</div>
+        </>
+      ) : (
+        <div className="hint">Sem circuito fechado: feche as paredes em volta do ambiente para a etiqueta aparecer nesta planta.</div>
+      )}
+    </Group>
+  );
+}
+
 /** Propriedades de um ou mais ambientes: nome, número, ponto interior (leitura), deslocamento, pé-direito, acabamentos e cor, com área, perímetro e volume. */
 export function RoomProperties({ rooms }: { rooms: Room[] }): ReactElement {
   const fmt = useFormat();
   const p: Project = useProject();
+  // Planta de área ativa: a etiqueta da vista só aparece nesse contexto.
+  const areaPlanId = useUi((s) => (s.view === 'plan' && s.planKind === 'area' ? s.areaPlanId : null));
+  const areaPlan = areaPlanId ? areaPlanOf(p, areaPlanId) : undefined;
   const ids = rooms.map((r) => r.id);
   const name = common(rooms, (r) => r.name);
   const number = common(rooms, (r) => r.number);
@@ -115,6 +222,9 @@ export function RoomProperties({ rooms }: { rooms: Room[] }): ReactElement {
           </div>
           <div className="hint">A posição vale na planta de piso, na planta de área e em qualquer vista onde o rótulo aparecer.</div>
         </Group>
+      )}
+      {single && areaPlan && areaPlan.levelId === single.levelId && (
+        <RoomTagGroup room={single} plan={areaPlan} hasCircuit={!!geo?.polygon} />
       )}
       <Group title="Vista" open={false}>
         <Row label="Cor" htmlFor="p-rcolor">

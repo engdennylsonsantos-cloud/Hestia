@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- o DXF da planta de área reúne o modelo, as anotações e as camadas de área no mesmo arquivo. */
 import { openingSymbolPaths, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, resolveLevel, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
 import { areaPlanProfile, buildPlanGeometry, climbWalk, levelBox, LIGHT, openingPlanWorldPaths, ownerOf, planViewOf, resolverZoom, risersInClimbOrder, roofFootprint, roomLabelAt, roomNameText, spiralByComponent, spiralPostRing, stairCut, type PlanOps, type PlanProfile, type PlanView, type StairCut } from '@hestia/render';

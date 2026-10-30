@@ -21,6 +21,8 @@ Data: 2026-10-30
 | `apps/web/src/editor/controller.ts` | `AREA_PLAN_TOOLS` agora inclui `room` e `roomsep`: dá para criar ambiente/área e separador na planta de área. |
 | `apps/web/src/editor/areaMerge.ts`, `areaMergePrompt.ts`, `ui/dialogs/AreaMergeDialog.tsx` | Regra de fusão de áreas com aviso de confirmação; mantém a maior e apaga as menores junto com a parede/separador. |
 | `packages/tools/src/infer.ts`, `apps/web/src/editor/state.ts`, `ui/OrthoButton.tsx`, `ui/StatusBar.tsx` | Modo ortogonal global com F8, ícone na barra de status e projeção estrita em 0°/90°. |
+| `packages/tools/src/wallTool.ts` | Removido o rótulo duplicado de comprimento+ângulo do trecho reto; a cota dinâmica (`segmentLengthDim`) é a única medida, só comprimento. |
+| `packages/tools/src/perimeterTool.ts` | A cota do lado em desenho usa o ponto capturado (`this.inf`), não o cursor cru; segue o ortogonal em piso/telhado/perímetro. |
 | `apps/web/src/ui/ribbon/tabsMain.ts`, `packages/tools/src/registry.ts` | “Separador de ambiente/área” e remoção dos botões “Área”/“Limite de área” que estavam “em breve”. |
 | Testes | `areaPlanGeometry.test.ts` (novo), `areaPlanDxf.test.ts` ampliado, `areaPlanOverlay.test.ts`/`areaPlanSelect.test.ts` com a regra somente leitura. |
 
@@ -39,6 +41,7 @@ A F0 foi integrada junto: na planta de área, `select` não move elemento de mod
 - **Delete** na planta de área apaga ambiente (área), separador de ambiente/área e anotações da vista; paredes e demais elementos de modelo continuam bloqueados.
 - **Regra de fusão de áreas:** ao apagar uma parede ou separador no fluxo normal, o app simula a remoção. Se dois ou mais ambientes caírem no mesmo circuito, abre um aviso; confirmar apaga a parede/separador e os ambientes menores na mesma transação, mantendo o de maior área; cancelar não altera nada.
 - **Modo ortogonal global (F8):** o botão da barra de status alterna o modo; enquanto ligado, todo ponto de desenho que passa pelo `infer` fica restrito à projeção em 0°/90°. Shift continua como override momentâneo quando o modo está desligado.
+- **Cotas em desenho:** a parede reta tem só a cota dinâmica de comprimento (editável), sem o rótulo duplicado de comprimento+ângulo; piso/telhado/perímetro usam o ponto capturado e também seguem o ortogonal.
 - Seleção/hover/caixa/fantasmas iguais aos da planta de piso; sem alças de modelo.
 
 ## DXF
@@ -54,11 +57,11 @@ Antes, `opsToDxf` mandava **todo** traço para `AMBIENTES` por heurística de co
 
 - `areaPlanGeometry.test.ts`: 7 testes.
 - `areaPlanDxf.test.ts`: 4 testes; `dxfCad.test.ts`: 9 testes (R12 nos templates).
-- `areaPlanOverlay.test.ts`: 9; `areaPlanSelect.test.ts`: 9; `areaPlan.test.ts`: 19; `planFrame.test.ts`: 21; `areaPlanSheet.test.ts`: 3; `areaPlanAnotacao.test.ts`: 8 (ambiente/separador na área); `areaPlanDelete.test.ts`: 4; `areaMerge.test.ts`: 3; `areaMergeDelete.test.ts`: 2; `orthoLock.test.ts`: 4; `ortho.test.ts`: 1.
+- `areaPlanOverlay.test.ts`: 9; `areaPlanSelect.test.ts`: 9; `areaPlan.test.ts`: 19; `planFrame.test.ts`: 21; `areaPlanSheet.test.ts`: 3; `areaPlanAnotacao.test.ts`: 8 (ambiente/separador na área); `areaPlanDelete.test.ts`: 4; `areaMerge.test.ts`: 3; `areaMergeDelete.test.ts`: 2; `orthoLock.test.ts`: 4; `ortho.test.ts`: 1; `wallDraftDims.test.ts`: 1; `perimeterTool.test.ts`: 21.
 - `ouroZoom.test.ts`: 88 testes, **sem diff de hash** — a planta de piso não mudou.
 - `npx tsc --noEmit`: limpo.
 - `npx eslint packages apps/web/src`: 0 erros; 1 warning pré-existente em `OpeningFlipGrips.tsx:70`.
-- Suíte completa: **696 arquivos, 7.881 testes, todos passando** (341,37 s), incluindo `ouroZoom.test.ts` (88).
+- Suíte completa: **697 arquivos, 7.883 testes, todos passando** (222,71 s), incluindo `ouroZoom.test.ts` (88).
 
 ## Limitações conhecidas
 
@@ -67,6 +70,7 @@ Antes, `opsToDxf` mandava **todo** traço para `AMBIENTES` por heurística de co
 - Objetos importados (`showGeneric`) aparecem na tela, mas não no DXF da área.
 - A projeção de telhado no DXF usa a pegada (`roofProjections`), sem as linhas internas de cumeeira/espigão da tela.
 - A regra de fusão usa a área **antes** da remoção; empate de áreas mantém o ambiente criado primeiro (ordem do nível). Se a remoção abrir o circuito em vez de fundir, não há esse aviso.
+- O ângulo do trecho reto da parede deixou de aparecer; se for desejado depois, entra como `secondary` da mesma cota (em radianos), sem segundo rótulo.
 - Com F8 ligado, o `infer` ignora endpoint/alinhamento/grade concorrentes; Shift continua forçando ortogonal quando o modo está desligado.
 - O `roofProjection` antigo do `PlanProfile` continua existindo por compatibilidade, mas a área usa `roofs: 'projection'`.
 

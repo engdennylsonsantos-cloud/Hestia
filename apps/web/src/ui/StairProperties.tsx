@@ -1,11 +1,15 @@
-import { useMemo, type ReactElement } from 'react';
-import { resolveStairsOnLevel, stairQuantities, stairValidationIssues } from '@hestia/engine';
-import { levelAbove, unitsOf, validateProject, type Id, type Project, type Stair, type StairOpeningMode, type StairSpiralParams, type ValidationIssue } from '@hestia/model';
+import { useMemo, useState, type ReactElement } from 'react';
+import type { Vec2 } from '@hestia/geom';
+import { measureFreeStair, regenStairFree, resolveStairsOnLevel, stairQuantities, stairValidationIssues } from '@hestia/engine';
+import { levelAbove, levelElevation, unitsOf, validateProject, type Id, type Project, type Stair, type StairOpeningMode, type StairSpiralParams, type ValidationIssue } from '@hestia/model';
 import { regenSpiralComponents, regenStraightComponents, spiralInfo, spiralOfStair } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { goToIssue } from '../editor/goToIssue.ts';
+import { I18N, useI18n } from '../editor/i18n.ts';
+import { readLevelKeep } from '../editor/levelActions.ts';
 import { useUi } from '../editor/state.ts';
 import { commonOf, patchStairs } from '../editor/stairActions.ts';
+import { adjustStairFree, applyStairFreeRegen, patchStairFree } from '../editor/stairFreeActions.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { useFormat } from './useUnits.ts';
 import { LevelField } from './LevelField.tsx';
@@ -21,6 +25,11 @@ function issuesOf(p: Project, id: Id): ValidationIssue[] {
   return [...validateProject(p), ...stairValidationIssues(p)].filter((i) => i.elementId === id);
 }
 
+/** Trajeto editável de uma escada livre (2 pontos ou mais), ou null nas demais formas. */
+export function freeStairPath(stair: Stair | null): Vec2[] | null {
+  return stair?.freePath && stair.freePath.length >= 2 ? stair.freePath : null;
+}
+
 /**
  * Propriedades de uma ou mais escadas: tipo, níveis, deslocamentos e abertura da laje (editáveis), quantitativos calculados
  * (só leitura, de uma escada só) e avisos com "Ir para". Cada alteração é uma transação, com um passo de desfazer.
@@ -28,6 +37,7 @@ function issuesOf(p: Project, id: Id): ValidationIssue[] {
 export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
   const fmt = useFormat();
   const p = useProject();
+  const t = I18N[useI18n((s) => s.lang)];
   const ids = stairs.map((s) => s.id);
   const typeId = commonOf(stairs, (s) => s.typeId);
   const base = commonOf(stairs, (s) => s.baseOffset);
@@ -48,6 +58,17 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
   // Caracol: só para uma escada com lance `spiral` (os campos regeneram o croqui; ver `regenSpiralComponents`).
   const spiral = useMemo(() => (single ? spiralOfStair(single) : null), [single]);
   const spiralNums = useMemo(() => (single && spiral ? spiralInfo(p, single, spiral.sp) : null), [p, single, spiral]);
+  // Escada livre: o grupo e os campos de edição só valem para UMA escada com trajeto.
+  const freePath = freeStairPath(single);
+  const freeWidth = useMemo(() => (single && freePath ? (measureFreeStair(single)?.width ?? null) : null), [single, freePath]);
+  const freeInfo = useMemo(() => {
+    if (!freePath || !single) return '';
+    const runs = single.components.filter((c) => c.kind === 'run').length;
+    const landings = single.components.length - runs;
+    const params: Record<string, string> = { n: String(freePath.length), r: String(runs), l: String(landings) };
+    return t.stair_free_path_info.replace(/\{(\w+)\}/g, (_, k: string) => params[k] ?? '');
+  }, [freePath, single, t]);
+  const [adjustMsg, setAdjustMsg] = useState('');
 
   /** Regenera o caracol com as mudanças de um campo, em UM passo de desfazer. Erro vai para a barra de status. */
   const editSpiral = (changes: Partial<StairSpiralParams>): void => {
@@ -83,6 +104,42 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
 
   const patch = (targets: Id[], value: Partial<Stair>): void => patchStairs(editor.store, targets, value);
 
+  /** Campo que muda a altura: na escada livre, grava e regenera o trajeto na MESMA transação. */
+  const patchHeight = (targets: Id[], value: Partial<Stair>): void => {
+    if (!freePath || !single || targets.length !== 1) {
+      patch(targets, value);
+      return;
+    }
+    const r = patchStairFree(editor.store, single.id, value);
+    if (r) useUi.setState({ status: `Escada: ${r.error}` });
+  };
+
+  /** Nível base da escada livre pelo mesmo select do `LevelField`, regenerando o trajeto. */
+  const changeFreeBaseLevel = (levelId: string): void => {
+    if (!single || !levelId) return;
+    const keep = readLevelKeep();
+    const baseOffset = keep === 'elevation' ? single.baseOffset + levelElevation(p, single.levelId) - levelElevation(p, levelId) : single.baseOffset;
+    patchHeight([single.id], { levelId, baseOffset });
+  };
+
+  /** Nova largura do lance da escada livre, regenerando em UM passo de desfazer. */
+  const editFreeWidth = (v: number): void => {
+    if (!single) return;
+    const r = regenStairFree(single, p, { width: v });
+    if ('error' in r) {
+      useUi.setState({ status: `Escada: ${r.error}` });
+      return;
+    }
+    applyStairFreeRegen(editor.store, single.id, r, 'Editar escada');
+  };
+
+  /** Botão "Ajustar": otimiza a escada livre à regra de Blondel do tipo em UMA transação "Ajustar escada". */
+  const adjust = (): void => {
+    if (!single) return;
+    const r = adjustStairFree(editor.store, single.id);
+    setAdjustMsg('error' in r ? `Escada: ${r.error}` : r.message);
+  };
+
   return (
     <>
       <TypeSelector
@@ -92,22 +149,30 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
         options={stairOptions(p)}
         selectedId={typeId.mixed ? null : typeId.value}
         editDisabled={typeId.mixed}
-        onSelect={(id) => patch(ids, { typeId: id })}
+        onSelect={(id) => patchHeight(ids, { typeId: id })}
         onEdit={() => useUi.setState({ dialog: 'stairType', dialogArg: typeId.value })}
       />
       <Group title="Restrições">
-        <LevelField ids={ids} label="Nível base" />
+        {freePath && single ? (
+          <Row label="Nível base" htmlFor="p-sbaselevel">
+            <select id="p-sbaselevel" className="select" value={single.levelId} onChange={(e) => changeFreeBaseLevel(e.target.value)}>
+              {p.levels.map((l) => <option key={l.id} value={l.id}>{`${l.name} · ${fmt('length', l.elevation)}`}</option>)}
+            </select>
+          </Row>
+        ) : (
+          <LevelField ids={ids} label="Nível base" />
+        )}
         <Row label="Nível de topo" htmlFor="p-stop">
-          <select id="p-stop" className="select" value={top.mixed ? '' : top.value} onChange={(e) => patch(ids, { topLevelId: e.target.value || null })}>
+          <select id="p-stop" className="select" value={top.mixed ? '' : top.value} onChange={(e) => patchHeight(ids, { topLevelId: e.target.value || null })}>
             {top.mixed && <option value="">variados</option>}
             <option value="">Automático (nível acima)</option>
             {p.levels.map((l) => <option key={l.id} value={l.id}>Até {l.name}</option>)}
           </select>
         </Row>
-        <Row label="Desloc. da base" htmlFor="p-sbase"><NumField id="p-sbase" value={base.value} mixed={base.mixed} onCommit={(v) => patch(ids, { baseOffset: v })} quantity="length" /></Row>
-        <Row label="Desloc. do topo" htmlFor="p-stopoff"><NumField id="p-stopoff" value={topOff.value} mixed={topOff.mixed} onCommit={(v) => patch(ids, { topOffset: v })} quantity="length" /></Row>
+        <Row label="Desloc. da base" htmlFor="p-sbase"><NumField id="p-sbase" value={base.value} mixed={base.mixed} onCommit={(v) => patchHeight(ids, { baseOffset: v })} quantity="length" /></Row>
+        <Row label="Desloc. do topo" htmlFor="p-stopoff"><NumField id="p-stopoff" value={topOff.value} mixed={topOff.mixed} onCommit={(v) => patchHeight(ids, { topOffset: v })} quantity="length" /></Row>
         {!top.mixed && top.value === '' && noLevelAbove && (
-          <Row label="Altura" htmlFor="p-sheight"><NumField id="p-sheight" value={height.value} mixed={height.mixed} min={0.1} onCommit={(v) => patch(ids, { height: Math.max(0.1, v) })} quantity="length" /></Row>
+          <Row label="Altura" htmlFor="p-sheight"><NumField id="p-sheight" value={height.value} mixed={height.mixed} min={0.1} onCommit={(v) => patchHeight(ids, { height: Math.max(0.1, v) })} quantity="length" /></Row>
         )}
         <Row label="Abertura da laje" htmlFor="p-sopenmode">
           <select id="p-sopenmode" className="select" value={openingMode.mixed ? '' : openingMode.value} onChange={(e) => e.target.value && patch(ids, { openingMode: e.target.value as StairOpeningMode })}>
@@ -133,6 +198,18 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
         <Row label="Folga lateral" htmlFor="p-sopenm"><NumField id="p-sopenm" value={openingMargin.value} mixed={openingMargin.mixed} disabled={noOpening} min={0} quantity="length" onCommit={(v) => patch(ids, { openingMargin: v })} /></Row>
         <Row label="Furo retangular" htmlFor="p-sopenrect"><Check id="p-sopenrect" checked={openingRect.value} mixed={openingRect.mixed} disabled={noOpening} onChange={(v) => patch(ids, { openingRect: v })} /></Row>
       </Group>
+      {freePath && single && (
+        <Group title={t.stair_free_group}>
+          <Row label={t.stair_free_group} readOnly><span className="val">{freeInfo}</span></Row>
+          <Row label={t.stair_free_width} htmlFor="p-sfreewidth">
+            <NumField id="p-sfreewidth" value={freeWidth} min={0.1} unit="m" onCommit={(v) => editFreeWidth(v)} />
+          </Row>
+          <Row label={t.stair_adjust}>
+            <button id="p-sadjust" className="chiplink" title={t.stair_adjust_title} onClick={adjust}>{t.stair_adjust}</button>
+          </Row>
+          {adjustMsg && <div className="hint" role="status">{adjustMsg}</div>}
+        </Group>
+      )}
       {spiral && spiralNums && (
         <Group title="Caracol">
           <Row label="Raio interno" htmlFor="p-spin">

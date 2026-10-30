@@ -17,13 +17,15 @@ const BOX: CSSProperties = {
   position: 'absolute',
   width: 62,
   height: 22,
-  padding: '0 4px',
+  padding: 0,
   textAlign: 'center',
   fontSize: 11,
   fontFamily: 'var(--font-mono)',
-  border: '1px solid var(--accent)',
-  borderRadius: 4,
-  background: 'var(--panel)',
+  border: 'none',
+  borderRadius: 0,
+  background: 'transparent',
+  boxShadow: 'none',
+  outline: 'none',
   color: 'var(--accent)',
   pointerEvents: 'auto',
   zIndex: 13,
@@ -163,7 +165,7 @@ export function TempDimsOverlay(): ReactElement | null {
               aria-label={`Cota: ${dim.key.split(':').pop()}`}
               title={view.editable ? 'Digite a medida e pressione Enter' : 'Cota de leitura'}
               readOnly={!view.editable}
-              style={{ ...BOX, width, left: view.textAt.x - width / 2, top: view.textAt.y - 11, pointerEvents: captures(valueRect(view.textAt, width), 0), ...(view.invalid ? { borderColor: DANGER, color: DANGER } : {}) }}
+              style={{ ...BOX, width, left: view.textAt.x, top: view.textAt.y, transform: `translate(-50%, -50%) rotate(${-(view.textRotation ?? 0)}deg)`, appearance: 'none', lineHeight: '22px', textShadow: '0 0 2px var(--panel), 0 0 3px var(--panel)', pointerEvents: captures(valueRect(view.textAt, width), 0), ...(view.invalid ? { color: DANGER } : {}) }}
               value={texto}
               onPointerDown={stop}
               onPointerUp={stop}

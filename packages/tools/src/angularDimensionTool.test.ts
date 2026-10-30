@@ -19,7 +19,7 @@ describe('Cota angular', () => {
     tool.start();
     clickAt(tool, 1.2, 0.01);
     clickAt(tool, 0.01, 1.2);
-    clickAt(tool, 1, 1);
+    clickAt(tool, -1, -1);
     const dims = levelDimensions(store.project, 'lv_0');
     expect(dims).toHaveLength(1);
     expect(dims[0]!.angular).toBeDefined();
@@ -71,21 +71,23 @@ describe('Cota angular', () => {
     return made;
   };
 
-  it('escolhe o lado pelo cursor: interno = menor, externo = maior, sem seletor', () => {
+  it('escolhe o lado pelo cursor: interno = menor, externo = volta >180°, sem seletor', () => {
     const { store, env } = crossing();
     const tool = createTool('angularDimension', env);
     tool.start();
     clickAt(tool, 1.2, 0);
     clickAt(tool, 1.2 * Math.cos(72.7 * deg), 1.2 * Math.sin(72.7 * deg));
-    // Cursor fora do setor de 72,7°: o lado externo é o maior (107,3°).
+    // Cursor fora do setor de 72,7°: o lado externo é a volta de 252,7°.
     clickAt(tool, 0, 1.5);
     const dims = levelDimensions(store.project, 'lv_0');
     expect(dims).toHaveLength(1);
     const a = dims[0]!.angular!;
-    expect(a.side).toBe('major');
-    expect(a.value).toBeCloseTo(107.3 * deg, 4);
+    expect(a.side).toBe('reflex');
+    expect(a.base).toBe('major');
+    expect(a.value).toBeCloseTo(252.7 * deg, 4);
     const g = angularDimensionGeometry(dims[0]!)!;
-    expect(g.value).toBeCloseTo(107.3 * deg, 4);
+    expect(g.value).toBeGreaterThan(Math.PI);
+    expect(g.value).toBeCloseTo(252.7 * deg, 4);
     expect(store.project.elements['w1']).toBeDefined();
     expect(store.project.elements['w2']).toBeDefined();
   });

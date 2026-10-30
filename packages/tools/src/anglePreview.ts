@@ -23,6 +23,12 @@ export interface DraftLine {
   b: Vec2;
 }
 
+export interface WallBand {
+  a: Vec2;
+  b: Vec2;
+  thickness: number;
+}
+
 const distToSegment = (q: Vec2, a: Vec2, b: Vec2): number => {
   const d = sub(b, a);
   const l2 = dot(d, d);
@@ -76,12 +82,13 @@ const away = (line: DraftLine, joint: Vec2): Vec2 => {
 };
 
 /** Tenta posições ao longo do arco para o texto não cair em cima da ponta em criação. */
-function labelAt(center: Vec2, angle: number, sweep: number, radius: number, avoid: Vec2[], mpp: number): Vec2 {
+function labelAt(center: Vec2, angle: number, sweep: number, radius: number, avoid: Vec2[], mpp: number, band?: WallBand): Vec2 {
   const clearance = Math.max(0.05, 26 * mpp);
+  const free = (q: Vec2): boolean => avoid.every((p) => dist(q, p) > clearance) && (!band || distToSegment(q, band.a, band.b) > band.thickness / 2 + clearance);
   for (const f of [0, 0.18, -0.18, 0.34, -0.34]) {
     const a = angle + sweep * f;
     const at = add(center, v2(Math.cos(a) * (radius + Math.max(0.12, radius * 0.12)), Math.sin(a) * (radius + Math.max(0.12, radius * 0.12))));
-    if (avoid.every((q) => dist(at, q) > clearance)) return at;
+    if (free(at)) return at;
   }
   const a = angle + sweep * 0.5;
   return add(center, v2(Math.cos(a) * (radius * 1.35), Math.sin(a) * (radius * 1.35)));
@@ -99,6 +106,8 @@ export function draftAngleItems(opts: {
   mpp: number;
   units: ResolvedUnits;
   avoid?: Vec2[];
+  /** Faixa da parede que está sendo criada; o texto não pode cair dentro dela. */
+  band?: WallBand;
 }): PreviewItem[] {
   const { joint, current, mpp, units } = opts;
   if (!opts.previous || dist(joint, current) < 0.01) return [];
@@ -120,7 +129,7 @@ export function draftAngleItems(opts: {
     prev = q;
   }
   const mid = start + (sign * value) / 2;
-  const textAt = labelAt(joint, mid, sign * value, radius, [...(opts.avoid ?? []), current, joint], mpp);
+  const textAt = labelAt(joint, mid, sign * value, radius, [...(opts.avoid ?? []), current, joint], mpp, opts.band);
   out.push({ kind: 'label', at: textAt, text: formatQuantity(units, 'angle', value) });
   return out;
 }
@@ -134,9 +143,10 @@ export function draftAngleItemsForConnection(
   current: Vec2,
   mpp: number,
   units: ResolvedUnits,
+  band?: WallBand,
 ): PreviewItem[] {
   const previous = connectedLineAt(p, levelId, joint, mpp, planId);
-  return draftAngleItems({ previous, joint, current, mpp, units, avoid: [current] });
+  return draftAngleItems({ previous, joint, current, mpp, units, avoid: [current], ...(band ? { band } : {}) });
 }
 
 /** Atalho para ferramentas que já têm um segmento anterior no próprio rascunho. */

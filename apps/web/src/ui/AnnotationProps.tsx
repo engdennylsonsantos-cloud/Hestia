@@ -122,12 +122,13 @@ export function angularSidePatch(a: AngularDimension, side: AngularDimensionSide
   if (side === a.side) return {};
   const flip = (v: { x: number; y: number }): { x: number; y: number } => ({ x: -v.x, y: -v.y });
   if (side === 'reflex') {
-    const base = a.side === 'reflex' ? a.base ?? 'minor' : a.side;
-    return { side, base, to: a.to, value: Math.PI * 2 - a.value };
+    // "Maior (externo)" é a volta que complementa o suplementar: 360° − (180° − interno) = 180° + interno.
+    const to = a.side === 'major' ? a.to : a.side === 'reflex' ? a.to : flip(a.to);
+    const majorValue = a.side === 'major' ? a.value : a.side === 'reflex' ? Math.PI * 2 - a.value : Math.PI - a.value;
+    return { side, base: 'major', to, value: Math.PI * 2 - majorValue };
   }
   if (a.side === 'reflex') {
-    const base = a.base ?? 'minor';
-    if (side === base) return { side, base: undefined, to: a.to, value: Math.PI * 2 - a.value };
+    if (side === 'major') return { side, base: undefined, to: a.to, value: Math.PI * 2 - a.value };
     return { side, base: undefined, to: flip(a.to), value: a.value - Math.PI };
   }
   return { side, to: flip(a.to), value: Math.PI - a.value };
@@ -150,7 +151,7 @@ export function AnnotationProps({ dim, text, line, region, tag, planId }: NotaSe
           <Row label="Texto" htmlFor="p-dtext">
             <TextField id="p-dtext" value={dim.text ?? ''} placeholder={formatDimension(shown, 0, units)} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { text: v.trim() === '' ? undefined : v } }))} />
           </Row>
-          <Row label="Lado"><select className="select" value={a.side} onChange={(e) => patchAngular(angularSidePatch(a, e.target.value as AngularDimensionSide))}><option value="minor">Menor</option><option value="major">Maior</option>{a.side === 'reflex' && <option value="reflex">Volta (360° − ângulo)</option>}</select></Row>
+          <Row label="Lado"><select className="select" value={a.side} onChange={(e) => patchAngular(angularSidePatch(a, e.target.value as AngularDimensionSide))}><option value="minor">Menor (interno)</option><option value="reflex">Maior (externo/360°)</option>{a.side === 'major' && <option value="major">Maior (suplementar)</option>}</select></Row>
           <Row label="Raio" htmlFor="p-dradius"><NumField id="p-dradius" value={a.radius} decimals={2} quantity="length" min={0.01} onCommit={(v) => patchAngular({ radius: v })} /></Row>
           <Row label="Casas decimais"><select className="select" value={dim.precision ?? 2} onChange={(e) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { precision: Number(e.target.value) as 0 | 1 | 2 | 3 } }))}><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></Row>
           <Row label="Altura do texto" htmlFor="p-dheight">{/* units-ok: altura em mm, como no campo da cota linear */}<NumField id="p-dheight" value={dim.textHeight ?? 2.5} decimals={1} unit="mm" min={0.5} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { textHeight: v } }))} /></Row>

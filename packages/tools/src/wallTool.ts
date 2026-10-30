@@ -175,7 +175,7 @@ export class WallTool extends ToolBase {
     const l = dist(a, b);
     if (l < 1e-6) return;
     this.items.push({ kind: 'wallBand', a, b, thickness, sMid });
-    this.items.push(...draftAngleItemsForConnection(this.env.project(), this.env.levelId(), this.env.areaPlanId?.(), a, b, this.env.metersPerPixel(), unitsOf(this.env.project())));
+    this.items.push(...draftAngleItemsForConnection(this.env.project(), this.env.levelId(), this.env.areaPlanId?.(), a, b, this.env.metersPerPixel(), unitsOf(this.env.project()), { a, b, thickness }));
     // Trecho reto: a cota dinâmica (`tempDims`) é a única leitura, só comprimento — sem rótulo duplicado nem ângulo.
     this.env.say(this.isArc() ? 'Clique no ponto final da corda.' : 'Clique para terminar a parede, ou digite o comprimento e Enter.');
   }

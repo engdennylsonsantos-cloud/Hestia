@@ -61,4 +61,16 @@ describe('ângulo dinâmico universal', () => {
     expect(angle).toBeDefined();
     expect(Math.hypot(angle.at.x - 1, angle.at.y - 0.15)).toBeGreaterThan(0.02);
   });
+
+  it('o texto angular da parede fica fora da faixa da parede', () => {
+    const ctx = wallAtOrigin();
+    const t = tool('wall', ctx.env);
+    t.move(P(2, 0));
+    t.click(P(2, 0));
+    t.move(P(2, 1));
+    const labels = t.preview().filter((i) => i.kind === 'label') as Array<{ at: { x: number; y: number }; text: string }>;
+    const angle = labels.find((l) => l.text.includes('°'))!;
+    expect(angle).toBeDefined();
+    expect(Math.abs(angle.at.x - 2)).toBeGreaterThan(0.1);
+  });
 });

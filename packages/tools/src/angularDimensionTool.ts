@@ -61,7 +61,7 @@ function intersection(a: Vec2, da: Vec2, b: Vec2, db: Vec2): Vec2 | null {
 export class AngularDimensionTool extends ToolBase {
   readonly id = 'angularDimension';
   readonly label = 'Cota angular';
-  readonly hint = 'Cota angular: clique na primeira referência, depois na segunda. Mova o cursor para escolher o lado (interno = menor, externo = maior) e o raio do arco; clique para criar. Tab alterna a referência.';
+  readonly hint = 'Cota angular: clique na primeira referência, depois na segunda. Mova o cursor para escolher o lado (interno = menor, externo = volta >180°) e o raio do arco; clique para criar. Tab alterna a referência.';
   private refA: AlignFeature | null = null;
   private refB: AlignFeature | null = null;
   private hover: AlignFeature[] = [];
@@ -149,16 +149,38 @@ export class AngularDimensionTool extends ToolBase {
     return Math.abs(wrapPi(cursorAngle - angleOf(from))) <= minor ? 'minor' : 'major';
   }
 
-  /** Dados da cota no lado escolhido pelo cursor: interno = menor; externo = maior. */
+  /** Raio limitado ao trecho visível das referências: o arco não ultrapassa as linhas selecionadas. */
+  private radiusAt(g: { center: Vec2; a: RefLine; b: RefLine }, cursor: Vec2): number {
+    const p = this.env.project();
+    const maxFor = (r: RefLine): number => {
+      const f = r.feature;
+      const segs = f.seg ? [f.seg.a, f.seg.b] : (() => {
+        const w = p.elements[f.ownerId];
+        return w && w.kind === 'wall' ? [w.a, w.b] : [];
+      })();
+      let max = Infinity;
+      for (const q of segs) {
+        const d = dot(sub(q, g.center), r.to);
+        if (d > 1e-6) max = Math.min(max, d);
+      }
+      return max;
+    };
+    const limit = Math.min(maxFor(g.a), maxFor(g.b));
+    const wanted = Math.max(MIN_RADIUS, dist(cursor, g.center));
+    return Number.isFinite(limit) ? Math.min(wanted, Math.max(MIN_RADIUS, limit * 0.92)) : wanted;
+  }
+
+  /** Dados da cota no lado escolhido pelo cursor: interno = menor; externo = volta >180°. */
   private angularData(g: { center: Vec2; a: RefLine; b: RefLine }, radius: number, cursor: Vec2): AngularDimension {
-    const side: AngularDimensionSide = this.sideAt(g.center, g.a.to, g.b.to, cursor);
-    return angularDimensionData(g.center, g.a.to, g.b.to, radius, side, this.refA!.key, this.refB!.key);
+    const base = this.sideAt(g.center, g.a.to, g.b.to, cursor);
+    const side: AngularDimensionSide = base === 'major' ? 'reflex' : 'minor';
+    return angularDimensionData(g.center, g.a.to, g.b.to, radius, side, this.refA!.key, this.refB!.key, base);
   }
 
   private makePreview(cursor: Vec2): void {
     const g = this.geometry();
     if (!g) { this.previewDim = null; return; }
-    const radius = Math.max(MIN_RADIUS, dist(cursor, g.center));
+    const radius = this.radiusAt(g, cursor);
     const angular = this.angularData(g, radius, cursor);
     const o = this.env.options();
     const dim: Dimension = {
@@ -221,7 +243,7 @@ export class AngularDimensionTool extends ToolBase {
     if (this.placing) {
       const g = this.geometry();
       if (!g || !this.previewDim?.angular) { this.env.say('As referências não formam um ângulo.'); return; }
-      const radius = Math.max(MIN_RADIUS, dist(p.raw, g.center));
+      const radius = this.radiusAt(g, p.raw);
       const angular = this.angularData(g, radius, p.raw);
       const o = this.env.options();
       const dimension: Dimension = {

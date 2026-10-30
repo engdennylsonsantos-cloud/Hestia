@@ -133,12 +133,12 @@ describe('cota angular: lado Volta', () => {
     expect(back.to).toEqual(major.to);
   });
 
-  it('de Menor (72,7°) para Volta dá 287,3° (2π − θ)', () => {
+  it('de Menor (72,7°) para Volta dá 252,7° (360° − suplementar)', () => {
     const to = { x: Math.cos(72.7 * deg), y: Math.sin(72.7 * deg) };
     const minor = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, to, 1.5, 'minor', 'a', 'b');
     const patch = angularSidePatch(minor, 'reflex');
-    expect(patch.base).toBe('minor');
-    expect(patch.value).toBeCloseTo(287.3 * deg, 9);
+    expect(patch.base).toBe('major');
+    expect(patch.value).toBeCloseTo(252.7 * deg, 9);
   });
 
   it('o seletor Lado oferece apenas Menor e Maior', () => {

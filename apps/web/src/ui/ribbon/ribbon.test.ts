@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { TOOL_LABEL } from '@hestia/tools';
 import { createEmptyProject, type Project } from '@hestia/model';
+import { useUi } from '../../editor/state.ts';
 import { ACTIONS, type RibbonCtx } from './actions.ts';
+import { allCommands } from './commandSearch.ts';
 import { contextTab, perimeterTab } from './context.ts';
-import { txt, type RibbonItem, type RibbonPanel } from './model.ts';
+import { txt, type RibbonItem, type RibbonPanel, type Txt } from './model.ts';
 import { TABS, TAB_ORDER } from './tabs.ts';
 
 const leaves = (items: RibbonItem[]): RibbonItem[] =>
@@ -49,6 +51,28 @@ describe('faixa guiada por dados', () => {
       if ((ctx as readonly string[]).includes(id) || (pendente as readonly string[]).includes(id)) continue;
       expect(naFaixa.has(id as never), id).toBe(true);
     }
+  });
+});
+
+describe('unidades do projeto na faixa', () => {
+  it('ACTIONS.units abre o diálogo de unidades', () => {
+    expect(ACTIONS.units).toBeDefined();
+    useUi.setState({ dialog: null, dialogArg: null });
+    ACTIONS.units.run();
+    expect(useUi.getState().dialog).toBe('units');
+  });
+
+  it('a aba Gerenciar tem a ação "units" e não tem mais o item "soon"', () => {
+    const gerenciar = TABS.find((tb) => tb.id === 'gerenciar');
+    const itens = leaves(gerenciar!.panels.flatMap((p) => p.items));
+    expect(itens.some((it) => it.kind === 'action' && it.action === 'units')).toBe(true);
+    const soonUnidades = itens.filter((it) => it.kind === 'soon' && txt(it.label, 'pt') === 'Unidades do projeto');
+    expect(soonUnidades).toHaveLength(0);
+  });
+
+  it('a busca de comandos encontra "Unidades do projeto"', () => {
+    const nomes = allCommands('pt').map((c) => c.label);
+    expect(nomes).toContain('Unidades do projeto');
   });
 });
 
@@ -104,5 +128,53 @@ describe('perímetro na faixa', () => {
   it('"Editar perímetro" fica desabilitado sem elemento editável, com o motivo', () => {
     expect(ACTIONS.editPerimeter.disabled?.({ p, selection: [] } as unknown as RibbonCtx)).toBeTruthy();
     expect(ACTIONS.editPerimeter.disabled?.({ p: comRoof, selection: ['r1'] } as unknown as RibbonCtx)).toBe(false);
+  });
+});
+
+describe('copiar, recortar, colar e criar semelhante na faixa', () => {
+  const p = createEmptyProject('vazio');
+  /** Parede mínima: só o que Copiar/Recortar/Criar semelhante olham (id, tipo de elemento e tipo). */
+  const comParede = { ...p, elements: { w1: { id: 'w1', kind: 'wall', typeId: 'wt_alv14' } } } as unknown as Project;
+  const comJanela = { ...p, elements: { j1: { id: 'j1', kind: 'window', typeId: 'jan_120' } } } as unknown as Project;
+  const ctx = (o: { p?: Project; selection?: string[]; view?: string }): RibbonCtx => ({ p, selection: [], ...o } as unknown as RibbonCtx);
+
+  it('as quatro ações estão na faixa', () => {
+    const acoes = leaves(allPanels().flatMap((pn) => pn.items)).flatMap((it) => (it.kind === 'action' ? [it.action] : []));
+    expect(acoes).toEqual(expect.arrayContaining(['copySelection', 'cutSelection', 'pasteAligned', 'createSimilar']));
+  });
+
+  it('Copiar fica desabilitado sem seleção e liberado com uma parede', () => {
+    expect(ACTIONS.copySelection.disabled?.(ctx({}))).toBeTruthy();
+    expect(ACTIONS.copySelection.disabled?.(ctx({ p: comParede, selection: ['w1'] }))).toBe(false);
+  });
+
+  it('Copiar fica desabilitado para uma janela sozinha (sem a parede hospedeira)', () => {
+    expect(ACTIONS.copySelection.disabled?.(ctx({ p: comJanela, selection: ['j1'] }))).toBeTruthy();
+  });
+
+  it('Recortar fica desabilitado sem seleção, liberado com parede e barrado com id inexistente', () => {
+    expect(ACTIONS.cutSelection.disabled?.(ctx({}))).toBeTruthy();
+    expect(ACTIONS.cutSelection.disabled?.(ctx({ p: comParede, selection: ['w1'] }))).toBe(false);
+    // Aberturas hospedadas entram em `copyableIds` sem estarem na seleção: a comparação é id a id, não por tamanho.
+    expect(ACTIONS.cutSelection.disabled?.(ctx({ p: comParede, selection: ['w1', 'nao_existe'] }))).toBeTruthy();
+  });
+
+  it('Colar avisa que nada foi copiado (buffer vazio neste arquivo) e que não vale para pranchas', () => {
+    const semBuffer = ACTIONS.pasteAligned.disabled?.(ctx({ view: 'plan' }));
+    expect(semBuffer).toBeTruthy();
+    expect(txt(semBuffer as Txt, 'pt')).toContain('Nada copiado');
+    const prancha = ACTIONS.pasteAligned.disabled?.(ctx({ view: 'sheet' }));
+    expect(prancha).toBeTruthy();
+    expect(txt(prancha as Txt, 'pt')).toContain('pranchas');
+  });
+
+  it('Criar semelhante fica desabilitado sem seleção e liberado com uma parede', () => {
+    expect(ACTIONS.createSimilar.disabled?.(ctx({}))).toBeTruthy();
+    expect(ACTIONS.createSimilar.disabled?.(ctx({ p: comParede, selection: ['w1'] }))).toBe(false);
+  });
+
+  it('a busca de comandos encontra Copiar, Recortar, Colar e Criar semelhante', () => {
+    const nomes = allCommands('pt').map((c) => c.label);
+    expect(nomes).toEqual(expect.arrayContaining(['Copiar', 'Recortar', 'Colar', 'Criar semelhante']));
   });
 });

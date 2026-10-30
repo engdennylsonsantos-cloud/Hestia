@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, makeLevel, openingsOfWall, wallsOnLevel, type Opening, type Wall } from '@hestia/model';
-import { clipboardFrom, pasteAlignedCommand } from './clipboard.ts';
+import { ProjectStore, makeCeiling, makeLevel, openingsOfWall, wallsOnLevel, type Generic, type Opening, type Wall } from '@hestia/model';
+import { clipboardFrom, copyableIds, pasteAlignedCommand } from './clipboard.ts';
 import { drawWall, makeEnv, tool } from './testEnv.ts';
 
 /** Projeto com dois níveis; lv_1 é o destino. Paredes: uma reta com porta, outra em L. */
@@ -16,6 +16,9 @@ function build() {
 }
 
 const onLevel = (s: ProjectStore, id: string): Wall[] => wallsOnLevel(s.project, id);
+
+/** Porta criada por `build()`, hospedada na primeira parede. */
+const doorOf = (s: ProjectStore) => Object.values(s.project.elements).find((e) => e.kind === 'door')!;
 
 describe('copiar e colar alinhado (F7)', () => {
   it('cola no outro nível nas mesmas coordenadas, com ids e ordem novos', () => {
@@ -100,5 +103,46 @@ describe('copiar e colar alinhado (F7)', () => {
     expect(r.openingIds).toHaveLength(0);
     store.exec(r.command);
     expect(onLevel(store, 'lv_1')[0]!.typeId).toBe(store.project.defaults.wallTypeId);
+  });
+});
+
+describe('ids que o Copiar levaria (copyableIds)', () => {
+  it('parede com porta hospedada leva a porta; parede sem porta leva só a parede', () => {
+    const { store } = build();
+    const [comPorta, semPorta] = onLevel(store, 'lv_0');
+    expect(copyableIds(store.project, [comPorta!.id])).toEqual([comPorta!.id, doorOf(store).id]);
+    expect(copyableIds(store.project, [semPorta!.id])).toEqual([semPorta!.id]);
+  });
+
+  it('porta sozinha não é copiável: sem a parede anfitriã não há como colar', () => {
+    const { store } = build();
+    expect(copyableIds(store.project, [doorOf(store).id])).toEqual([]);
+  });
+
+  it('forro, objeto genérico, grade, anotação e separador de ambiente ficam de fora', () => {
+    const { store } = build();
+    store.exec({ type: 'addCeiling', ceiling: makeCeiling({ id: 'c1', typeId: 'ct_gesso', levelId: 'lv_0', boundary: [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 2 }] }) });
+    store.exec({ type: 'addText', levelId: 'lv_0', text: { id: 't1', at: { x: 0, y: 0 }, text: 'nota', height: 2.5, rotation: 0 } });
+    store.exec({ type: 'addRoomSeparator', levelId: 'lv_0', separator: { id: 'sep1', a: { x: 0, y: 2 }, b: { x: 2, y: 2 } } });
+    store.exec({ type: 'addGrid', grid: { id: 'gr1', name: '1', typeId: 'gt_6mm', points: [{ x: 0, y: 0 }, { x: 0, y: 5 }], sag: 0, bubbleStart: true, bubbleEnd: true } });
+    const generico: Generic = { id: 'g1', kind: 'generic', levelId: 'lv_0', name: 'Viga', sourceClass: 'IFCBEAM', mesh: { positions: [], indices: [] }, order: 1 };
+    const p = { ...store.project, elements: { ...store.project.elements, g1: generico } };
+    expect(copyableIds(p, ['c1', 't1', 'sep1', 'gr1', 'g1'])).toEqual([]);
+    // Com uma parede junto, só a parede (e suas aberturas) sobra.
+    expect(copyableIds(p, ['c1', onLevel(store, 'lv_0')[1]!.id])).toEqual([onLevel(store, 'lv_0')[1]!.id]);
+  });
+
+  it('ids inexistentes e duplicatas não aparecem; a ordem é a da seleção e depois as aberturas', () => {
+    const { store } = build();
+    const [w1, w2] = onLevel(store, 'lv_0');
+    expect(copyableIds(store.project, ['zzz'])).toEqual([]);
+    expect(copyableIds(store.project, [w1!.id, w1!.id, 'zzz', w2!.id])).toEqual([w1!.id, w2!.id, doorOf(store).id]);
+  });
+
+  it('bate com o que clipboardFrom realmente copia', () => {
+    const { store } = build();
+    const ids = onLevel(store, 'lv_0').map((w) => w.id);
+    const clip = clipboardFrom(store.project, ids)!;
+    expect(copyableIds(store.project, ids)).toEqual([...clip.walls.map((w) => w.id), ...clip.openings.map((o) => o.id)]);
   });
 });

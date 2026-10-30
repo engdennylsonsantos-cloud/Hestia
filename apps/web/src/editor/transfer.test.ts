@@ -130,3 +130,30 @@ describe('copiar e colar escada (controlador web)', () => {
     expect(stairsOnLevel(s.project, 'lv_0')).toHaveLength(1);
   });
 });
+
+describe('estado do buffer e ids que o Copiar levaria', () => {
+  it('hasClip é falso antes de copiar e verdadeiro depois', () => {
+    const s = setup();
+    const t = new Transfer();
+    expect(t.hasClip()).toBe(false);
+    expect(t.copy(s.project, ['A'])).toBe(true);
+    expect(t.hasClip()).toBe(true);
+  });
+
+  it('seleção mista continua copiando o que é copiável; sem nada copiável o buffer segue vazio', () => {
+    const s = setup();
+    const t = new Transfer();
+    expect(t.copy(s.project, ['nada', 'zzz'])).toBe(false);
+    expect(t.hasClip()).toBe(false);
+    expect(t.copy(s.project, ['A', 'zzz'])).toBe(true);
+    expect(t.hasClip()).toBe(true);
+  });
+
+  it('copyableIds delega à função pura: paredes, aberturas hospedadas e nada de ids inválidos', () => {
+    const s = setup();
+    s.exec({ type: 'addOpening', opening: { id: 'd1', kind: 'door', typeId: 'ot_p80', hostId: 'A', offset: 1, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+    const t = new Transfer();
+    expect(t.copyableIds(s.project, ['A', 'A', 'zzz'])).toEqual(['A', 'd1']);
+    expect(t.copyableIds(s.project, [])).toEqual([]);
+  });
+});

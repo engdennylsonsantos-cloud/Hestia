@@ -3,12 +3,14 @@ import type { PerimeterModifyKind, ToolOptions } from '@hestia/tools';
 import { tagAllNotTagged } from '../../editor/tagActions.ts';
 import { addMissingTagsAction } from '../../editor/areaPlanActions.ts';
 import { editor } from '../../editor/controller.ts';
+import { createSimilarTarget, startCreateSimilar } from '../../editor/createSimilar.ts';
 import { resetDock, setDock } from '../../editor/dockActions.ts';
 import type { DockLayout, DockPanel, DockSide } from '../../editor/dockLayout.ts';
 import { editThinLines, thinLinesOn } from '../../editor/graphicsActions.ts';
 import { perimeterActions } from '../../editor/perimeter.ts';
 import { addSheetAction } from '../../editor/sheetActions.ts';
 import { setSnap, toggleRoofProjection, useUi, type DialogKind, type UiState } from '../../editor/state.ts';
+import { transfer } from '../../editor/transfer.ts';
 import { activateView } from '../../editor/viewTabActions.ts';
 import { applyDrop } from '../dockDrag.ts';
 import { gridToolOf } from '../gridUi.ts';
@@ -92,6 +94,11 @@ function typeDialogFor(c: RibbonCtx): { dialog: DialogKind; arg: string } | null
 
 const planOrSection = (c: RibbonCtx): boolean => c.view === 'plan' || c.view === 'section';
 const noSel = (c: RibbonCtx): Txt | false => (c.selection.length === 0 ? t('Selecione elementos primeiro.', 'Select elements first.') : false);
+/** Copiar/Recortar só valem para o que o buffer leva; forro, anotação, grade e id inexistente ficam de fora. */
+const naoTransferivel = (verbo: 'Copiar' | 'Recortar'): Txt => t(
+  `${verbo} só vale para paredes, pisos, lajes, telhados, escadas, rampas, ambientes e aberturas hospedadas (com a parede selecionada).`,
+  `${verbo === 'Copiar' ? 'Copy' : 'Cut'} only works for walls, floors, slabs, roofs, stairs, ramps, rooms and hosted openings (with the host wall selected).`,
+);
 const stairsIn = (c: RibbonCtx): Array<{ typeId: Id }> => c.selection.map((id) => c.p.elements[id]).filter(isStair);
 const rampsIn = (c: RibbonCtx): Ramp[] => c.selection.map((id) => c.p.elements[id]).filter(isRamp);
 
@@ -189,6 +196,15 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     run: () => { editor.selectAllOfSelectedName(); },
     disabled: (c) => (c.selection.some((id) => isRoom(c.p.elements[id])) ? false : t('Selecione um ambiente primeiro.', 'Select a room first.')),
   },
+  createSimilar: {
+    label: t('Criar semelhante', 'Create Similar'),
+    icon: 'copy',
+    hint: t('Ativa a ferramenta do elemento selecionado, já com o tipo dele.', 'Starts the tool of the selected element with its type.'),
+    run: () => { startCreateSimilar(); },
+    disabled: (c) => (createSimilarTarget(c.p, c.selection)
+      ? false
+      : t('Selecione um elemento de um só tipo (parede, porta, janela, piso, laje, forro ou telhado).', 'Select one element of a single type (wall, door, window, floor, slab, ceiling or roof).')),
+  },
   moveLevel: {
     label: t('Nível…', 'Level…'),
     icon: 'layers',
@@ -205,6 +221,47 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
       if (id) perimeterActions.edit(id);
     },
     disabled: (c) => (idPerimetroEditavel(c.p, c.selection) ? false : t('Selecione um telhado, piso, laje ou forro', 'Select a roof, floor, slab or ceiling')),
+  },
+  copySelection: {
+    label: t('Copiar', 'Copy'),
+    icon: 'copy',
+    hint: t('Copia a seleção; Ctrl+V cola alinhado no nível ativo.', 'Copies the selection; Ctrl+V pastes aligned in the active level.'),
+    run: () => { transfer.copy(editor.project, useUi.getState().selection); },
+    disabled: (c) => {
+      if (c.selection.length === 0) return noSel(c);
+      return transfer.copyableIds(c.p, c.selection).length === 0 ? naoTransferivel('Copiar') : false;
+    },
+  },
+  cutSelection: {
+    label: t('Recortar', 'Cut'),
+    icon: 'cut',
+    hint: t('Copia e apaga a seleção; Ctrl+V cola no nível ativo.', 'Copies and deletes the selection; Ctrl+V pastes in the active level.'),
+    run: () => {
+      const st = useUi.getState();
+      const ids = transfer.copyableIds(editor.project, st.selection);
+      if (st.selection.some((id) => !ids.includes(id))) {
+        useUi.setState({ status: 'Recortar só vale para paredes, pisos, lajes, telhados, escadas, rampas, ambientes e aberturas hospedadas (com a parede selecionada).' });
+        return;
+      }
+      if (!transfer.copy(editor.project, st.selection)) return;
+      editor.deleteSelection();
+      useUi.setState({ status: 'Recortado(s). Ctrl+V cola no nível ativo.' });
+    },
+    disabled: (c) => {
+      if (c.selection.length === 0) return noSel(c);
+      // `copyableIds` inclui as aberturas hospedadas (que não estavam selecionadas): compare id a id, nunca o tamanho.
+      const ids = transfer.copyableIds(c.p, c.selection);
+      return c.selection.some((id) => !ids.includes(id)) ? naoTransferivel('Recortar') : false;
+    },
+  },
+  pasteAligned: {
+    label: t('Colar', 'Paste'),
+    icon: 'paste',
+    hint: t('Cola o copiado nas mesmas coordenadas, no nível ativo.', 'Pastes what was copied at the same coordinates in the active level.'),
+    run: () => { transfer.paste(editor.store, useUi.getState().levelId); },
+    disabled: (c) => (c.view === 'sheet'
+      ? t('Não vale para pranchas.', 'Not available for sheets.')
+      : !transfer.hasClip() ? t('Nada copiado ainda. Use Copiar ou Ctrl+C.', 'Nothing copied yet. Use Copy or Ctrl+C.') : false),
   },
   delete: {
     label: t('Excluir', 'Delete'),
@@ -269,6 +326,12 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
   materials: { label: t('Materiais', 'Materials'), icon: 'layers', run: openDialog('materials') },
   levels: { label: t('Nível', 'Level'), icon: 'level', hint: t('Cria e edita os níveis do projeto.', 'Create and edit project levels.'), run: openDialog('levels') },
   lineWeights: { label: t('Espessuras de linha', 'Line Weights'), icon: 'detail', hint: t('Pesos de linha por escala, por categoria e limites de detalhe.', 'Line weights by scale and category.'), run: openDialog('lineWeights') },
+  units: {
+    label: t('Unidades do projeto', 'Project Units'),
+    icon: 'type',
+    hint: t('Unidades de comprimento, área, volume, ângulo e inclinação do projeto.', 'Project units for length, area, volume, angle and slope.'),
+    run: openDialog('units'),
+  },
   shortcutsConfig: { label: t('Atalhos de teclado…', 'Keyboard Shortcuts…'), icon: 'help', run: openDialog('shortcutsConfig') },
   shortcuts: { label: t('Lista de atalhos', 'Shortcut List'), icon: 'help', run: openDialog('shortcuts') },
   schedWalls: sched(t('Tabela de paredes', 'Wall Schedule'), 'schedule'),

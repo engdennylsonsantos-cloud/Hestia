@@ -123,7 +123,7 @@ export const TAB_GERENCIAR: RibbonTab = {
       t('Configurações', 'Settings'),
       act('materials'),
       soon(t('Estilos de objeto', 'Object Styles'), 'soon'),
-      stack(soonS(t('Informações do projeto', 'Project Information'), 'soon'), soonS(t('Parâmetros do projeto', 'Project Parameters'), 'soon'), soonS(t('Unidades do projeto', 'Project Units'), 'soon')),
+      stack(soonS(t('Informações do projeto', 'Project Information'), 'soon'), soonS(t('Parâmetros do projeto', 'Project Parameters'), 'soon'), act('units', 'small')),
       stack(soonS(t('Transferir padrões', 'Transfer Standards'), 'soon'), soonS(t('Limpar não usados', 'Purge Unused'), 'soon'), act('lineWeights', 'small')),
     ),
     panel('gerenciar-projeto', t('Gerenciar projeto', 'Manage Project'), soon(t('Gerenciar links', 'Manage Links'), 'link'), soon(t('Gerenciar imagens', 'Manage Images'), 'sheet'), soon(t('Vista inicial', 'Starting View'), 'eye')),

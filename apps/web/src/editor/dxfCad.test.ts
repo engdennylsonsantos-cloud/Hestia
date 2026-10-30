@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { planRamp } from '@hestia/engine';
-import { dxfProblemsR12 } from '@hestia/io';
+import { dxfProblems2000 } from '@hestia/io';
 import {
   buildTemplate,
   createEmptyProject,
@@ -19,9 +19,9 @@ import {
 import { areaPlanDxf, planDxf, sectionDxf } from './dxfExport.ts';
 
 /**
- * DXF real, como sai do app, conferido pelo verificador estrutural R12 (`dxfProblemsR12`). O AutoCAD 2025 descartava os
- * três tipos de arquivo: "Unknown group 370 for table" na planta e no corte, "DXF read error" na planta de área (AC1015
- * declarado sem a estrutura do R2000).
+ * DXF real, como sai do app, conferido pelo verificador estrutural R2000 (`dxfProblems2000`). O Hestia exporta AC1015 desde
+ * a troca do R12: o R12 não guarda a espessura de linha por camada (370), e o AutoCAD 2025 descartava o desenho inteiro
+ * quando a estrutura do R2000 estava incompleta.
  */
 
 const rampType = createEmptyProject().rampTypes.rmt_nbr9050!;
@@ -85,19 +85,19 @@ function arquivos(p: Project): Array<[string, string]> {
   return [...p.levels.map((l): [string, string] => [`planta ${l.id}`, planDxf(p, l.id)]), ['corte', sectionDxf(p, 'corte_a')], ['planta de área', areaPlanDxf(p, 'ap1')]];
 }
 
-describe.each(['house2', 'house-premium'] as const)('DXF do template %s é R12 estrito', (template) => {
+describe.each(['house2', 'house-premium'] as const)('DXF do template %s é R2000', (template) => {
   const p = rico(template);
 
-  it('planta, corte e planta de área passam no verificador, sem 370 nem BLOCKS ausente', () => {
+  it('planta, corte e planta de área passam no verificador, com a espessura (370) por camada', () => {
     for (const [nome, text] of arquivos(p)) {
-      expect(dxfProblemsR12(text), nome).toEqual([]);
-      expect(text, nome).not.toContain('\r\n370\r\n');
+      expect(dxfProblems2000(text), nome).toEqual([]);
+      expect(text, nome).toContain('\r\n370\r\n');
     }
   });
 
-  it('os três tipos declaram AC1009, têm uma só seção BLOCKS e terminam em EOF com quebra de linha', () => {
+  it('os três tipos declaram AC1015, têm uma só seção BLOCKS e terminam em EOF com quebra de linha', () => {
     for (const [nome, text] of arquivos(p)) {
-      expect(text, nome).toContain('9\r\n$ACADVER\r\n1\r\nAC1009\r\n');
+      expect(text, nome).toContain('9\r\n$ACADVER\r\n1\r\nAC1015\r\n');
       expect(text.match(/2\r\nBLOCKS\r\n/g), nome).toHaveLength(1);
       expect(text.endsWith('0\r\nEOF\r\n'), nome).toBe(true);
     }
@@ -123,7 +123,7 @@ describe.each(['house2', 'house-premium'] as const)('DXF do template %s é R12 e
   });
 });
 
-describe('planta de área em R12', () => {
+describe('planta de área em R2000', () => {
   it('traços e textos saem como LINE e TEXT nas camadas AMBIENTES*, com as cotas e textos das anotações', () => {
     const text = areaPlanDxf(rico('house2'), 'ap1');
     expect(text).toContain('8\r\nAMBIENTES_TEXTO\r\n');
@@ -131,6 +131,6 @@ describe('planta de área em R12', () => {
     expect(text).toContain('0\r\nTEXT\r\n');
     expect(text).toContain('Observa\\U+00E7\\U+00E3o');
     expect(text).toContain('4,00 m');
-    expect(dxfProblemsR12(text)).toEqual([]);
+    expect(dxfProblems2000(text)).toEqual([]);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { firstSurfaceDistance, pickModelPoint } from './pick3d.ts';
+import { firstSurfaceDistance, pickLevel, pickModelPoint } from './pick3d.ts';
 
 /** Câmera de cima (olhando para −z) sobre o ponto (2, 3). */
 function topCamera(): THREE.PerspectiveCamera {
@@ -62,6 +62,40 @@ describe('firstSurfaceDistance: distância à primeira parede no eixo (zoom)', (
     root.add(new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshBasicMaterial()));
     expect(firstSurfaceDistance(root, new THREE.Vector3(0, 0, 2), new THREE.Vector3(1, 0, 0))).toBeNull();
     expect(firstSurfaceDistance(new THREE.Group(), new THREE.Vector3(0, 0, 2), new THREE.Vector3(0, 0, 1))).toBeNull();
+  });
+});
+
+describe('pickLevel: datum de nível na vista 3D', () => {
+  /** Câmera de cima sobre a origem, olhando para −z (o raio do centro acerta a linha em y = 0). */
+  const cameraDeCima = (): THREE.PerspectiveCamera => {
+    const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
+    cam.position.set(0, 0, 20);
+    cam.up.set(0, 1, 0);
+    cam.lookAt(0, 0, 0);
+    cam.updateMatrixWorld();
+    return cam;
+  };
+
+  it('cena mínima com uma linha em z = 0, câmera de cima: devolve o levelId e o ponto', () => {
+    const scene = new THREE.Scene();
+    const grupo = new THREE.Group();
+    grupo.userData = { levels: true };
+    const linha = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-5, 0, 0), new THREE.Vector3(5, 0, 0)]),
+      new THREE.LineBasicMaterial(),
+    );
+    linha.userData = { levelId: 'lv_0' };
+    grupo.add(linha);
+    scene.add(grupo);
+    const hit = pickLevel(scene, cameraDeCima(), { x: 0, y: 0 });
+    expect(hit).not.toBeNull();
+    expect(hit!.kind).toBe('level');
+    expect(hit!.levelId).toBe('lv_0');
+    expect(hit!.point.z).toBeCloseTo(0, 6);
+  });
+
+  it('sem datum na cena devolve null', () => {
+    expect(pickLevel(new THREE.Scene(), cameraDeCima(), { x: 0, y: 0 })).toBeNull();
   });
 });
 

@@ -4,7 +4,7 @@ import { applyPartialStructure, frameOfWall, resolveCeilings, junctionLevel, res
 import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
 import { DARK, LIGHT } from '../plan/types.ts';
 import { projetoDaJuncao } from '../plan/viewContext.ts';
-import { OrbitCamera } from './orbit.ts';
+import { OrbitCamera, cameraBasis } from './orbit.ts';
 import { firstSurfaceDistance } from './pick3d.ts';
 import { caixasEPrismasDaAbertura, montarAbertura } from './aberturas3d.ts';
 import { arestasDaSilhuetaDeCaixas } from './silhuetaCaixas3d.ts';
@@ -15,6 +15,9 @@ import { BITS_PROFUNDIDADE, diagnosticarOrigem, diagnosticarProfundidade, type D
 import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
 import { buildGenericSolids } from './genericSolids.ts';
+import { buildCadLines } from './cad3d.ts';
+import { buildLevels, disposeLevels, layoutLevels } from './levels3d.ts';
+import { levelProjectBox } from './levelsData.ts';
 import { buildRampSolids } from './rampSolids.ts';
 import { RealcesDaCena } from './realceDaCena3d.ts';
 import { buildLevelSolidsComCaixas } from './paredesInstanciadas3d.ts';
@@ -45,6 +48,11 @@ export interface Scene3DOptions {
 
 /** Ângulo (graus) acima do qual uma aresta da malha é desenhada. */
 const EDGE_ANGLE = 28;
+/**
+ * Margem (m) em X somada à caixa do datum no "Enquadrar": a bolha e o texto do nível ficam além da obra e não podem
+ * sair da vista. Vale para os dois lados (o texto cresce para a esquerda da bolha).
+ */
+const MARGEM_ENQUADRAMENTO_NIVEIS = 6;
 /** Fundo do tema, quando `view3d.background` é null. */
 const BACKGROUND = { light: '#dfe7ee', dark: '#14171b' };
 /** Distância da luz em raios do modelo: |(0,7; −0,5; 1,1)|, a posição do sol antes da vista 3D configurável. */
@@ -82,6 +90,16 @@ export class ModelScene {
   private realces = new RealcesDaCena(this.scene);
   /** Malhas só de picking no wireframe (fora do modelo; ver `buildPickLayer`). */
   private pickLayer = new THREE.Object3D();
+  /** Linhas de nível e rótulos: um grupo só, fora dos níveis (o picking lê `userData.levelId` de cada peça). */
+  private niveis3d = new THREE.Group();
+  /** Grupo devolvido por `buildLevels` (o que `disposeLevels` libera); null quando a vista esconde os níveis. */
+  private niveis: THREE.Group | null = null;
+  /** Nível selecionado no 3D (o plano azul do datum); preservado quando o projeto é remontado. */
+  private selectedLevel: Id | null = null;
+  /** Projeto e nível com que o grupo de níveis foi montado: evita refazer o datum a cada quadro. */
+  private niveisChave: { projeto: Project; levelId: Id | null } | null = null;
+  /** Caixa do "Enquadrar": modelo + datum dos níveis (com a margem do texto/bolha em X). */
+  private caixaEnquadramento = new THREE.Box3();
   /** Peças de picking do nível que se monta agora (no wireframe a malha não entra na cena: vai para cá). */
   private picks: PickSource[] = [];
   private caixaUnitaria = criarCaixaUnitaria();
@@ -152,6 +170,8 @@ export class ModelScene {
     this.orbit.obstacle = (origin, dir) => firstSurfaceDistance(this.model, origin, dir);
     this.scene.add(this.model);
     this.scene.add(this.pickLayer);
+    this.niveis3d.userData = { levels: true };
+    this.scene.add(this.niveis3d);
     this.scene.add(this.realces.camada);
     // Gancho de quadro do three (antes da lista de desenho e antes do passe de sombra): é onde o orçamento de sombra e o
     // enquadramento do sol acontecem, com a câmera do quadro. Sem ele, a vista teria de chamar a cena a cada rAF.
@@ -166,9 +186,10 @@ export class ModelScene {
     this.sun.shadow.normalBias = 0.03;
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
+    // Chão só com sombra: sem cor, o que está abaixo do nível 0 fica visível; a grade continua.
     this.ground = new THREE.Mesh(
       new THREE.PlaneGeometry(400, 400),
-      new THREE.MeshStandardMaterial({ color: 0xe3dfd6, roughness: 1 }),
+      new THREE.ShadowMaterial({ color: 0x000000, opacity: 0.22, transparent: true, depthWrite: false }),
     );
     this.ground.position.z = -0.03;
     this.ground.receiveShadow = true;
@@ -300,17 +321,31 @@ export class ModelScene {
       }));
     }
     this.buildPickLayer();
+    // Datum dos níveis: uma vez para o projeto (não por nível), fora dos grupos de nível. O nível selecionado é o
+    // guardado, então a remontagem do projeto mantém a seleção.
+    this.reconstruirNiveis(p);
     // Níveis que saíram da cena e não estão mais no cache: liberados (os que ficaram no cache seguem para o reuso).
     const saiu = new Set([...antes, ...sobras, ...expulsas]);
     for (const e of atuais) saiu.delete(e);
     for (const e of saiu) if (!this.cache.contem(e)) disposeNivel(e);
     this.boxCache = new THREE.Box3().setFromObject(this.model);
     this.orbit.sceneRadius = this.boxCache.isEmpty() ? 0 : this.boxCache.getSize(new THREE.Vector3()).length() / 2;
+    // "Enquadrar": o modelo mais o datum dos níveis, com folga em X para a bolha e o texto não ficarem fora da vista.
+    this.caixaEnquadramento.copy(this.boxCache);
+    if (view.showLevels !== false && p.levels.length) {
+      const b = levelProjectBox(p);
+      const cotas = p.levels.map((l) => l.elevation);
+      this.caixaEnquadramento.union(
+        new THREE.Box3(
+          new THREE.Vector3(b.minX - MARGEM_ENQUADRAMENTO_NIVEIS, b.minY - MARGEM_ENQUADRAMENTO_NIVEIS, Math.min(...cotas)),
+          new THREE.Vector3(b.maxX + MARGEM_ENQUADRAMENTO_NIVEIS, b.maxY + MARGEM_ENQUADRAMENTO_NIVEIS, Math.max(...cotas)),
+        ),
+      );
+    }
     this.orbit.apply();
     const bg = new THREE.Color(view.background ?? (opt.dark ? BACKGROUND.dark : BACKGROUND.light));
     this.ground.visible = view.style !== 'wireframe';
     this.ground.receiveShadow = this.frame.shadows;
-    (this.ground.material as THREE.MeshStandardMaterial).color.set(opt.dark ? 0x2a2f36 : 0xe3dfd6);
     this.scene.background = bg;
     this.scene.fog = new THREE.Fog(bg, 60, 170);
     this.sun.castShadow = this.frame.shadows;
@@ -341,6 +376,7 @@ export class ModelScene {
    * caixa das faixas escolhidas. Fora disso é só uma leitura de dois campos — nada muda com a câmera ou o realce.
    */
   private antesDeDesenhar(renderer: RendererDeQuadro): void {
+    this.layoutNiveis();
     if (!this.frame.shadows) return;
     prepararSombraDoQuadro({
       renderer,
@@ -354,6 +390,50 @@ export class ModelScene {
       teto: this.sombraMaxTriangulos,
       tamanhoTela: this.tamanhoTela,
     });
+  }
+
+  /**
+   * Seleciona um nível no 3D (o plano azul do datum) ou limpa (`null`). Libera o grupo anterior e reconstrói o datum com
+   * `buildLevels(p, levelId)`. É chamado no clique do 3D e também a cada montagem/atualização do projeto, para a seleção
+   * sobreviver à remontagem. Sem mudança de projeto nem de nível, não refaz nada.
+   */
+  selecionarNivel(p: Project, levelId: Id | null): void {
+    if (this.niveisChave?.projeto === p && this.niveisChave.levelId === levelId) return;
+    this.selectedLevel = levelId;
+    this.reconstruirNiveis(p);
+  }
+
+  /**
+   * Refaz o datum dos níveis para o projeto e o nível selecionado guardados. `showLevels` desligado deixa o grupo vazio
+   * (nada é adicionado); o picking e o toggle acham o grupo por `userData.levels`.
+   */
+  private reconstruirNiveis(p: Project): void {
+    this.liberarNiveis();
+    this.niveisChave = { projeto: p, levelId: this.selectedLevel };
+    if (this.frame.view.showLevels === false) return;
+    const grupo = buildLevels(p, this.selectedLevel);
+    grupo.userData = { ...grupo.userData, levels: true };
+    this.niveis3d.add(grupo);
+    this.niveis = grupo;
+    this.layoutNiveis();
+  }
+
+  /** Libera geometrias, materiais e texturas do datum anterior; o grupo contêiner continua na cena (vazio). */
+  private liberarNiveis(): void {
+    if (this.niveis) disposeLevels(this.niveis);
+    this.niveis = null;
+    this.niveis3d.clear();
+    this.niveis3d.userData = { levels: true };
+  }
+
+  /**
+   * Recalcula o datum para a câmera atual. Roda a cada quadro (no `antesDeDesenhar`) para a bolha ficar sempre à
+   * esquerda e o conjunto atrás/à esquerda da obra; a escolha do lado e da ponta tem histerese (ver `layoutLevels`).
+   */
+  private layoutNiveis(): void {
+    if (!this.niveis) return;
+    const { toCamera } = cameraBasis(this.orbit.azimuth, this.orbit.elevation);
+    layoutLevels(this.niveis, this.orbit.camera, toCamera.clone().negate());
   }
 
   /** Faixas verticais da cena (culling por frustum) e quantas existem agora. */
@@ -477,6 +557,13 @@ export class ModelScene {
         grupo.add(m.grupo);
       }
     }
+    // Linhas do CAD importado do nível (categoria "genérica"): segmentos com a cor ACI da entidade/camada, na cota do
+    // nível mais o deslocamento do desenho. São linhas: não entram nas sombras nem nas arestas dos sólidos.
+    if (shown('generic')) {
+      const cota = p.levels.find((l) => l.id === lv0.levelId)?.elevation ?? 0;
+      const cad = buildCadLines(p, lv0.levelId, cota);
+      if (cad) grupo.add(cad);
+    }
     // Malhas de picking (invisíveis) e arestas das caixas: no grupo do nível, para o cache, o picking e o realce as acharem.
     const montadas = caixas?.montar(grupo, this.mats.cached('pick', () => new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })));
     let arestasSolidas: Float32Array | undefined;
@@ -558,15 +645,17 @@ export class ModelScene {
   }
 
   fit(): void {
-    if (this.boxCache.isEmpty()) {
+    if (this.caixaEnquadramento.isEmpty()) {
       this.orbit.target.set(0, 0, 1);
       this.orbit.distance = 14;
       this.orbit.apply();
-    } else this.orbit.fit(this.boxCache);
+    } else this.orbit.fit(this.caixaEnquadramento);
   }
 
   dispose(): void {
     this.detach();
+    this.liberarNiveis();
+    this.niveisChave = null;
     this.faixasDeSombra = [];
     this.lotes.dispose();
     this.caixaUnitaria.dispose();

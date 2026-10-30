@@ -15,14 +15,13 @@ function sala(withRoom = true): Project {
 const onLayer = (dxf: string, layer: string): boolean => new RegExp(`\\s8\\s*\\r?\\n${layer}\\r?\\n`).test(dxf);
 
 describe('ambientes no DXF da planta (decisão 0018/0037, camadas AMBIENTES e AMBIENTES_TEXTO)', () => {
-  it('contorno fechado na camada AMBIENTES e só o nome na AMBIENTES_TEXTO', () => {
+  it('contorno fechado na camada AMBIENTES e o rótulo completo na AMBIENTES_TEXTO', () => {
     const dxf = planDxf(sala(), 'lv_0');
     expect(onLayer(dxf, 'AMBIENTES')).toBe(true);
     expect(onLayer(dxf, 'AMBIENTES_TEXTO')).toBe(true);
-    expect(dxf).toContain('Sala');
-    // Decisão 0037: a planta de piso não mostra número nem área no rótulo do ambiente.
-    expect(dxf).not.toContain('(101)');
-    expect(dxf).not.toContain('m²');
+    expect(dxf).toContain('Sala (101)');
+    // O DXF é R12 estrito: "·" e "²" saem como escapes \U+XXXX (o AutoCAD não lê UTF-8 cru). Área com vírgula.
+    expect(dxf).toMatch(/Sala \(101\) \\U\+00B7 \d+,\d\d m\\U\+00B2/);
   });
 
   it('categoria "ambiente" oculta na vista: nada sai', () => {

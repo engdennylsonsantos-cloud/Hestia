@@ -61,6 +61,8 @@ export interface SelectionLabelInput {
   ramps: number;
   rooms: number;
   generics: number;
+  /** Desenhos CAD importados (opcional para não quebrar os chamadores antigos). */
+  cads?: number;
   grade: { name: string } | null | undefined;
   view: { kind: string; name: string } | null;
 }
@@ -79,6 +81,7 @@ export function selectionLabel(c: SelectionLabelInput): string {
   if (c.stairs) return plural(c.stairs, 'escada', 'escadas');
   if (c.ramps) return plural(c.ramps, 'rampa', 'rampas');
   if (c.rooms) return plural(c.rooms, 'ambiente', 'ambientes');
+  if (c.cads) return plural(c.cads, 'desenho CAD', 'desenhos CAD');
   if (c.generics) return plural(c.generics, 'objeto', 'objetos');
   if (c.view) return `${c.view.kind === 'elevation' ? 'Elevação' : 'Corte'} ${c.view.name}`;
   return 'Vista';

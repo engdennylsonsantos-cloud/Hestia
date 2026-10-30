@@ -27,12 +27,21 @@ const geo: DxfSectionGeometry = {
 /** Código 370 (largura) da camada, lido da tabela LAYER; `undefined` se a camada não leva 370. */
 function layerWeight(text: string, name: string): string | undefined {
   const lines = text.split('\r\n');
-  const i = lines.findIndex((l, k) => l.trim() === '2' && lines[k + 1]?.trim() === name && lines[k - 1]?.trim() === 'LAYER' && lines[k - 2]?.trim() === '0');
-  if (i < 0) throw new Error(`camada ausente: ${name}`);
-  for (let j = i + 2; j + 1 < lines.length && lines[j]!.trim() !== '0'; j += 2) {
-    if (lines[j]!.trim() === '370') return lines[j + 1]!.trim();
+  let inLayer = false;
+  let found = false;
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const code = lines[i]!.trim();
+    const value = lines[i + 1]!.trim();
+    if (code === '0') {
+      inLayer = value === 'LAYER';
+      found = false;
+    } else if (inLayer && code === '2') {
+      found = value === name;
+    } else if (inLayer && found && code === '370') {
+      return value;
+    }
   }
-  return undefined;
+  throw new Error(`camada ausente: ${name}`);
 }
 
 describe('camadas do corte e da elevação', () => {
@@ -52,17 +61,16 @@ describe('camadas do corte e da elevação', () => {
 });
 
 describe('exportSectionDxf', () => {
-  it('aceita lineWeights mas não o escreve: o 370 é do R2000 e o AutoCAD recusa o arquivo R12 que o leva', () => {
+  it('lineWeights vira o 370 de cada camada (o que o R12 não guardava)', () => {
     const text = exportSectionDxf(withSection(), 'corte_a', { ...geo, lineWeights: { CORTE_PAREDE: 50, CORTE_JANELA_PROJECAO: 18, CORTE_CONTORNO: 0 } });
-    expect(layerWeight(text, 'CORTE_PAREDE')).toBeUndefined();
-    expect(text).not.toContain('370\r\n');
-    expect(text).toBe(exportSectionDxf(withSection(), 'corte_a', geo));
+    expect(layerWeight(text, 'CORTE_PAREDE')).toBe('50');
+    expect(layerWeight(text, 'CORTE_JANELA_PROJECAO')).toBe('18');
+    expect(layerWeight(text, 'CORTE_CONTORNO')).toBe('0');
   });
 
-  it('sem lineWeights a tabela de camadas não leva 370 (como antes)', () => {
+  it('sem lineWeights cada camada sai com -3, o padrão do DXF', () => {
     const text = exportSectionDxf(withSection(), 'corte_a', geo);
-    expect(layerWeight(text, 'CORTE_PAREDE')).toBeUndefined();
-    expect(text).not.toContain('370\r\n');
+    expect(layerWeight(text, 'CORTE_PAREDE')).toBe('-3');
   });
 
   it('o contorno externo sai em CORTE_CONTORNO e a unidade é o metro com z para cima', () => {

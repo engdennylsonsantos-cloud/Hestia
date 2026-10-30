@@ -1,4 +1,4 @@
-import { formatQuantity, isWall, unitsOf, type Project, type ValidationIssue } from '@hestia/model';
+import { formatQuantity, isWall, unitsOf, wallBaseElevation, type Project, type ValidationIssue } from '@hestia/model';
 import { resolveAllFloors } from './floors.ts';
 import { resolveAllRoofs } from './roofs.ts';
 import { roofAxisReport } from './roofWall.ts';
@@ -23,7 +23,7 @@ export function roofWallIssues(p: Project): ValidationIssue[] {
   const out: ValidationIssue[] = [];
   for (const e of Object.values(p.elements)) {
     if (!isWall(e)) continue;
-    const rep = roofAxisReport(e, roofs);
+    const rep = roofAxisReport(e, roofs, wallBaseElevation(p, e));
     if (!rep) continue;
     if (e.attachTopToRoof) {
       if (rep.uncovered <= UNCOVERED_TOL) continue;

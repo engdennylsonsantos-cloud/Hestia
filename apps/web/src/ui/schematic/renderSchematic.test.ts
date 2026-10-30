@@ -67,6 +67,20 @@ describe('SchematicDrawing', () => {
     expect(html()).toContain('min-width:');
   });
 
+  it('desenha cada linha do texto na propria altura', () => {
+    // Regressão: `dy` num tspan que também tem `y` deslocava todas as linhas a partir do mesmo `y`, empilhando as
+    // linhas 2+ no mesmo lugar (o "estrutural"/"12,0 cm" do corte da escada sumia).
+    const d = testDrawing();
+    d.prims.push({ kind: 'label', id: 'lbl.mult', at: [0.1, 0.5], text: 'L1\nL2\nL3', anchor: 'start', tone: 'muted' });
+    const s = renderToStaticMarkup(createElement(SchematicDrawing, { drawing: d, ariaLabel: 'Corte de teste' }));
+    const porLinha = [...s.matchAll(/<tspan[^>]*y="([^"]+)"[^>]*>([^<]*)<\/tspan>/g)].filter((m) => /^L[123]$/.test(m[2] ?? ''));
+    expect(porLinha).toHaveLength(3);
+    const ys = porLinha.map((m) => Number(m[1]));
+    expect(new Set(ys).size).toBe(3);
+    expect(ys[1]!).toBeCloseTo(ys[0]! + 1.15 * testDrawing().em, 6);
+    expect(ys[2]!).toBeCloseTo(ys[0]! + 2 * 1.15 * testDrawing().em, 6);
+  });
+
   it('mostra a legenda abaixo', () => {
     expect(html()).toContain('Legenda de teste');
   });

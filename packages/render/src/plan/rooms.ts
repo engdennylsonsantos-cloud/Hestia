@@ -2,7 +2,8 @@ import type { Vec2 } from '@hestia/geom';
 import { pointInPolygon } from '@hestia/geom';
 import type { ResolvedRoom } from '@hestia/engine';
 import type { DetailLevel, Id, Project } from '@hestia/model';
-import { belowFloorOps, labelPoint, type FloorOps } from './floors.ts';
+import type { ResolvedUnits } from '@hestia/model';
+import { belowFloorOps, fmtArea, labelPoint, type FloorOps } from './floors.ts';
 import { ambientesDoNivel } from './resolucao.ts';
 import { surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme } from './types.ts';
@@ -21,6 +22,15 @@ const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
  */
 export function roomNameText(r: ResolvedRoom): string {
   return r.name || (r.number ? `Ambiente ${r.number}` : 'Ambiente');
+}
+
+/**
+ * Rótulo completo para o DXF da planta de piso: `Sala (101) · 12,34 m²` (nome, número entre parênteses quando há e
+ * área com 2 casas). Na tela a planta de piso mostra só o nome (decisão 0037); o desenho técnico leva tudo.
+ */
+export function roomFullText(r: ResolvedRoom, u: ResolvedUnits): string {
+  const num = r.number ? ` (${r.number})` : '';
+  return `${roomNameText(r)}${num} · ${fmtArea(u, r.area, 2)}`;
 }
 
 /** Ponto da etiqueta: o centro do maior trecho interno do polígono (vale também para contornos em L). */

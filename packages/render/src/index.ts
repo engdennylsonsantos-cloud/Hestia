@@ -12,6 +12,9 @@ export * from './model3d/solids.ts';
 export * from './model3d/orbit.ts';
 export * from './model3d/scene3d.ts';
 export * from './model3d/pick3d.ts';
+export * from './model3d/cad3d.ts';
+export * from './model3d/levels3d.ts';
+export * from './model3d/levelsData.ts';
 // Picking por ID buffer (R3): tabela de códigos, geometria do passe e o leitor da GPU (`PickGpu3d`).
 export * from './model3d/pickIdBuffer3d.ts';
 export * from './model3d/openingParts.ts';
@@ -40,7 +43,7 @@ export * from './sheet/types.ts';
 export * from './sheet/build.ts';
 export { STAMP_H, STAMP_W } from './sheet/frame.ts';
 // Ambientes (decisão 0018, 0037): nome e centro de cada ambiente, o mesmo texto da planta de piso e do DXF.
-export { roomLabelAt, roomNameText } from './plan/rooms.ts';
+export { roomFullText, roomLabelAt, roomNameText } from './plan/rooms.ts';
 export { areaPlanLegendOps, areaPlanRoomOps, areaPlanTableOps, areaPlanTagOps, labelGhostOps, referenceAt, referenceSegments, roomTagLines, tagBoxModel } from './plan/areaPlan.ts';
 export * from './plan/sketch.ts';
 // Anotações (textos e cotas): desenho, caixa do texto, moldura e destaque de seleção/hover.

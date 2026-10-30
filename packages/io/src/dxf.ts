@@ -1,5 +1,7 @@
-import type { GraphicsCategory, Id, Project } from '@hestia/model';
-import { DXF_LAYER_COTAS, DXF_LAYER_DETALHE, DXF_LAYER_ETIQUETAS, DXF_LAYER_TEXTOS, dxfTextRecords, type DxfNoteText, type DxfNotes } from './dxfNotes.ts';
+import { DXF_LINE_WEIGHTS, DXF_LINE_WEIGHT_DEFAULT, type DxfLayerStyle, type GraphicsCategory, type Id, type Project } from '@hestia/model';
+import { DXF_LAYER_COTAS, DXF_LAYER_DETALHE, DXF_LAYER_ETIQUETAS, DXF_LAYER_TEXTOS, dxfTextEntity, type DxfNoteText, type DxfNotes } from './dxfNotes.ts';
+import { writeDxf2000, type DxfDoc, type DxfDocEntity, type DxfDocLayer, type DxfLineType, type DxfUnit } from './dxfDoc.ts';
+import { DXF_LAYER_GENERIC } from './dxfGeneric.ts';
 
 /** Ponto em metros: x para a direita, y para cima (planta). */
 export interface DxfPoint {
@@ -116,11 +118,17 @@ export interface DxfLevelGeometry {
   }>;
   /**
    * Largura de linha de cada camada, em centésimos de mm (arredondada ao valor DXF válido por `dxfLineWeight`). Quem monta
-   * a geometria preenche com `lineWeightsOf` (apps/web), a partir de `dxfLayersOf` e `dxfLineRoleOf`.
-   * O `exportDxf` NÃO a escreve: o arquivo é R12 e o código 370 da tabela LAYER só existe a partir do R2000; o AutoCAD
-   * recusa o desenho inteiro ("Unknown group 370 for table"). Fica para um exportador R2000.
+   * a geometria preenche com `lineWeightsOf` (apps/web), a partir de `dxfLayersOf` e `dxfLineRoleOf`. O escritor R2000 grava
+   * o valor no código 370 da tabela LAYER (o R12 antigo não tinha esse código: o AutoCAD recusava o desenho com ele).
    */
   lineWeights?: Partial<Record<string, number>>;
+  /**
+   * Estilo por camada (cor ACI, tipo de linha e espessura) vindo da tabela editável do projeto. Ausente = o padrão de
+   * `dxfLayerStyleOf`, o que mantém os chamadores antigos e os testes.
+   */
+  layerStyles?: Record<string, DxfLayerStyle>;
+  /** Unidade de saída do arquivo (mm, cm, m, ft ou in); ausente = metros. A geometria continua em metros. */
+  units?: DxfUnit;
   /** Cotas e textos de anotação do nível (decisão 0019): ver `notesDxfOf`. Ausente = nenhum. */
   notes?: DxfNotes;
   /** Marcas de corte/elevação em planta (linhas, setas e rótulos), ver `sectionMarksDxfOf`. Ausente = nenhuma. */
@@ -228,32 +236,6 @@ export function dxfLayerOfRoof(typeCode: string): string {
 }
 
 const EPS = 1e-9;
-/** Coordenadas com 6 casas (1 µm); zero negativo vira zero. */
-// units-ok: coordenada DXF (formato de máquina)
-const fmt = (v: number): string => (Math.abs(v) < 5e-7 ? 0 : v).toFixed(6);
-
-/** Par código/valor de um registro DXF. */
-export type DxfPair = readonly [number, string | number];
-
-/**
- * Gravador de pares código/valor em `out`. Os números de coordenada, altura e ângulo (códigos 10 a 59) saem com 6 casas,
- * como `exportDxf` (`String(1e-7)` seria "1e-7"); os demais (70, 66…) são inteiros e saem como vieram.
- */
-export function dxfRecorder(out: string[]): (code: number, value: string | number) => void {
-  return (code, value) => {
-    out.push(String(code), typeof value === 'number' && code >= 10 && code < 60 ? fmt(value) : String(value));
-  };
-}
-
-/** Tabela STYLE com o estilo STANDARD, que o TEXT sem estilo usa (o R12 clássico a espera quando há TEXT). */
-export const DXF_STYLE_TABLE: readonly DxfPair[] = [
-  [0, 'TABLE'], [2, 'STYLE'], [70, 1],
-  [0, 'STYLE'], [2, 'STANDARD'], [70, 0], [40, '0.0'], [41, '1.0'], [50, '0.0'], [71, 0], [42, '0.2'], [3, 'txt'], [4, ''],
-  [0, 'ENDTAB'],
-];
-
-/** Seção BLOCKS vazia: o formato clássico é HEADER, TABLES, BLOCKS, ENTITIES e EOF, e o Hestia não usa blocos. */
-export const DXF_BLOCKS_SECTION: readonly DxfPair[] = [[0, 'SECTION'], [2, 'BLOCKS'], [0, 'ENDSEC']];
 
 /** Anel sem o vértice de fechamento repetido. Com menos de 3 vértices não há área: devolve null. */
 function openRing(ring: DxfPoint[]): DxfPoint[] | null {
@@ -290,7 +272,7 @@ interface Line {
 }
 
 /** Tipo de linha de uma camada: contínua, ou tracejada nas camadas de projeção acima do corte. */
-type LineType = 'CONTINUOUS' | 'DASHED';
+type LineType = DxfLineType;
 
 interface LayerStyle {
   linetype: LineType;
@@ -312,16 +294,39 @@ const LAYER_STYLE: Record<string, LayerStyle> = {
 };
 const styleOf = (layer: string): LayerStyle => LAYER_STYLE[layer] ?? { linetype: 'CONTINUOUS', color: 7 };
 
-/** Larguras de linha válidas do DXF (código 370, em centésimos de mm). */
-export const DXF_LINE_WEIGHTS: readonly number[] = [0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200, 211];
-/** Largura padrão do DXF (-3): a camada sem entrada em `lineWeights` sai com ela e não passa pelo arredondamento. */
-export const DXF_LINE_WEIGHT_DEFAULT = -3;
+/** Larguras de linha válidas do DXF (código 370, em centésimos de mm), da tabela do modelo. */
+export { DXF_LINE_WEIGHTS, DXF_LINE_WEIGHT_DEFAULT };
 
 /** Arredonda uma largura em centésimos de mm ao valor DXF válido mais próximo (empate: o maior; fora de 0 a 211, o limite). */
 export function dxfLineWeight(centi: number): number {
   let best = DXF_LINE_WEIGHTS[0]!;
   for (const w of DXF_LINE_WEIGHTS) if (Math.abs(w - centi) <= Math.abs(best - centi)) best = w;
   return best;
+}
+
+/**
+ * Cor ACI padrão de cada categoria na tabela de camadas do DXF: as camadas de uma mesma categoria compartilham a cor (os
+ * materiais seguem em camadas próprias). `annotation` fica em 7 (branco/preto) e o importado em 8 (cinza).
+ */
+export const DXF_CATEGORY_COLORS: Record<GraphicsCategory, number> = {
+  wall: 1,
+  door: 2,
+  window: 2,
+  floor: 5,
+  slab: 4,
+  roof: 3,
+  stair: 6,
+  room: 7,
+  annotation: 7,
+  generic: 8,
+};
+
+/** Estilo padrão de uma camada da planta: cor da categoria, tipo de linha do papel dela e a espessura pedida. */
+export function dxfLayerStyleOf(layer: string, lineWeight = DXF_LINE_WEIGHT_DEFAULT): DxfLayerStyle {
+  const style = styleOf(layer);
+  const role = dxfLineRoleOf(layer);
+  const color = role === undefined || role === 'annotation' ? style.color : DXF_CATEGORY_COLORS[role.category];
+  return { color, lineWeight, linetype: style.linetype };
 }
 
 /**
@@ -370,6 +375,8 @@ const FIXED_LINE_ROLE = new Map<string, DxfLineRole>([
   // A marca é desenho, não texto: usa o peso de corte da categoria 'anotação' (as camadas de texto ficam em 0).
   [DXF_LAYER_CORTES, cut('annotation')],
   [DXF_LAYER_ELEVACOES, cut('annotation')],
+  // Objetos importados: cinza, sem peso próprio (a espessura fica a padrão).
+  [DXF_LAYER_GENERIC, cut('generic')],
 ]);
 
 /** Papel de uma camada pelo nome. `undefined` = sem categoria (sai com -3). `PAREDE_<material>` é corte de parede. */
@@ -477,123 +484,37 @@ export function dxfLayersOf(project: Project, geo: DxfLevelGeometry): string[] {
 }
 
 /**
- * Planta de um nível em DXF ASCII (AC1009, o R12): unidades em metros ($INSUNITS 6, que o AutoCAD lê mesmo no R12), uma camada por material
+ * Documento R2000 (AC1015) da planta de um nível: unidades em metros ($INSUNITS 6), uma camada por material
  * (`PAREDE_<material>`), `PAREDE_CONTORNO` para o contorno externo e `ABERTURAS` para os vãos de corte. Elementos fora do
  * corte entram nas camadas de projeção (`PAREDE_PROJECAO_*`, `ABERTURA_*`, `ESCADA_ACIMA`, `TELHADO_PROJECAO`), com tipo de
- * linha tracejado quando estão acima do corte; os vãos de projeção saem com o símbolo de planta (`DxfOpening.symbol`). Cada anel é uma POLYLINE fechada (flag 1): LWPOLYLINE só existe a partir do
- * AutoCAD R14. A tabela de tipos de linha só leva `DASHED` quando alguma camada o usa, então o arquivo sem projeções é o mesmo.
- * R12 estrito: só grupos e entidades do R12 (sem 370, 100, 330), com as seções HEADER, TABLES (LTYPE, LAYER, STYLE), BLOCKS
- * (vazia) e ENTITIES. Textos fora do ASCII saem como \U+XXXX (`dxfEscapeText`). A largura de linha de `geo.lineWeights` não
- * vai ao arquivo: o 370 da tabela LAYER é do R2000 e o AutoCAD recusa o desenho inteiro com ele.
+ * linha tracejado quando estão acima do corte; os vãos de projeção saem com o símbolo de planta (`DxfOpening.symbol`). Cada
+ * anel é uma POLYLINE fechada (flag 1). Cada camada leva a cor e o tipo de linha do papel dela e a largura de linha de
+ * `geo.lineWeights` em centésimos de mm (código 370). Textos fora do ASCII saem como \U+XXXX (`dxfEscapeText`).
  */
-export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry): string {
+export function dxfDocOf(project: Project, levelId: Id, geo: DxfLevelGeometry): DxfDoc {
   if (!project.levels.some((l) => l.id === levelId)) throw new Error(`Nível ausente: ${levelId}`);
   const shapes = shapesOf(project, geo);
   const lines = linesOf(geo);
   const texts = textsOf(geo);
-  const layers = [...new Set([...layerNamesOf(shapes, lines, texts), ...(geo.extraLayers ?? [])])].sort();
-  // Tipo DASHED na tabela se alguma camada o usa ou se algum traço o põe sozinho (símbolo de vão em camada contínua).
-  const dashed = layers.some((name) => styleOf(name).linetype === 'DASHED') || shapes.some((s) => s.dashed === true);
+  const layers: DxfDocLayer[] = [...new Set([...layerNamesOf(shapes, lines, texts), ...(geo.extraLayers ?? [])])].sort().map((name) => {
+    const style = geo.layerStyles?.[name] ?? dxfLayerStyleOf(name, geo.lineWeights?.[name] ?? DXF_LINE_WEIGHT_DEFAULT);
+    return { name, color: style.color, linetype: style.linetype, lineWeight: style.lineWeight };
+  });
+  const entities: DxfDocEntity[] = [
+    ...shapes.map((s): DxfDocEntity => ({ kind: 'polyline', layer: s.layer, points: s.pts, closed: s.closed !== false, ...(s.dashed === true ? { dashed: true } : {}) })),
+    ...lines.map((l): DxfDocEntity => ({ kind: 'line', layer: l.layer, a: l.a, b: l.b })),
+    ...texts.map((t) => dxfTextEntity(t)),
+  ];
   const all = [...shapes.flatMap((s) => s.pts), ...lines.flatMap((l) => [l.a, l.b]), ...texts.map((t) => t.at)];
   const lo = all.reduce((m, p) => ({ x: Math.min(m.x, p.x), y: Math.min(m.y, p.y) }), { x: 0, y: 0 });
   const hi = all.reduce((m, p) => ({ x: Math.max(m.x, p.x), y: Math.max(m.y, p.y) }), { x: 0, y: 0 });
+  return { layers, entities, extMin: lo, extMax: hi, ...(geo.units === undefined ? {} : { units: geo.units }) };
+}
 
-  const out: string[] = [];
-  const rec = (code: number, value: string | number): void => {
-    out.push(String(code), String(value));
-  };
-
-  rec(0, 'SECTION');
-  rec(2, 'HEADER');
-  rec(9, '$ACADVER');
-  rec(1, 'AC1009');
-  rec(9, '$INSUNITS');
-  rec(70, 6);
-  rec(9, '$MEASUREMENT');
-  rec(70, 1);
-  rec(9, '$EXTMIN');
-  rec(10, fmt(lo.x));
-  rec(20, fmt(lo.y));
-  rec(30, '0.000000');
-  rec(9, '$EXTMAX');
-  rec(10, fmt(hi.x));
-  rec(20, fmt(hi.y));
-  rec(30, '0.000000');
-  rec(0, 'ENDSEC');
-
-  rec(0, 'SECTION');
-  rec(2, 'TABLES');
-  rec(0, 'TABLE');
-  rec(2, 'LTYPE');
-  rec(70, dashed ? 2 : 1);
-  rec(0, 'LTYPE');
-  rec(2, 'CONTINUOUS');
-  rec(70, 0);
-  rec(3, 'Solid line');
-  rec(72, 65);
-  rec(73, 0);
-  rec(40, '0.0');
-  if (dashed) {
-    // Traço de 0,25 m e espaço de 0,125 m (unidades do desenho, em metros).
-    rec(0, 'LTYPE');
-    rec(2, 'DASHED');
-    rec(70, 0);
-    rec(3, 'Dashed line');
-    rec(72, 65);
-    rec(73, 2);
-    rec(40, '0.375');
-    rec(49, '0.25');
-    rec(49, '-0.125');
-  }
-  rec(0, 'ENDTAB');
-  rec(0, 'TABLE');
-  rec(2, 'LAYER');
-  rec(70, layers.length);
-  for (const name of layers) {
-    const style = styleOf(name);
-    rec(0, 'LAYER');
-    rec(2, name);
-    rec(70, 0);
-    rec(62, style.color);
-    rec(6, style.linetype);
-  }
-  rec(0, 'ENDTAB');
-  for (const [c, v] of DXF_STYLE_TABLE) rec(c, v);
-  rec(0, 'ENDSEC');
-
-  for (const [c, v] of DXF_BLOCKS_SECTION) rec(c, v);
-
-  rec(0, 'SECTION');
-  rec(2, 'ENTITIES');
-  for (const s of shapes) {
-    rec(0, 'POLYLINE');
-    rec(8, s.layer);
-    if (s.dashed) rec(6, 'DASHED');
-    rec(66, 1);
-    rec(10, '0.000000');
-    rec(20, '0.000000');
-    rec(70, s.closed === false ? 0 : 1);
-    for (const p of s.pts) {
-      rec(0, 'VERTEX');
-      rec(8, s.layer);
-      rec(10, fmt(p.x));
-      rec(20, fmt(p.y));
-    }
-    rec(0, 'SEQEND');
-    rec(8, s.layer);
-  }
-  for (const l of lines) {
-    rec(0, 'LINE');
-    rec(8, l.layer);
-    rec(10, fmt(l.a.x));
-    rec(20, fmt(l.a.y));
-    rec(30, '0.000000');
-    rec(11, fmt(l.b.x));
-    rec(21, fmt(l.b.y));
-    rec(31, '0.000000');
-  }
-  for (const t of texts) for (const [c, v] of dxfTextRecords(t)) rec(c, v);
-  rec(0, 'ENDSEC');
-  rec(0, 'EOF');
-  return `${out.join('\r\n')}\r\n`;
+/**
+ * Planta de um nível em DXF R2000 (AC1015), o `writeDxf2000` do documento de `dxfDocOf`. O R12 antigo não guardava a
+ * espessura de linha por camada; o AC1015 guarda (370) e abre do AutoCAD 2000 ao 2025.
+ */
+export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry): string {
+  return writeDxf2000(dxfDocOf(project, levelId, geo));
 }

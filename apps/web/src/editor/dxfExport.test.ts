@@ -28,7 +28,26 @@ import {
   type ViewRange,
 } from '@hestia/model';
 import { climbWalk, openingPlanWorldPaths, planViewOf, risersInClimbOrder } from '@hestia/render';
-import { arrowOfPath, dxfGeometryOf, lineWeightsOf, planDxf, sectionDxf, sectionDxfGeometryOf, sectionLineWeightsOf, stairArrow } from './dxfExport.ts';
+import { arrowOfPath, dxfGeometryOf, dxfLayerTableOf, lineWeightsOf, planDxf, sectionDxf, sectionDxfGeometryOf, sectionLineWeightsOf, stairArrow } from './dxfExport.ts';
+
+/** Tabela de camadas do diálogo de exportação: a mesma lista que o arquivo leva, com o estilo efetivo. */
+describe('tabela de camadas do DXF (diálogo de exportação)', () => {
+  it('planta: uma linha por camada, com a cor da categoria e a espessura do lineWeights', () => {
+    const p = buildTemplate('house2');
+    const rows = dxfLayerTableOf(p, { kind: 'plan', levelId: 'lv_0' });
+    const byName = new Map(rows.map((r) => [r.name, r.style]));
+    expect(byName.get('PAREDE_CONTORNO')).toEqual({ color: 1, lineWeight: 50, linetype: 'CONTINUOUS' });
+    expect(byName.get('ABERTURA_ACIMA')).toEqual({ color: 2, lineWeight: 18, linetype: 'DASHED' });
+    expect(rows.map((r) => r.name)).toEqual(dxfLayersOf(p, dxfGeometryOf(p, 'lv_0')));
+  });
+
+  it('o que o projeto guarda em dxfLayers sobrepõe o padrão, na tabela e no arquivo', () => {
+    const p = structuredClone(buildTemplate('house2'));
+    p.dxfLayers = { PAREDE_CONTORNO: { color: 5, lineWeight: 100, linetype: 'DASHED' } };
+    expect(dxfLayerTableOf(p, { kind: 'plan', levelId: 'lv_0' }).find((r) => r.name === 'PAREDE_CONTORNO')?.style).toEqual({ color: 5, lineWeight: 100, linetype: 'DASHED' });
+    expect(planDxf(p, 'lv_0')).toContain('\r\nPAREDE_CONTORNO\r\n70\r\n0\r\n62\r\n5\r\n6\r\nDASHED\r\n');
+  });
+});
 
 /** Duas paredes em L no térreo, com uma porta na primeira. Passa pelo engine real, como no app. */
 function lPlan(): ProjectStore {
@@ -278,15 +297,13 @@ describe('escadas no DXF (camadas ESCADA, ESCADA_ESPELHO e ESCADA_SETA)', () => 
     // Conta registros de entidade (0/POLYLINE ou 0/LINE seguido da camada), não ocorrências do nome da camada.
     // Degraus em 0,60 / 1,20 / 1,80 / 2,40 m. Até o topo do intervalo (2,30 m) ficam 3: 2 cheios (até a cota de corte,
     // 1,20 m, inclusive) e 1 tracejado (acima dela). O de 2,40 m sai. Espelhos: os 3 com topo até 2,30 m.
-    const polylines = text.match(/\r\n0\r\nPOLYLINE\r\n8\r\nESCADA\r\n/g) ?? [];
+    const polylines = polylinesOf(text).filter((x) => x.layer === 'ESCADA');
     expect(polylines).toHaveLength(2);
-    const above = text.match(/\r\n0\r\nPOLYLINE\r\n8\r\nESCADA_ACIMA\r\n/g) ?? [];
+    const above = polylinesOf(text).filter((x) => x.layer === 'ESCADA_ACIMA');
     expect(above).toHaveLength(1);
-    const risers = text.match(/\r\n0\r\nLINE\r\n8\r\nESCADA_ESPELHO\r\n/g) ?? [];
-    expect(risers).toHaveLength(3);
+    expect(linesIn(text, 'ESCADA_ESPELHO')).toHaveLength(3);
     // seta: haste e duas pontas
-    const arrow = text.match(/\r\n0\r\nLINE\r\n8\r\nESCADA_SETA\r\n/g) ?? [];
-    expect(arrow).toHaveLength(3);
+    expect(linesIn(text, 'ESCADA_SETA')).toHaveLength(3);
     expect(text.endsWith('\r\n0\r\nEOF\r\n')).toBe(true);
   });
 
@@ -451,7 +468,7 @@ describe('caracol no DXF (decisão 0014 §1 item 10)', () => {
 
   it('a seta segue a caminhada em arcos (muitos trechos de haste), com as duas pontas; o corte sai na cota de 1,20 m', () => {
     const text = planDxf(spiralStore().project, 'lv_0');
-    expect((text.match(/\r\n0\r\nLINE\r\n8\r\nESCADA_SETA\r\n/g) ?? []).length).toBeGreaterThan(19);
+    expect(linesIn(text, 'ESCADA_SETA').length).toBeGreaterThan(19);
     expect(polylinesOf(text).filter((x) => x.layer === 'ESCADA_CORTE')).toHaveLength(1);
   });
 });

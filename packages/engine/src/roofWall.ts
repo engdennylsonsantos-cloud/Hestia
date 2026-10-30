@@ -24,14 +24,17 @@ interface AxisRoofs {
 }
 
 /**
- * Eixo da parede (reta ou curva) contra os telhados dos níveis dela (base e topo): comprimento, quebras e face inferior.
+ * Eixo da parede (reta ou curva) contra os telhados que cobrem o eixo: comprimento, quebras e face inferior.
  * Reta: quebras exatas nas bordas. Curva (sag ≠ 0): o eixo é o arco; quebras por amostragem a cada ARC_STEP e pelos
  * pontos em que o arco entra ou sai do telhado. Arco degenerado ou comprimento nulo, null.
+ *
+ * O nível do telhado NÃO decide o anexo: a cobertura costuma ser desenhada no nível de cima (ou o telhado muda de nível
+ * depois, `setElementLevel`), e a parede continua embaixo dele. Vale o telhado que cobre o eixo, de qualquer nível, e a
+ * face usada é a mais baixa ACIMA da base `baseZ` da parede (face abaixo da base não daria altura à parede). Com telhado
+ * escolhido (`attachTopRoofId`), só ele conta.
  */
-function axisRoofs(w: Wall, roofs: ResolvedRoof[]): AxisRoofs | null {
-  const topLevel = w.topLevelId ?? w.levelId;
-  // Com telhado escolhido (attachTopRoofId), só esse telhado conta; sem escolha, qualquer telhado do nível.
-  const rs = roofs.filter((r) => (r.levelId === w.levelId || r.levelId === topLevel) && (!w.attachTopRoofId || r.roofId === w.attachTopRoofId));
+function axisRoofs(w: Wall, roofs: ResolvedRoof[], baseZ: number): AxisRoofs | null {
+  const rs = w.attachTopRoofId ? roofs.filter((r) => r.roofId === w.attachTopRoofId) : roofs;
   const arc = w.sag !== 0 ? arcFromSagitta(w.a, w.b, w.sag) : null;
   if (w.sag !== 0 && !arc) return null;
   const L = arc ? arc.length : dist(w.a, w.b);
@@ -45,6 +48,8 @@ function axisRoofs(w: Wall, roofs: ResolvedRoof[]): AxisRoofs | null {
       const top = roofTopAt(r, p);
       if (top === null) continue;
       const bottom = top - roofThickness(r);
+      // Face no nível da base ou abaixo dela não serve para o topo: a parede ficaria sem altura.
+      if (bottom <= baseZ + MIN_HEIGHT) continue;
       z = z === null ? bottom : Math.min(z, bottom);
     }
     return z;
@@ -86,12 +91,13 @@ function curveBreakpoints(L: number, covered: (t: number) => boolean): number[] 
  * ao longo do eixo (cota da face superior menos a espessura total), relativa à base `baseZ`. Só o trecho do eixo coberto
  * pelo telhado segue o telhado; o trecho sem telhado fica na altura normal `normalTop` (absoluta), com um degrau no limite.
  * Amostras: extremos do eixo, cada divisa entre águas e cada borda do telhado que o eixo cruza, e um ponto médio entre duas
- * amostras seguidas. Entre telhados que cobrem o mesmo ponto vale a face inferior mais baixa. Sem nenhum trecho coberto,
- * null (a parede segue a altura normal). Parede curva não usa perfil.
+ * amostras seguidas. Entre telhados que cobrem o mesmo ponto vale a face inferior mais baixa acima da base da parede (o
+ * telhado pode estar em qualquer nível: ver `axisRoofs`). Sem nenhum trecho coberto, null (a parede segue a altura normal).
+ * Parede curva não usa perfil.
  */
 export function roofWallProfile(w: Wall, roofs: ResolvedRoof[], baseZ: number, normalTop: number): ProfilePoint[] | null {
   if (w.sag !== 0) return null;
-  const ax = axisRoofs(w, roofs);
+  const ax = axisRoofs(w, roofs, baseZ);
   if (!ax) return null;
   const { L, bps, bottomAt } = ax;
   const mids = bps.slice(0, -1).map((t, i) => (t + bps[i + 1]!) / 2);
@@ -130,11 +136,12 @@ export interface RoofAxisReport {
 }
 
 /**
- * Relatório de cobertura do eixo (reta ou curva, medido ao longo do arco): o aviso usa este relatório. Null só em parede
- * de comprimento nulo ou arco degenerado.
+ * Relatório de cobertura do eixo (reta ou curva, medido ao longo do arco): o aviso usa este relatório. `baseZ` é a base
+ * da parede: faces de telhado na base ou abaixo dela não contam (não dão altura à parede). Sem `baseZ`, vale toda face.
+ * Null só em parede de comprimento nulo ou arco degenerado.
  */
-export function roofAxisReport(w: Wall, roofs: ResolvedRoof[]): RoofAxisReport | null {
-  const ax = axisRoofs(w, roofs);
+export function roofAxisReport(w: Wall, roofs: ResolvedRoof[], baseZ = -Infinity): RoofAxisReport | null {
+  const ax = axisRoofs(w, roofs, baseZ);
   if (!ax) return null;
   const { L, bps, bottomAt } = ax;
   let uncovered = 0;

@@ -1,8 +1,10 @@
 import type { ReactElement } from 'react';
-import { STAIR_RUN_SHAPE_LABEL, STAIR_RUN_SHAPES, stairTypeForShape, stairTypesForShape, type StairRunShape, type StairRunToolOptions } from '@hestia/tools';
+import { stairTypeForShape, stairTypesForShape, type StairRunShape, type StairRunToolOptions } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
+import { I18N, useI18n } from '../editor/i18n.ts';
 import { useUi } from '../editor/state.ts';
 import { NumField } from './fields.tsx';
+import { stairRunFields, stairShapeOptions } from './stairRunFields.ts';
 
 /** Dica da barra por forma: o caracol tem três cliques; as demais, dois (ou um e a digitação do ângulo). */
 const HINT: Record<StairRunShape, string> = {
@@ -18,22 +20,23 @@ const HINT: Record<StairRunShape, string> = {
 const INNER_DEFAULT = 0.1;
 
 /**
- * Barra da ferramenta de escada por cliques (`stairrun`): forma (reta, L, U, leque ou caracol), largura, giro ou os campos
- * do caracol (raios, varredura e sentido) e tipo. A lista de tipos segue a forma: o caracol lista os tipos caracol; as
- * outras formas, os demais. Trocar a forma reinicia o desenho (como o modo do piso e do telhado); os demais campos valem
- * no próximo clique.
+ * Barra da ferramenta de escada por cliques (`stairrun`): forma (reta, L, U, leque, caracol ou livre), largura, patamar,
+ * giro ou os campos do caracol (raios, varredura e sentido) e tipo. A lista de formas vem de `stairShapeOptions`, a mesma
+ * do painel de Propriedades (a escada livre precisa aparecer nos dois lugares). A lista de tipos segue a forma: o caracol
+ * lista os tipos caracol; as outras formas, os demais. Trocar a forma reinicia o desenho (como o modo do piso e do
+ * telhado); os demais campos valem no próximo clique.
  */
 export function StairRunOptionsBar(): ReactElement {
   const p = useProject();
+  const t = I18N[useI18n((s) => s.lang)];
   const options = useUi((s) => s.options);
   const o: StairRunToolOptions = options.stairRun ?? { shape: 'straight', width: 1.2, turn: 'left' };
   const set = (patch: Partial<StairRunToolOptions>): void => {
     const cur = useUi.getState().options;
     useUi.setState({ options: { ...cur, stairRun: { ...(cur.stairRun ?? o), ...patch } } });
   };
-  const spiral = o.shape === 'spiral';
-  const turnable = o.shape !== 'straight' && o.shape !== 'free' && !spiral;
-  const landable = o.shape === 'lshape' || o.shape === 'ushape' || o.shape === 'free';
+  const fields = stairRunFields(o.shape);
+  const { spiral, turn: turnable, landing } = fields;
   const types = stairTypesForShape(p, o.shape);
   const typeValue = stairTypeForShape(p, o.shape, o.typeId) ?? '';
   return (
@@ -51,18 +54,18 @@ export function StairRunOptionsBar(): ReactElement {
             editor.setTool('stairrun');
           }}
         >
-          {STAIR_RUN_SHAPES.map((s) => (
-            <option key={s} value={s}>{STAIR_RUN_SHAPE_LABEL[s]}</option>
+          {stairShapeOptions(t.stair_shape_free).map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
           ))}
         </select>
       </label>
-      {!spiral && (
+      {fields.width && (
         <label>
           Largura
           <NumField id="opt-stairwidth" value={o.width} onCommit={(v) => set({ width: Math.max(0.1, v) })} quantity="length" min={0.1} />
         </label>
       )}
-      {landable && (
+      {landing && (
         <label>
           Prof. patamar
           <NumField

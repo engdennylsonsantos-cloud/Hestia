@@ -1,4 +1,4 @@
-import { resolveFloors, resolveRoofs, resolveSlabs, viewContextOf, wallZRange, type ResolvedFloor, type ResolvedRoof, type ResolvedSlab, type ViewContext } from '@hestia/engine';
+import { resolveAllRoofs, resolveFloors, resolveRoofs, resolveSlabs, viewContextOf, wallZRange, type ResolvedFloor, type ResolvedRoof, type ResolvedSlab, type ViewContext } from '@hestia/engine';
 import { isWall, levelAbove, levelElevation, wallMaxHeight, wallsOnLevel, wallTopElevation, type Id, type Project, type Wall } from '@hestia/model';
 
 /**
@@ -28,33 +28,43 @@ function espessuraMaxima(p: Project): number {
 /** Faixa de cota absoluta de cada nível: a união das faixas de parede, piso e laje que estão nele. Sem elemento, fora do mapa. */
 const faixasMemo = new WeakMap<Project, Map<Id, readonly [number, number]>>();
 
-/** Elementos que a faixa de cota de uma parede anexada ao telhado lê, por nível: telhados, pisos e lajes. */
+/** Pisos e lajes que a faixa de cota de uma parede anexada ao telhado lê, por nível. */
 interface LeituraDeNivel {
-  roofs: ResolvedRoof[];
   floors: ResolvedFloor[];
   slabs: ResolvedSlab[];
 }
 
 /**
- * Faixa de cota exata de uma parede anexada ao telhado (`wallZRange`, com o topo na face do telhado). A parede lê só os
- * telhados, pisos e lajes do próprio nível e do nível de topo (`topLevelId`, ou o próprio): `axisRoofs` filtra por esses
- * dois níveis. Por isso a faixa sai com a mesma leitura do motor, sem resolver os demais níveis.
+ * Faixa de cota exata de uma parede anexada ao telhado (`wallZRange`, com o topo na face do telhado). A parede lê os
+ * telhados de qualquer nível (o telhado que cobre o eixo pode estar no nível de cima, ver `axisRoofs`) e os pisos e lajes
+ * do próprio nível e do nível de topo (`topLevelId`, ou o próprio). Por isso a faixa sai com a mesma leitura do motor.
  */
 function faixaDaParedeNoTelhado(p: Project, w: Wall, porNivel: Map<Id, LeituraDeNivel>): readonly [number, number] {
   const niveis = [...new Set<Id>([w.levelId, w.topLevelId ?? w.levelId])];
-  const leitura: LeituraDeNivel = { roofs: [], floors: [], slabs: [] };
+  const floors: ResolvedFloor[] = [];
+  const slabs: ResolvedSlab[] = [];
   for (const id of niveis) {
     let doNivel = porNivel.get(id);
     if (!doNivel) {
-      doNivel = { roofs: resolveRoofs(p, id), floors: resolveFloors(p, id), slabs: resolveSlabs(p, id) };
+      doNivel = { floors: resolveFloors(p, id), slabs: resolveSlabs(p, id) };
       porNivel.set(id, doNivel);
     }
-    leitura.roofs.push(...doNivel.roofs);
-    leitura.floors.push(...doNivel.floors);
-    leitura.slabs.push(...doNivel.slabs);
+    floors.push(...doNivel.floors);
+    slabs.push(...doNivel.slabs);
   }
-  const z = wallZRange(p, w, leitura.floors, leitura.slabs, leitura.roofs);
+  const z = wallZRange(p, w, floors, slabs, telhadosDoProjeto(p));
   return [z.z0, z.z0 + z.height];
+}
+
+/** Telhados de todos os níveis, resolvidos uma vez por projeto (a parede anexada pode ler qualquer um deles). */
+const telhadosMemo = new WeakMap<Project, ResolvedRoof[]>();
+
+function telhadosDoProjeto(p: Project): ResolvedRoof[] {
+  const hit = telhadosMemo.get(p);
+  if (hit) return hit;
+  const valor = resolveAllRoofs(p);
+  telhadosMemo.set(p, valor);
+  return valor;
 }
 
 function faixasDosNiveis(p: Project): Map<Id, readonly [number, number]> {
@@ -111,9 +121,11 @@ function adjacentesDoNivel(p: Project, levelId: Id): Id[] {
 
 /**
  * Adiciona a `mantidos` os níveis que as paredes do nível leem além do próprio: o nível e seus vizinhos
- * (`attachBottomToFloor`, `attachTopToFloor`) e o nível de topo com os vizinhos dele (`attachTopToFloor` com `topLevelId`).
+ * (`attachBottomToFloor`, `attachTopToFloor`), o nível de topo com os vizinhos dele (`attachTopToFloor` com `topLevelId`)
+ * e, para `attachTopToRoof`, os níveis que têm telhado (a parede lê qualquer telhado que cubra o eixo, ver `axisRoofs`).
  */
 function adicionaDependencias(p: Project, nivel: Id, mantidos: Set<Id>): void {
+  let comTelhado: Id[] | null = null;
   for (const e of Object.values(p.elements)) {
     if (!isWall(e) || e.levelId !== nivel) continue;
     if (e.attachBottomToFloor === true || e.attachTopToFloor === true) {
@@ -122,11 +134,19 @@ function adicionaDependencias(p: Project, nivel: Id, mantidos: Set<Id>): void {
     if (e.attachTopToFloor === true && e.topLevelId) {
       for (const d of [e.topLevelId, ...adjacentesDoNivel(p, e.topLevelId)]) mantidos.add(d);
     }
-    // Parede anexada ao telhado lê só os telhados do próprio nível e do nível de topo (`axisRoofs`).
+    // Parede anexada ao telhado lê os telhados de todos os níveis: qualquer um pode cobrir o eixo dela.
     if (e.attachTopToRoof === true) {
-      for (const d of [nivel, e.topLevelId ?? nivel]) mantidos.add(d);
+      comTelhado ??= niveisComTelhado(p);
+      for (const d of comTelhado) mantidos.add(d);
     }
   }
+}
+
+/** Níveis que têm pelo menos um telhado (o que uma parede anexada pode ler). */
+function niveisComTelhado(p: Project): Id[] {
+  const out = new Set<Id>();
+  for (const e of Object.values(p.elements)) if (e.kind === 'roof') out.add(e.levelId);
+  return [...out];
 }
 
 /** Fecha as dependências: cada nível mantido puxa os níveis que as paredes dele leem, até o conjunto parar de crescer. */
@@ -147,8 +167,8 @@ const juncaoMemo = new WeakMap<Project, Map<Id, Project>>();
  *  - o próprio nível e os vizinhos (a resolução de lajes lê os vizinhos);
  *  - os níveis cuja faixa de elementos (paredes, pisos e lajes, com a espessura dos tipos) toca a faixa do nível. Para
  *    parede anexada ao telhado, a faixa é a cota exata que o motor calcula (`wallZRange`);
- *  - os níveis que as paredes anexadas desses níveis leem: piso de base ou de topo (com os vizinhos) e, para telhado, o
- *    próprio nível e o de topo. O conjunto fecha sobre si mesmo, porque cada nível novo traz as próprias dependências.
+ *  - os níveis que as paredes anexadas desses níveis leem: piso de base ou de topo (com os vizinhos) e, para telhado,
+ *    todos os níveis com telhado. O conjunto fecha sobre si mesmo, porque cada nível novo traz as próprias dependências.
  * Assim a junção do nível sai igual à do projeto inteiro: nível fora do conjunto não tem peça que alcance a faixa do nível.
  */
 export function projetoDaJuncao(p: Project, levelId: Id): Project {

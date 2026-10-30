@@ -18,7 +18,7 @@ export type RibbonTabId =
 export type ActionId =
   | 'cotasAuto' | 'typeProps' | 'properties' | 'browser' | 'sameType' | 'sameName' | 'moveLevel' | 'delete'
   | 'zoomFit' | 'thinLines' | 'grid' | 'underlay' | 'roofProjection' | 'graphicsVisibility' | 'view3d' | 'genElevations' | 'newSheet'
-  | 'materials' | 'levels' | 'lineWeights' | 'shortcutsConfig' | 'shortcuts'
+  | 'materials' | 'levels' | 'lineWeights' | 'shortcutsConfig' | 'shortcuts' | 'importCad'
   | 'schedWalls' | 'schedFloors' | 'schedSlabs' | 'schedCeilings' | 'schedRoofs' | 'schedStairs' | 'schedRooms' | 'schedOpenings'
   | 'stairSketch' | 'stairTypes' | 'rampTypes' | 'schedRamps' | 'propsSide' | 'browserSide' | 'resetDock' | 'tagAll' | 'wallTags' | 'editPerimeter';
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeLevel, makeWall, type Command, type Id, type Project } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeLevel, makeRoof, makeWall, type Command, type Id, type Project } from '@hestia/model';
 import { assinaturasDoProjeto, chavesDeNivel, hashTexto } from './chaveNivel3d.ts';
 
 /** Projeto com `n` pavimentos (cota de 3 m) e quatro paredes por nível, como o gerador do baseline. */
@@ -27,6 +27,32 @@ function comParede(p: Project, i: number, j: number, dx: number): Project {
   const w = p.elements[`ch_w_${i}_${j}`];
   if (!w || w.kind !== 'wall') throw new Error('parede de teste não encontrada');
   return { ...p, elements: { ...p.elements, [w.id]: { ...w, b: { x: w.b.x + dx, y: w.b.y } } } };
+}
+
+const CAIXA = [
+  { x: 0, y: 0 },
+  { x: 4, y: 0 },
+  { x: 4, y: 4 },
+  { x: 0, y: 4 },
+];
+
+/**
+ * Prédio de `n` pavimentos com um telhado no último nível. Com `anexar`, a parede do primeiro pavimento fica com o topo
+ * anexado ao telhado (`attachTopToRoof`), que o motor lê de qualquer nível (`axisRoofs`).
+ */
+function comTelhado(n: number, anexar: boolean): Project {
+  const store = new ProjectStore(predio(n));
+  const ultimo = `ch_lv_${n - 1}`;
+  store.exec({ type: 'addRoof', roof: makeRoof({ id: 'ch_r', typeId: 'rt_ceramica', levelId: ultimo, boundary: CAIXA, shape: 'gable', slopePercent: 30, dir: { x: 1, y: 0 }, heightOffset: 3 }) });
+  if (anexar) store.exec({ type: 'updateElements', ids: ['ch_w_0_0'], patch: { attachTopToRoof: true } });
+  return store.project;
+}
+
+/** Projeto igual, com a cota do beiral do telhado mudada (só o telhado muda). */
+function beiral(p: Project, altura: number): Project {
+  const s = new ProjectStore(p);
+  s.exec({ type: 'updateElements', ids: ['ch_r'], patch: { heightOffset: altura } });
+  return s.project;
 }
 
 const MARCA = '[false,false,false,"realistic"]';
@@ -97,5 +123,20 @@ describe('chaves de nível (conteúdo do pavimento e dos vizinhos por cota)', ()
   it('hashTexto é determinístico e distingue textos diferentes', () => {
     expect(hashTexto('abc')).toBe(hashTexto('abc'));
     expect(hashTexto('abc')).not.toBe(hashTexto('abd'));
+  });
+
+  it('nível com parede anexada ao telhado refaz quando um telhado de outro nível muda', () => {
+    const p = comTelhado(5, true);
+    const antes = chaves(p);
+    const mudou = chaves(beiral(p, 3.5)).map((k, i) => k !== antes[i]);
+    // lv_0 tem a parede anexada: lê o telhado do último nível (ch_lv_4), que é vizinho de ch_lv_3.
+    expect(mudou).toEqual([true, false, false, true, true]);
+  });
+
+  it('sem parede anexada, o telhado de outro nível só muda a chave do nível dele e do vizinho de cota', () => {
+    const p = comTelhado(5, false);
+    const antes = chaves(p);
+    const mudou = chaves(beiral(p, 3.5)).map((k, i) => k !== antes[i]);
+    expect(mudou).toEqual([false, false, false, true, true]);
   });
 });

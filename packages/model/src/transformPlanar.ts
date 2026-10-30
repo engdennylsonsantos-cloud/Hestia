@@ -1,5 +1,6 @@
 import { applyTransform, type Transform, type Vec2 } from '@hestia/geom';
 import { followsRoom } from './ceiling.ts';
+import type { CadDrawing } from './cad.ts';
 import { type Ceiling, type Floor, type Roof, type Slab } from './types.ts';
 
 /** Solta o vínculo do contorno quando o elemento é movido/girado/espelhado (a cópia herda a origem; decisão 0023 §8.2b). */
@@ -44,6 +45,21 @@ export function transformCeiling(c: Ceiling, t: Transform, copy = false): Ceilin
   };
   const moved = { ...c, boundary: pts(c.boundary), holes: c.holes.map(pts) };
   return !copy && followsRoom(c) ? { ...moved, roomLinked: false } : moved;
+}
+
+/** Move/gira/espelha um desenho CAD importado: todos os pontos dos caminhos e o ponto de cada texto. No espelho os
+ * caminhos fechados invertem o sentido (como piso e laje); devolve sempre uma cópia, sem mexer no original. */
+export function transformCad(cad: CadDrawing, t: Transform, copy = false): CadDrawing {
+  // O CAD não tem vínculo de contorno a soltar; `copy` só existe para casar com os demais transformadores.
+  void copy;
+  return {
+    ...cad,
+    paths: cad.paths.map((path) => {
+      const pts = path.pts.map((q) => applyTransform(t, q));
+      return { ...path, pts: t.kind === 'mirror' && path.closed ? pts.reverse() : pts };
+    }),
+    texts: cad.texts.map((text) => ({ ...text, at: applyTransform(t, text.at) })),
+  };
 }
 
 /**

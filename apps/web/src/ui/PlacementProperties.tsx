@@ -1,14 +1,16 @@
 import type { ReactElement } from 'react';
 import { areaPlanOf, isOpeningDimRef, isWallDimRef, type LocationLine } from '@hestia/model';
-import { DEFAULT_RAMP_OPTIONS, roofAutoOffset, type ToolId } from '@hestia/tools';
+import { DEFAULT_RAMP_OPTIONS, roofAutoOffset, stairTypeForShape, type ToolId } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { clearDimOverride, setDimOverride, useUi } from '../editor/state.ts';
+import { I18N, useI18n } from '../editor/i18n.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { useFormat } from './useUnits.ts';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
 import { OPENING_OPTIONS, WALL_OPTIONS, sessionChoice } from './dialogs/dimensionSettingsModel.ts';
 import { RampLevelsFields, rampLevelsValue } from './RampLevelsFields.tsx';
 import { abrirCaixaDeTexto } from './dialogs/TextDialog.tsx';
+import { stairRunFields, stairShapeOptions } from './stairRunFields.ts';
 
 const PLACE_TOOLS = new Set<ToolId>(['wall', 'door', 'window', 'floor', 'slab', 'slope', 'ceiling', 'roof', 'roofextrusion', 'stair', 'stairrun', 'ramp', 'room', 'roomsep', 'dimension', 'text', 'section']);
 
@@ -20,6 +22,7 @@ export function hasPlacementProperties(tool: ToolId): boolean {
 export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
   const p = useProject();
   const format = useFormat();
+  const t = I18N[useI18n((s) => s.lang)];
   const levelId = useUi((s) => s.levelId);
   const planKind = useUi((s) => s.planKind);
   const areaPlanId = useUi((s) => s.areaPlanId);
@@ -99,15 +102,20 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
           {!(o.stair?.topLevelId ?? p.levels.some((l) => l.elevation > (p.levels.find((x) => x.id === levelId)?.elevation ?? 0))) && <Row label="Altura" htmlFor="place-stair-height"><NumField id="place-stair-height" value={o.stair?.height ?? 2.8} quantity="length" min={0.1} onCommit={(v) => setStair({ height: v })} /></Row>}
         </Group>
       )}
-      {tool === 'stairrun' && (
-        <Group title="Colocação · Escada por lance">
-          <Row label="Forma" htmlFor="place-run-shape"><select id="place-run-shape" className="select" value={o.stairRun?.shape ?? 'straight'} onChange={(e) => setStairRun({ shape: e.target.value as NonNullable<typeof o.stairRun>['shape'] })}><option value="straight">Reta</option><option value="lshape">Em L</option><option value="ushape">Em U</option><option value="winder">Com leque</option><option value="spiral">Caracol</option></select></Row>
-          <Row label="Largura" htmlFor="place-run-width"><NumField id="place-run-width" value={o.stairRun?.width ?? 1.2} quantity="length" min={0.4} onCommit={(v) => setStairRun({ width: v })} /></Row>
-          {o.stairRun?.shape !== 'straight' && <Row label="Giro" htmlFor="place-run-turn"><select id="place-run-turn" className="select" value={o.stairRun?.turn ?? 'left'} onChange={(e) => setStairRun({ turn: e.target.value as 'left' | 'right' })}><option value="left">Esquerda</option><option value="right">Direita</option></select></Row>}
-          {/* units-ok: varredura da escada em graus (valor gravado em graus) */}
-          {o.stairRun?.shape === 'spiral' && <><Row label="Raio interno" htmlFor="place-run-inner"><NumField id="place-run-inner" value={o.stairRun?.spiralInner ?? 0.1} quantity="length" min={0.05} onCommit={(v) => setStairRun({ spiralInner: v })} /></Row><Row label="Raio externo" htmlFor="place-run-outer"><NumField id="place-run-outer" value={o.stairRun?.spiralOuter ?? 1} quantity="length" min={0.2} onCommit={(v) => setStairRun({ spiralOuter: v })} /></Row><Row label="Varredura" htmlFor="place-run-sweep"><NumField id="place-run-sweep" value={((o.stairRun?.spiralSweep ?? 360) * Math.PI) / 180} quantity="angle" min={(30 * Math.PI) / 180} max={(720 * Math.PI) / 180} onCommit={(v) => setStairRun({ spiralSweep: (v * 180) / Math.PI })} /></Row></>}
-        </Group>
-      )}
+      {tool === 'stairrun' && (() => {
+        const run = o.stairRun ?? { shape: 'straight' as const, width: 1.2, turn: 'left' as const };
+        const fields = stairRunFields(run.shape);
+        return (
+          <Group title="Colocação · Escada por lance">
+            <Row label="Forma" htmlFor="place-run-shape"><select id="place-run-shape" className="select" value={run.shape} onChange={(e) => { const shape = e.target.value as NonNullable<typeof o.stairRun>['shape']; setStairRun({ shape, typeId: stairTypeForShape(p, shape, run.typeId) ?? undefined }); }}>{stairShapeOptions(t.stair_shape_free).map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select></Row>
+            {fields.width && <Row label="Largura" htmlFor="place-run-width"><NumField id="place-run-width" value={run.width} quantity="length" min={0.4} onCommit={(v) => setStairRun({ width: v })} /></Row>}
+            {fields.landing && <Row label="Prof. do patamar" htmlFor="place-run-landing"><NumField id="place-run-landing" value={run.landingDepth ?? null} placeholder="largura" quantity="length" min={0.1} onCommit={(v) => setStairRun({ landingDepth: v })} onClear={() => setStairRun({ landingDepth: undefined })} /></Row>}
+            {fields.turn && <Row label="Giro" htmlFor="place-run-turn"><select id="place-run-turn" className="select" value={run.turn} onChange={(e) => setStairRun({ turn: e.target.value as 'left' | 'right' })}><option value="left">Esquerda</option><option value="right">Direita</option></select></Row>}
+            {/* units-ok: varredura da escada em graus (valor gravado em graus) */}
+            {fields.spiral && <><Row label="Raio interno" htmlFor="place-run-inner"><NumField id="place-run-inner" value={run.spiralInner ?? 0.1} quantity="length" min={0.05} onCommit={(v) => setStairRun({ spiralInner: v })} /></Row><Row label="Raio externo" htmlFor="place-run-outer"><NumField id="place-run-outer" value={run.spiralOuter ?? 1} quantity="length" min={0.2} onCommit={(v) => setStairRun({ spiralOuter: v })} /></Row><Row label="Varredura" htmlFor="place-run-sweep"><NumField id="place-run-sweep" value={((run.spiralSweep ?? 360) * Math.PI) / 180} quantity="angle" min={(30 * Math.PI) / 180} max={(720 * Math.PI) / 180} onCommit={(v) => setStairRun({ spiralSweep: (v * 180) / Math.PI })} /></Row></>}
+          </Group>
+        );
+      })()}
       {tool === 'ramp' && (
         <Group title="Colocação · Rampa">
           <RampLevelsFields project={p} levelId={levelId} idPrefix="place-ramp" value={rampLevelsValue(o.ramp ?? DEFAULT_RAMP_OPTIONS)} onChange={setRamp} Field={Row} />

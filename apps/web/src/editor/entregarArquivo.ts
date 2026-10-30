@@ -35,6 +35,7 @@ export function tipoDoArquivo(nome: string): string {
   if (ext === 'csv') return 'text/csv;charset=utf-8';
   if (ext === 'json') return 'application/json';
   if (ext === 'pdf') return 'application/pdf';
+  if (ext === 'zip') return 'application/zip';
   return 'text/plain;charset=utf-8';
 }
 

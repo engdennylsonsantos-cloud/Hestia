@@ -24,6 +24,39 @@ export interface ElementHit {
   kind: GraphicsCategory;
 }
 
+/** Nível atingido nas linhas de nível (nome/cota) da vista 3D: o id e o ponto (m) do traço. */
+export interface LevelHit {
+  kind: 'level';
+  levelId: Id;
+  point: { x: number; y: number; z: number };
+}
+
+/**
+ * Cota atingida no 3D: o intervalo, a etiqueta (sprite) da cota e a posição (NDC) do **centro da etiqueta**, para o
+ * editor abrir exatamente sobre ela. O clique pode ter acertado a linha ou os tiques; a etiqueta vem sempre do mesmo
+ * intervalo (`levelId`/`neighborId`/`side`).
+ */
+export interface DimensionHit {
+  levelId: Id;
+  neighborId: Id;
+  side: 'below' | 'above';
+  value: number;
+  /** Etiqueta 3D da cota: o editor a esconde enquanto o input ocupa o lugar dela. */
+  label: THREE.Sprite;
+  ndc: { x: number; y: number };
+}
+
+/** `userData.dimension` dos objetos da cota (linha, chamadas, tiques e etiqueta compartilham o mesmo info). */
+interface DimensionInfo {
+  levelId: Id;
+  neighborId: Id;
+  side: 'below' | 'above';
+  value: number;
+}
+
+/** Tolerância (m) do raio às linhas de nível: o clique não precisa acertar o fio exato. */
+const LIMIAR_LINHA_NIVEL = 0.15;
+
 /**
  * Picking na GPU (ID buffer). `ler` devolve um resultado **já lido** para este pixel e câmera (cache do leitor); `pedir`
  * agenda a leitura assíncrona do pixel para o próximo quadro. Enquanto a leitura não chega, `pickElement` responde pelo
@@ -119,6 +152,83 @@ export function pickElement(
     gpu.pedir(ndc, camera);
   }
   return pickElementNoBvh(root, camera, ndc);
+}
+
+/**
+ * Nível atingido pelo raio do cursor no datum da vista 3D (linha tracejada, bolha, texto e o plano do nível selecionado).
+ * Só os objetos com `userData.levelId` do grupo `userData.levels` (ou o plano com `userData.levelsPlane`) entram: as
+ * linhas do CAD e as malhas do modelo não têm esse campo (o `pickElement` continua devolvendo só elementos). A tolerância
+ * de linha é a de um clique confortável.
+ */
+export function pickLevel(scene: THREE.Object3D, camera: THREE.Camera, ndc: { x: number; y: number }): LevelHit | null {
+  scene.updateMatrixWorld(true);
+  const alvos = new Set<THREE.Object3D>();
+  scene.traverse((o) => {
+    if (o.userData.levels === true) {
+      o.traverse((c) => {
+        // O plano azul é só realce de seleção: não entra no picking, senão bloqueia paredes/telhados atrás dele.
+        if (c.userData.levelId && c.userData.levelsPlane !== true) alvos.add(c);
+      });
+    } else if (o.userData.levelId && o.userData.levelsPlane !== true && ((o as THREE.Line).isLine || (o as THREE.Sprite).isSprite || (o as THREE.Mesh).isMesh)) {
+      // Datum fora do grupo: a linha/bolha/texto também é alvo (o plano não).
+      alvos.add(o);
+    }
+  });
+  if (!alvos.size) return null;
+
+  rc.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), camera);
+  const limiarAnt = rc.params.Line.threshold;
+  rc.params.Line.threshold = LIMIAR_LINHA_NIVEL;
+  try {
+    for (const h of rc.intersectObjects([...alvos], false)) {
+      const levelId = h.object.userData.levelId as Id | undefined;
+      if (!levelId) continue;
+      return { kind: 'level', levelId, point: { x: h.point.x, y: h.point.y, z: h.point.z } };
+    }
+  } finally {
+    rc.params.Line.threshold = limiarAnt;
+  }
+  return null;
+}
+
+/**
+ * Cota sob o cursor: procura as linhas/etiquetas com `userData.dimension` e devolve o intervalo, a etiqueta e o centro
+ * dela em NDC. A etiqueta é um sprite e as linhas de cota têm tolerância; o clique não precisa acertar o pixel exato.
+ * Como o editor HTML substitui a etiqueta no lugar dela, a posição devolvida é sempre a do sprite (mesmo quando o raio
+ * acerta a linha ou os tiques), nunca a do ponto clicado.
+ */
+export function pickDimension(scene: THREE.Object3D, camera: THREE.Camera, ndc: { x: number; y: number }): DimensionHit | null {
+  scene.updateMatrixWorld(true);
+  const alvos: THREE.Object3D[] = [];
+  const etiquetas: THREE.Sprite[] = [];
+  scene.traverse((o) => {
+    if (!o.userData.dimension) return;
+    alvos.push(o);
+    if ((o as THREE.Sprite).isSprite) etiquetas.push(o as THREE.Sprite);
+  });
+  if (!alvos.length || !etiquetas.length) return null;
+  rc.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), camera);
+  const limiarAnt = rc.params.Line.threshold;
+  rc.params.Line.threshold = LIMIAR_LINHA_NIVEL;
+  try {
+    for (const h of rc.intersectObjects(alvos, false)) {
+      const d = h.object.userData.dimension as DimensionInfo | undefined;
+      if (!d) continue;
+      // A etiqueta é o sprite do mesmo intervalo: o editor abre sobre ela, não sobre o ponto atingido.
+      const label = etiquetas.find((s) => mesmaCota(s.userData.dimension as DimensionInfo, d));
+      if (!label) continue;
+      const p = label.getWorldPosition(new THREE.Vector3()).project(camera);
+      return { levelId: d.levelId, neighborId: d.neighborId, side: d.side, value: d.value, label, ndc: { x: p.x, y: p.y } };
+    }
+  } finally {
+    rc.params.Line.threshold = limiarAnt;
+  }
+  return null;
+}
+
+/** Os dois objetos são da mesma cota (mesmo intervalo e mesmo lado)? */
+function mesmaCota(a: DimensionInfo | undefined, b: DimensionInfo): boolean {
+  return !!a && a.levelId === b.levelId && a.neighborId === b.neighborId && a.side === b.side;
 }
 
 /** O caminho de sempre: BVH por malha, faixa do triângulo atingido → id. */

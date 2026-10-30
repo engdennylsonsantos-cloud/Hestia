@@ -211,19 +211,28 @@ describe('pickElement (vista 3D)', () => {
   });
 });
 
+/** Objeto do datum de nível (o grupo leva `userData.levels`): não é realce nem malha do modelo. */
+function ehDoNivel(o: THREE.Object3D): boolean {
+  for (let a: THREE.Object3D | null = o; a; a = a.parent) if (a.userData?.levels === true) return true;
+  return false;
+}
+
 /** Malhas de sobreposição de realce: transparentes e sem gravar profundidade (o modelo não tem nenhuma assim por padrão). */
 function realces(ms: ModelScene): THREE.Mesh[] {
   const out: THREE.Mesh[] = [];
   ms.scene.traverse((o) => {
+    if (ehDoNivel(o)) return;
     const m = o as THREE.Mesh;
+    // O chão é um plano transparente (só sombra): não é realce.
+    if (m.isMesh && m.geometry?.type === 'PlaneGeometry') return;
     if (m.isMesh && m.material && (m.material as THREE.Material).transparent && (m.material as THREE.Material).depthWrite === false) out.push(m);
   });
   return out;
 }
 
-/** Malhas do modelo (o grupo principal da cena), sem as de picking e as de realce. */
+/** Malhas do modelo (o grupo principal da cena), sem as de picking, as de realce e o datum de nível. */
 function malhasDoModelo(ms: ModelScene): number {
-  const grupo = ms.scene.children.find((c): c is THREE.Group => c instanceof THREE.Group)!;
+  const grupo = ms.scene.children.find((c): c is THREE.Group => c instanceof THREE.Group && c.userData?.levels !== true)!;
   let n = 0;
   grupo.traverse((o) => {
     if ((o as THREE.Mesh).isMesh) n++;

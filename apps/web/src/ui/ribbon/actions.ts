@@ -267,6 +267,12 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     },
   },
   materials: { label: t('Materiais', 'Materials'), icon: 'layers', run: openDialog('materials') },
+  importCad: {
+    label: t('Importar CAD (DXF)', 'Import CAD'),
+    icon: 'open',
+    hint: t('Insere um desenho DXF no nível, como um objeto só, com as camadas do arquivo.', 'Insert a DXF drawing on the level as a single object, with the file layers.'),
+    run: openDialog('importCad'),
+  },
   levels: { label: t('Nível', 'Level'), icon: 'level', hint: t('Cria e edita os níveis do projeto.', 'Create and edit project levels.'), run: openDialog('levels') },
   lineWeights: { label: t('Espessuras de linha', 'Line Weights'), icon: 'detail', hint: t('Pesos de linha por escala, por categoria e limites de detalhe.', 'Line weights by scale and category.'), run: openDialog('lineWeights') },
   shortcutsConfig: { label: t('Atalhos de teclado…', 'Keyboard Shortcuts…'), icon: 'help', run: openDialog('shortcutsConfig') },

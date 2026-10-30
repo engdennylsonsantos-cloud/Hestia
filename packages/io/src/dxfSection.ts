@@ -1,10 +1,12 @@
-import type { GraphicsCategory, Id, Project } from '@hestia/model';
-import { DXF_BLOCKS_SECTION, DXF_STYLE_TABLE, type DxfPoint, type DxfPolygons } from './dxf.ts';
+import type { DxfLayerStyle, GraphicsCategory, Id, Project } from '@hestia/model';
+import type { DxfPoint, DxfPolygons } from './dxf.ts';
+import { DXF_CATEGORY_COLORS, DXF_LINE_WEIGHT_DEFAULT } from './dxf.ts';
+import { writeDxf2000, type DxfDoc, type DxfDocEntity, type DxfDocLayer, type DxfUnit } from './dxfDoc.ts';
 
 /**
  * DXF do corte e da elevação (decisão 0015 §2.7). O desenho é (t, z), com z para cima; o peso da categoria na escala da
- * vista fica em `lineWeights`, que o R12 não escreve (como a planta: ver `DxfLevelGeometry.lineWeights`). O io não conhece
- * o motor: quem monta a geometria é o app, que entrega os polígonos já visíveis e a categoria de cada um.
+ * vista fica em `lineWeights`, que vira o 370 de cada camada no R2000. O io não conhece o motor: quem monta a geometria é o
+ * app, que entrega os polígonos já visíveis e a categoria de cada um.
  */
 
 /** Categoria de uma camada do corte/elevação e se o peso é o de corte ou o de projeção. */
@@ -28,10 +30,13 @@ export interface DxfSectionGeometry {
   silhouette?: DxfPolygons;
   /**
    * Largura de linha de cada camada, em centésimos de mm (arredondada ao valor DXF válido). Quem monta preenche com
-   * `sectionLineWeightsOf` (apps/web), na escala da vista. O `exportSectionDxf` não a escreve: o 370 é do R2000 e o
-   * AutoCAD recusa o arquivo R12 que o leva.
+   * `sectionLineWeightsOf` (apps/web), na escala da vista; sai no código 370 da tabela LAYER.
    */
   lineWeights?: Partial<Record<string, number>>;
+  /** Estilo por camada vindo da tabela editável do projeto; ausente = `dxfSectionLayerStyleOf`. */
+  layerStyles?: Record<string, DxfLayerStyle>;
+  /** Unidade de saída do arquivo; ausente = metros. A geometria (t, z) continua em metros. */
+  units?: DxfUnit;
 }
 
 const CATEGORY_LAYER: Record<GraphicsCategory, string> = {
@@ -68,9 +73,6 @@ export function dxfSectionLineRoleOf(layer: string): DxfSectionRole | 'annotatio
   }
   return undefined;
 }
-
-// units-ok: coordenada DXF (formato de máquina)
-const fmt = (v: number): string => (Math.abs(v) < 5e-7 ? 0 : v).toFixed(6);
 
 /** Anel sem o vértice de fechamento repetido; com menos de 3 vértices não há área. */
 function openRing(ring: DxfPoint[]): DxfPoint[] | null {
@@ -109,89 +111,37 @@ export function dxfSectionLayersOf(geo: DxfSectionGeometry): string[] {
   return [...new Set(['0', ...shapesOf(geo).map((s) => s.layer)])].sort();
 }
 
+/** Estilo padrão de uma camada do corte: cor da categoria (cinza na projeção), contínua e a espessura pedida. */
+export function dxfSectionLayerStyleOf(layer: string, lineWeight = DXF_LINE_WEIGHT_DEFAULT): DxfLayerStyle {
+  const role = dxfSectionLineRoleOf(layer);
+  if (role === undefined || role === 'annotation') return { color: 7, lineWeight, linetype: 'CONTINUOUS' };
+  return { color: role.view === 'projection' ? 8 : DXF_CATEGORY_COLORS[role.category], lineWeight, linetype: 'CONTINUOUS' };
+}
+
 /**
- * Corte ou elevação em DXF ASCII (AC1009, R12), unidades em metros, z para cima. As camadas seguem a categoria
- * (`CORTE_PAREDE`, `CORTE_PISO`, …, `_PROJECAO` para o que está além) e o contorno externo vai em `CORTE_CONTORNO`.
- * R12 estrito, como a planta: sem 370, com STYLE e BLOCKS (vazia).
+ * Documento R2000 (AC1015) do corte ou da elevação: unidades em metros, z para cima. As camadas seguem a categoria
+ * (`CORTE_PAREDE`, `CORTE_PISO`, …, `_PROJECAO` para o que está além) e o contorno externo vai em `CORTE_CONTORNO`. Cada
+ * camada leva a largura de linha de `geo.lineWeights` (código 370, o que o R12 não guardava) e o estilo de `layerStyles`,
+ * ou o padrão de `dxfSectionLayerStyleOf`.
  */
-export function exportSectionDxf(project: Project, viewId: Id, geo: DxfSectionGeometry): string {
-  if (!project.views.some((v) => v.id === viewId)) throw new Error(`Vista ausente: ${viewId}`);
+export function sectionDxfDocOf(geo: DxfSectionGeometry): DxfDoc {
   const shapes = shapesOf(geo);
-  const layers = [...new Set(['0', ...shapes.map((s) => s.layer)])].sort();
+  const layers: DxfDocLayer[] = [...new Set(['0', ...shapes.map((s) => s.layer)])].sort().map((name) => {
+    const style = geo.layerStyles?.[name] ?? dxfSectionLayerStyleOf(name, geo.lineWeights?.[name] ?? DXF_LINE_WEIGHT_DEFAULT);
+    return { name, color: style.color, linetype: style.linetype, lineWeight: style.lineWeight };
+  });
+  const entities: DxfDocEntity[] = shapes.map((s) => ({ kind: 'polyline', layer: s.layer, points: s.pts, closed: true }));
   const all = shapes.flatMap((s) => s.pts);
   const lo = all.reduce((m, p) => ({ x: Math.min(m.x, p.x), y: Math.min(m.y, p.y) }), { x: 0, y: 0 });
   const hi = all.reduce((m, p) => ({ x: Math.max(m.x, p.x), y: Math.max(m.y, p.y) }), { x: 0, y: 0 });
-  const out: string[] = [];
-  const rec = (code: number, value: string | number): void => {
-    out.push(String(code), String(value));
-  };
+  return { layers, entities, extMin: lo, extMax: hi, ...(geo.units === undefined ? {} : { units: geo.units }) };
+}
 
-  rec(0, 'SECTION');
-  rec(2, 'HEADER');
-  rec(9, '$ACADVER');
-  rec(1, 'AC1009');
-  rec(9, '$INSUNITS');
-  rec(70, 6);
-  rec(9, '$MEASUREMENT');
-  rec(70, 1);
-  rec(9, '$EXTMIN');
-  rec(10, fmt(lo.x));
-  rec(20, fmt(lo.y));
-  rec(30, '0.000000');
-  rec(9, '$EXTMAX');
-  rec(10, fmt(hi.x));
-  rec(20, fmt(hi.y));
-  rec(30, '0.000000');
-  rec(0, 'ENDSEC');
-
-  rec(0, 'SECTION');
-  rec(2, 'TABLES');
-  rec(0, 'TABLE');
-  rec(2, 'LTYPE');
-  rec(70, 1);
-  rec(0, 'LTYPE');
-  rec(2, 'CONTINUOUS');
-  rec(70, 0);
-  rec(3, 'Solid line');
-  rec(72, 65);
-  rec(73, 0);
-  rec(40, '0.0');
-  rec(0, 'ENDTAB');
-  rec(0, 'TABLE');
-  rec(2, 'LAYER');
-  rec(70, layers.length);
-  for (const name of layers) {
-    rec(0, 'LAYER');
-    rec(2, name);
-    rec(70, 0);
-    rec(62, 7);
-    rec(6, 'CONTINUOUS');
-  }
-  rec(0, 'ENDTAB');
-  for (const [c, v] of DXF_STYLE_TABLE) rec(c, v);
-  rec(0, 'ENDSEC');
-
-  for (const [c, v] of DXF_BLOCKS_SECTION) rec(c, v);
-
-  rec(0, 'SECTION');
-  rec(2, 'ENTITIES');
-  for (const s of shapes) {
-    rec(0, 'POLYLINE');
-    rec(8, s.layer);
-    rec(66, 1);
-    rec(10, '0.000000');
-    rec(20, '0.000000');
-    rec(70, 1);
-    for (const p of s.pts) {
-      rec(0, 'VERTEX');
-      rec(8, s.layer);
-      rec(10, fmt(p.x));
-      rec(20, fmt(p.y));
-    }
-    rec(0, 'SEQEND');
-    rec(8, s.layer);
-  }
-  rec(0, 'ENDSEC');
-  rec(0, 'EOF');
-  return `${out.join('\r\n')}\r\n`;
+/**
+ * Corte ou elevação em DXF R2000 (AC1015): o `writeDxf2000` do documento de `sectionDxfDocOf`. Só a existência da vista é
+ * conferida aqui (o io não conhece o motor): quem monta a geometria é o app.
+ */
+export function exportSectionDxf(project: Project, viewId: Id, geo: DxfSectionGeometry): string {
+  if (!project.views.some((v) => v.id === viewId)) throw new Error(`Vista ausente: ${viewId}`);
+  return writeDxf2000(sectionDxfDocOf(geo));
 }

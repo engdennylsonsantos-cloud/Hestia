@@ -41,6 +41,10 @@ export interface AssinaturasProjeto {
   nivel: Map<Id, string>;
   /** Ids dos níveis do mais baixo ao mais alto (cota; empate pela ordem do projeto). */
   ordem: Id[];
+  /** Níveis com parede de topo anexado ao telhado: a malha do nível depende dos telhados de qualquer nível. */
+  anexadosAoTelhado: Set<Id>;
+  /** Ids dos níveis que têm telhado, na ordem do projeto. */
+  comTelhado: Id[];
 }
 
 /** Assinaturas do projeto para as chaves dos níveis (uma passada sobre os elementos). */
@@ -48,6 +52,8 @@ export function assinaturasDoProjeto(p: Project): AssinaturasProjeto {
   const { elements, ...resto } = p;
   const porNivel = new Map<Id, string[]>();
   const globais: string[] = [];
+  const anexadosAoTelhado = new Set<Id>();
+  const comTelhado = new Set<Id>();
   for (const id of Object.keys(elements)) {
     const e = elements[id]!;
     const linha = `${id}:${JSON.stringify(e)}`;
@@ -57,6 +63,8 @@ export function assinaturasDoProjeto(p: Project): AssinaturasProjeto {
       const lista = porNivel.get(nivel);
       if (lista) lista.push(linha);
       else porNivel.set(nivel, [linha]);
+      if (e.kind === 'wall' && e.attachTopToRoof === true) anexadosAoTelhado.add(nivel);
+      if (e.kind === 'roof') comTelhado.add(nivel);
     }
   }
   const nivel = new Map<Id, string>();
@@ -65,20 +73,30 @@ export function assinaturasDoProjeto(p: Project): AssinaturasProjeto {
     .map((l, i) => ({ id: l.id, cota: l.elevation, i }))
     .sort((a, b) => a.cota - b.cota || a.i - b.i)
     .map((l) => l.id);
-  return { global: hashTexto(`${JSON.stringify(resto)}\u0002${globais.join('\n')}`), nivel, ordem };
+  return {
+    global: hashTexto(`${JSON.stringify(resto)}\u0002${globais.join('\n')}`),
+    nivel,
+    ordem,
+    anexadosAoTelhado,
+    comTelhado: p.levels.filter((l) => comTelhado.has(l.id)).map((l) => l.id),
+  };
 }
 
 /**
  * Chave de cada nível do projeto. `marca` é a marca da vista (tema, arestas, sombras): entra em todas as chaves.
- * Duas chaves iguais garantem a mesma malha; uma chave diferente refaz o nível.
+ * Duas chaves iguais garantem a mesma malha; uma chave diferente refaz o nível. Nível com parede anexada ao telhado lê
+ * os telhados de TODOS os níveis (`axisRoofs`): a chave deles entra na chave dele, senão editar um telhado de outro
+ * nível deixaria a malha antiga na tela.
  */
 export function chavesDeNivel(p: Project, marca: string): Map<Id, string> {
   const a = assinaturasDoProjeto(p);
+  const telhados = a.comTelhado.map((id) => a.nivel.get(id) ?? '-').join('|');
   const out = new Map<Id, string>();
   a.ordem.forEach((id, i) => {
     const abaixo = i > 0 ? a.nivel.get(a.ordem[i - 1]!)! : '-';
     const acima = i < a.ordem.length - 1 ? a.nivel.get(a.ordem[i + 1]!)! : '-';
-    out.set(id, hashTexto([marca, a.global, abaixo, a.nivel.get(id)!, acima].join('|')));
+    const deTelhado = a.anexadosAoTelhado.has(id) ? telhados : '-';
+    out.set(id, hashTexto([marca, a.global, abaixo, a.nivel.get(id)!, acima, deTelhado].join('|')));
   });
   return out;
 }

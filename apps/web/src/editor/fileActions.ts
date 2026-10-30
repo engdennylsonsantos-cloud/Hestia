@@ -1,5 +1,4 @@
 import { editor } from './controller.ts';
-import { saveAreaPlanDxf, savePlanDxf, saveSectionDxf } from './dxfExport.ts';
 import { saveProjectIfc } from './ifcExport.ts';
 import { savePdf } from './savePdf.ts';
 import { pranchaDaPlantaAtual, sheetsPdfOf } from './sheetActions.ts';
@@ -16,16 +15,9 @@ export async function openProjectFile(f: File | undefined): Promise<void> {
   say(r.ok ? `Aberto: ${f.name}` : `Não foi possível abrir: ${r.error}`);
 }
 
+/** Abre o diálogo de exportação DXF (lote de desenhos e pranchas, num ZIP). */
 export async function exportDxf(): Promise<void> {
-  const ui = useUi.getState();
-  // A planta de cobertura não tem DXF próprio: sairia a planta de piso do nível, como se fosse a que está na tela.
-  if (ui.view === 'plan' && ui.planKind === 'roof') return say('A planta de cobertura ainda não exporta DXF: abra a planta de piso do nível.');
-  try {
-    if (ui.view === 'plan' && ui.planKind === 'area' && ui.areaPlanId) return say(`DXF salvo: ${await saveAreaPlanDxf(editor.project, ui.areaPlanId)}`);
-    say(ui.view === 'section' && ui.sectionId ? await saveSectionDxf(editor.project, ui.sectionId) : await savePlanDxf(editor.project, ui.levelId, ui.showRoofProjection));
-  } catch (e) {
-    say(`Não foi possível exportar o DXF: ${why(e)}`);
-  }
+  useUi.setState({ dialog: 'dxfLayers' });
 }
 
 export async function exportPdf(): Promise<void> {

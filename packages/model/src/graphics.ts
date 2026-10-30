@@ -99,6 +99,8 @@ export interface View3DSettings {
   background: string | null;
   /** Abre as folhas no 3D (porta de giro a 90°, janela de correr/giro entreaberta). Ausente = fechada. */
   openOpenings?: boolean;
+  /** Mostra as linhas de nível (nome e cota) no 3D. Ausente = ligado. */
+  showLevels?: boolean;
 }
 
 /** Tabela do template padrão do Revit (mm de papel, 1:50 | 1:100 | 1:200). Fonte: docs/visualizacao/C-relatorio-pesquisa.md (c) [SECUNDÁRIO]. */

@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { buildTemplate, createEmptyProject, type Project } from '@hestia/model';
-import { dxfLayerOfMaterial, exportDxf, type DxfLevelGeometry, type DxfPoint } from './dxf.ts';
-import { dxfProblemsR12 } from './dxfCheck.ts';
-import { dxfEscapeText, dxfTextRecords } from './dxfNotes.ts';
-import { exportSectionDxf, type DxfSectionGeometry } from './dxfSection.ts';
+import { dxfLayerOfMaterial, dxfLayerStyleOf, exportDxf, type DxfLevelGeometry, type DxfPoint } from './dxf.ts';
+import { dxfProblems2000 } from './dxfCheck.ts';
+import { dxfEscapeText } from './dxfNotes.ts';
+import { dxfSectionLayerStyleOf, exportSectionDxf, type DxfSectionGeometry } from './dxfSection.ts';
 
 /**
- * Compatibilidade com o AutoCAD (decisão: o DXF é R12/AC1009). O AutoCAD 2025 descarta o desenho inteiro se achar um
- * código que o R12 não tem: "Unknown group 370 for table … Invalid or incomplete DXF input -- drawing discarded".
- * O verificador `dxfProblemsR12` confere essa estrutura sem depender do CAD.
+ * Compatibilidade com o AutoCAD. O Hestia exporta R2000 (AC1015): o R12 (AC1009) não guarda a espessura de linha por camada
+ * (código 370), e o AutoCAD 2025 descarta o desenho inteiro se a estrutura do R2000 estiver incompleta ("Invalid or
+ * incomplete DXF input -- drawing discarded"). O verificador `dxfProblems2000` confere essa estrutura sem depender do CAD.
  */
 
 const project = buildTemplate('house2');
@@ -38,59 +38,114 @@ const withSection = (): Project => {
   return p;
 };
 
-describe('verificador do DXF R12', () => {
-  it('acusa o 370 na tabela LAYER, o defeito que o AutoCAD recusa', () => {
-    const ok = exportDxf(project, 'lv_0', planGeo);
-    expect(dxfProblemsR12(ok)).toEqual([]);
-    const ruim = ok.replace('CONTINUOUS\r\n0\r\nLAYER', 'CONTINUOUS\r\n370\r\n-3\r\n0\r\nLAYER');
-    expect(ruim).not.toBe(ok);
-    expect(dxfProblemsR12(ruim)).toContain('código 370 não existe no R12');
+/** Registros do arquivo: tipo (código 0) e pares seguintes. */
+function records(text: string): Array<{ type: string; pairs: Array<[number, string]> }> {
+  const out: Array<{ type: string; pairs: Array<[number, string]> }> = [];
+  const lines = text.split('\r\n');
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const code = Number(lines[i]);
+    if (code === 0) out.push({ type: lines[i + 1]!, pairs: [] });
+    else out.at(-1)?.pairs.push([code, lines[i + 1]!]);
+  }
+  return out;
+}
+
+describe('verificador do DXF R2000', () => {
+  it('aceita a planta, o corte e o documento vazio', () => {
+    expect(dxfProblems2000(exportDxf(project, 'lv_0', planGeo))).toEqual([]);
+    expect(dxfProblems2000(exportSectionDxf(withSection(), 'corte_a', sectionGeo))).toEqual([]);
+    expect(dxfProblems2000(exportDxf(project, 'lv_0', { clusters: [], openings: [] }))).toEqual([]);
   });
 
-  it('acusa seção BLOCKS ausente, EOF repetido, valor não ASCII e NaN', () => {
+  it('acusa a versão errada, a camada sem 370 e o 390 sem objeto', () => {
     const ok = exportDxf(project, 'lv_0', planGeo);
-    expect(dxfProblemsR12(ok.replace('0\r\nSECTION\r\n2\r\nBLOCKS\r\n0\r\nENDSEC\r\n', ''))).toEqual(expect.arrayContaining([expect.stringContaining('seções')]));
-    expect(dxfProblemsR12(`${ok}0\r\nEOF\r\n`)).toContain('EOF ausente ou repetido');
-    expect(dxfProblemsR12(ok.replace('PAREDE_CONTORNO', 'PAREDE_CONTORNÃO'))).toEqual(expect.arrayContaining([expect.stringContaining('não ASCII')]));
-    expect(dxfProblemsR12(ok.replace('4.000000', 'NaN'))).toEqual(expect.arrayContaining([expect.stringContaining('não numérico')]));
+    expect(dxfProblems2000(ok.replace('AC1015', 'AC1009'))).toContain('$ACADVER ausente ou diferente de AC1015');
+    expect(dxfProblems2000(ok.replace('\r\n370\r\n-3\r\n', '\r\n'))).toEqual(expect.arrayContaining([expect.stringContaining('sem espessura (370)')]));
+    expect(dxfProblems2000(ok.replace('\r\n390\r\n', '\r\n391\r\n'))).toEqual(expect.arrayContaining([expect.stringContaining('sem PlotStyleName (390)')]));
+  });
+
+  it('acusa seção ausente, EOF repetido, valor não ASCII, NaN e handle fora do $HANDSEED', () => {
+    const ok = exportDxf(project, 'lv_0', planGeo);
+    expect(dxfProblems2000(ok.replace(/0\r\nSECTION\r\n2\r\nCLASSES\r\n[\s\S]*?0\r\nENDSEC\r\n/, ''))).toEqual(expect.arrayContaining([expect.stringContaining('seções')]));
+    expect(dxfProblems2000(`${ok}0\r\nEOF\r\n`)).toContain('EOF ausente ou repetido');
+    expect(dxfProblems2000(ok.replace('PAREDE_CONTORNO', 'PAREDE_CONTORNÃO'))).toEqual(expect.arrayContaining([expect.stringContaining('não ASCII')]));
+    expect(dxfProblems2000(ok.replace('4.000000', 'NaN'))).toEqual(expect.arrayContaining([expect.stringContaining('não numérico')]));
+    expect(dxfProblems2000(ok.replace(/\$HANDSEED\r\n5\r\n[0-9A-F]+/, '$HANDSEED\r\n5\r\n1'))).toEqual(expect.arrayContaining([expect.stringContaining('não é menor que $HANDSEED')]));
+  });
+
+  it('acusa handle repetido e camada usando tipo de linha que não está na tabela', () => {
+    const ok = exportDxf(project, 'lv_0', planGeo);
+    expect(dxfProblems2000(ok.replace('5\r\n10\r\n', '5\r\n11\r\n'))).toEqual(expect.arrayContaining([expect.stringContaining('handle repetido')]));
+    expect(dxfProblems2000(ok.replace('\r\n6\r\nCONTINUOUS\r\n', '\r\n6\r\nPONTILHADO\r\n'))).toEqual(expect.arrayContaining([expect.stringContaining('que não está na tabela LTYPE')]));
   });
 });
 
-describe('planta e corte são R12 estrito (sem grupos do R2000)', () => {
-  it('a planta, com e sem lineWeights, passa no verificador e não leva 370', () => {
-    const layer = dxfLayerOfMaterial(mat.name);
-    for (const lineWeights of [undefined, { [layer]: 70, ABERTURAS: 35 }]) {
-      const text = exportDxf(project, 'lv_0', { ...planGeo, ...(lineWeights ? { lineWeights } : {}) });
-      expect(dxfProblemsR12(text)).toEqual([]);
-      expect(text).not.toContain('\r\n370\r\n');
+describe('planta e corte em R2000 (AC1015)', () => {
+  it('as camadas levam cor (62), tipo de linha (6), espessura (370) e plot style (390)', () => {
+    const text = exportDxf(project, 'lv_0', { ...planGeo, lineWeights: { [dxfLayerOfMaterial(mat.name)]: 70, ABERTURAS: 35 } });
+    const layers = records(text).filter((r) => r.type === 'LAYER');
+    const field = (name: string, code: number): string | undefined =>
+      layers.find((r) => r.pairs.some(([c, v]) => c === 2 && v === name))?.pairs.find(([c]) => c === code)?.[1];
+    expect([field('0', 370), field('0', 62), field('0', 6)]).toEqual(['-3', '7', 'CONTINUOUS']);
+    expect([field('ABERTURAS', 370), field(dxfLayerOfMaterial(mat.name), 370)]).toEqual(['35', '70']);
+    for (const r of layers) {
+      expect(r.pairs.find(([c]) => c === 390)?.[1]).toMatch(/^[0-9A-F]+$/);
+      expect(r.pairs.find(([c]) => c === 62)?.[1]).toBeDefined();
     }
   });
 
-  it('o corte, com e sem lineWeights, passa no verificador e não leva 370', () => {
-    for (const lineWeights of [undefined, { CORTE_PAREDE: 70 }]) {
-      const text = exportSectionDxf(withSection(), 'corte_a', { ...sectionGeo, ...(lineWeights ? { lineWeights } : {}) });
-      expect(dxfProblemsR12(text)).toEqual([]);
-      expect(text).not.toContain('\r\n370\r\n');
-    }
-  });
-
-  it('as seções saem na ordem HEADER, TABLES, BLOCKS, ENTITIES e há um único EOF', () => {
+  it('as seções saem na ordem do R2000 e há um único EOF', () => {
     for (const text of [exportDxf(project, 'lv_0', planGeo), exportSectionDxf(withSection(), 'corte_a', sectionGeo)]) {
       const sections = [...text.matchAll(/0\r\nSECTION\r\n2\r\n(\w+)\r\n/g)].map((m) => m[1]);
-      expect(sections).toEqual(['HEADER', 'TABLES', 'BLOCKS', 'ENTITIES']);
+      expect(sections).toEqual(['HEADER', 'CLASSES', 'TABLES', 'BLOCKS', 'ENTITIES', 'OBJECTS']);
       expect(text.match(/\r\nEOF\r\n/g)).toHaveLength(1);
       expect(text).toContain('2\r\nSTYLE\r\n');
+      expect(text).toContain('2\r\nBLOCK_RECORD\r\n');
     }
   });
 
-  it('as unidades continuam em metros ($INSUNITS 6; o AutoCAD 2025 as lê mesmo no R12)', () => {
-    expect(exportDxf(project, 'lv_0', planGeo)).toContain('9\r\n$INSUNITS\r\n70\r\n6\r\n');
-    expect(exportSectionDxf(withSection(), 'corte_a', sectionGeo)).toContain('9\r\n$INSUNITS\r\n70\r\n6\r\n');
+  it('as unidades continuam em metros ($INSUNITS 6) e a espessura de linha fica visível ($LWDISPLAY)', () => {
+    for (const text of [exportDxf(project, 'lv_0', planGeo), exportSectionDxf(withSection(), 'corte_a', sectionGeo)]) {
+      expect(text).toContain('9\r\n$INSUNITS\r\n70\r\n6\r\n');
+      expect(text).toContain('9\r\n$LWDISPLAY\r\n290\r\n1\r\n');
+    }
   });
 });
 
-describe('texto acentuado no DXF R12', () => {
-  it('dxfEscapeText troca o que não é ASCII por \\U+XXXX (o AutoCAD lê o R12 em ANSI, não em UTF-8)', () => {
+describe('tabela de camadas do DXF (cor, tipo de linha e espessura)', () => {
+  const layerOf = (name: string): { color?: string; lineType?: string; weight?: string } => {
+    const r = records(exportDxf(project, 'lv_0', planGeo)).find((x) => x.type === 'LAYER' && x.pairs.some(([c, v]) => c === 2 && v === name));
+    return { color: r?.pairs.find(([c]) => c === 62)?.[1], lineType: r?.pairs.find(([c]) => c === 6)?.[1], weight: r?.pairs.find(([c]) => c === 370)?.[1] };
+  };
+
+  it('a cor padrão vem da categoria e a espessura de lineWeights', () => {
+    expect(dxfLayerStyleOf(dxfLayerOfMaterial(mat.name), 70)).toEqual({ color: 1, lineWeight: 70, linetype: 'CONTINUOUS' });
+    expect(dxfLayerStyleOf('ABERTURA_ACIMA', 18)).toEqual({ color: 2, lineWeight: 18, linetype: 'DASHED' });
+    expect(dxfLayerStyleOf('IMPORTADO')).toEqual({ color: 8, lineWeight: -3, linetype: 'CONTINUOUS' });
+    expect(dxfLayerStyleOf('0')).toEqual({ color: 7, lineWeight: -3, linetype: 'CONTINUOUS' });
+  });
+
+  it('a camada do material sai vermelha (parede) e as de vão amarelas', () => {
+    expect(layerOf(dxfLayerOfMaterial(mat.name))).toEqual({ color: '1', lineType: 'CONTINUOUS', weight: '-3' });
+    expect(layerOf('ABERTURAS')).toEqual({ color: '2', lineType: 'CONTINUOUS', weight: '-3' });
+  });
+
+  it('layerStyles sobrepõe cor, tipo de linha e espessura da tabela', () => {
+    const layer = dxfLayerOfMaterial(mat.name);
+    const text = exportDxf(project, 'lv_0', { ...planGeo, layerStyles: { [layer]: { color: 5, lineWeight: 100, linetype: 'DASHED' } } });
+    const r = records(text).find((x) => x.type === 'LAYER' && x.pairs.some(([c, v]) => c === 2 && v === layer));
+    expect([r?.pairs.find(([c]) => c === 62)?.[1], r?.pairs.find(([c]) => c === 6)?.[1], r?.pairs.find(([c]) => c === 370)?.[1]]).toEqual(['5', 'DASHED', '100']);
+  });
+
+  it('no corte, o que está além do plano fica cinza e o corte na cor da categoria', () => {
+    expect(dxfSectionLayerStyleOf('CORTE_PAREDE')).toEqual({ color: 1, lineWeight: -3, linetype: 'CONTINUOUS' });
+    expect(dxfSectionLayerStyleOf('CORTE_PAREDE_PROJECAO')).toEqual({ color: 8, lineWeight: -3, linetype: 'CONTINUOUS' });
+    expect(dxfSectionLayerStyleOf('CORTE_NIVEIS')).toEqual({ color: 7, lineWeight: -3, linetype: 'CONTINUOUS' });
+  });
+});
+
+describe('texto acentuado no DXF R2000', () => {
+  it('dxfEscapeText troca o que não é ASCII por \\U+XXXX (o AC1015 também lê em ANSI, não em UTF-8)', () => {
     expect(dxfEscapeText('Cozinha açaí')).toBe('Cozinha a\\U+00E7a\\U+00ED');
     expect(dxfEscapeText('12,66 m²')).toBe('12,66 m\\U+00B2');
     expect(dxfEscapeText('Sala 101')).toBe('Sala 101');
@@ -98,10 +153,5 @@ describe('texto acentuado no DXF R12', () => {
 
   it('quebra de linha no texto não parte o par código/valor do arquivo', () => {
     expect(dxfEscapeText('a\nb')).toBe('a\\U+000Ab');
-  });
-
-  it('dxfTextRecords grava o grupo 1 já escapado', () => {
-    const rec = dxfTextRecords({ at: { x: 1, y: 2 }, text: 'Área útil', height: 0.2, rotation: 0, layer: 'TEXTOS' });
-    expect(rec.find(([c]) => c === 1)?.[1]).toBe('\\U+00C1rea \\U+00FAtil');
   });
 });

@@ -4,14 +4,14 @@ import { editor } from './controller.ts';
 import { exportDxf } from './fileActions.ts';
 import { useUi } from './state.ts';
 
-describe('exportar DXF com a planta de cobertura ativa', () => {
+describe('exportar DXF', () => {
   beforeEach(() => {
     editor.load(createEmptyProject(), 'teste.hestia.json');
   });
 
-  it('recusa com mensagem clara, sem exportar a planta de piso do nível', async () => {
-    useUi.setState({ view: 'plan', planKind: 'roof', status: '' });
+  it('abre o diálogo do lote (desenhos e pranchas) em vez de salvar direto', async () => {
+    useUi.setState({ dialog: null });
     await exportDxf();
-    expect(useUi.getState().status).toMatch(/cobertura ainda não exporta DXF/);
+    expect(useUi.getState().dialog).toBe('dxfLayers');
   });
 });

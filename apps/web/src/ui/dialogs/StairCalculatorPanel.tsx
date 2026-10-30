@@ -35,7 +35,20 @@ export function StairCalculatorPanel({ type, heightCm, onHeight }: { type: Stair
         <NumField id="stt-calc-h" value={heightCm / 100} scale={100} decimals={0} unit="cm" min={0.01} strictRange onCommit={(v) => onHeight(v * 100)} />
       </div>
       {post ? (
-        <p className="hint">{t.stt_calc_no_rule}</p>
+        <>
+          {calc.valid ? (
+            <>
+              {row(t.stt_calc_risers, calc.risers)}
+              {row(t.stt_calc_riser, cm(calc.riser))}
+            </>
+          ) : (
+            <>
+              {row(t.stt_calc_risers, '—')}
+              {row(t.stt_calc_riser, '—')}
+            </>
+          )}
+          <p className="hint">{t.stt_calc_post_note}</p>
+        </>
       ) : !calc.valid ? (
         <>
           {row(t.stt_calc_risers, '—')}

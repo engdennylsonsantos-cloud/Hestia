@@ -44,7 +44,7 @@ const runOf = (s: Stair): StairRun => s.components[0] as StairRun;
 
 describe('ferramenta Escada: forma caracol (3 cliques)', () => {
   it('a forma caracol existe na barra, com o rótulo "Caracol" e as cinco formas', () => {
-    expect(STAIR_RUN_SHAPES).toEqual(['straight', 'lshape', 'ushape', 'winder', 'spiral']);
+    expect(STAIR_RUN_SHAPES).toEqual(['straight', 'lshape', 'ushape', 'winder', 'spiral', 'free']);
     expect(STAIR_RUN_SHAPE_LABEL.spiral).toBe('Caracol');
   });
 

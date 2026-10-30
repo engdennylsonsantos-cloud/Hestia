@@ -4,34 +4,36 @@ import {
   generateStraightRun,
   generateUShape,
   generateWinderL,
+  planStairFree,
   riserCountFor,
   treadFor,
   type StairComponentSketch,
+  type StairFixed,
   type StairRunSketch,
   type TreadRule,
 } from '@hestia/engine';
-import { DEFAULT_STAIR_CALC_RULE, type Id, type StairGenerator } from '@hestia/model';
+import { DEFAULT_STAIR_CALC_RULE, type Id, type StairGenerator, type StairType } from '@hestia/model';
 import type { StairPart } from './stairSketchState.ts';
 
 /**
  * Formas da ferramenta Escada por cliques (decisão 0011 §5; caracol, decisão 0014 §1 item 12). Os valores de reta, L, U e
- * leque são os nomes dos geradores do modelo; `spiral` é o caracol (gerador `generateSpiralRun`, `stairSpiralRun.ts`).
- * `free` é a escada livre: já é um valor do modelo (`generatedBy`), mas a ferramenta ainda não a desenha, então fica fora
- * de `STAIR_RUN_SHAPES` (o seletor não a mostra) até a ferramenta existir.
+ * leque são os nomes dos geradores do modelo; `spiral` é o caracol (gerador `generateSpiralRun`, `stairSpiralRun.ts`);
+ * `free` é a escada livre, planejada pelo trajeto de cliques (`planStairRunFree`).
  */
-export const STAIR_RUN_SHAPES = ['straight', 'lshape', 'ushape', 'winder', 'spiral'] as const;
+export const STAIR_RUN_SHAPES = ['straight', 'lshape', 'ushape', 'winder', 'spiral', 'free'] as const;
 export type StairRunShape = (typeof STAIR_RUN_SHAPES)[number] | 'free';
 
-/** Rótulos das formas que a ferramenta oferece; a livre fica de fora até a ferramenta existir. */
-export const STAIR_RUN_SHAPE_LABEL: Record<Exclude<StairRunShape, 'free'>, string> = {
+/** Rótulos das formas que a ferramenta oferece. */
+export const STAIR_RUN_SHAPE_LABEL: Record<StairRunShape, string> = {
   straight: 'Reta',
   lshape: 'Em L',
   ushape: 'Em U',
   winder: 'Com leque',
   spiral: 'Caracol',
+  free: 'Livre',
 };
-/** Rótulo da escada livre, ainda oculta no seletor da ferramenta. */
-export const STAIR_RUN_SHAPE_FREE_LABEL = 'Livre';
+/** Rótulo da escada livre (mantido para quem importava a constante antiga). */
+export const STAIR_RUN_SHAPE_FREE_LABEL = STAIR_RUN_SHAPE_LABEL.free;
 
 /** Opções da ferramenta Escada reta/L/U/leque/caracol (`ToolOptions.stairRun`). */
 export interface StairRunToolOptions {
@@ -121,6 +123,16 @@ export interface StairRunPlan {
   tread: number;
   /** Reta com clique além do fim da escada: a explicação em pt-BR (ausente se o comprimento é usado inteiro). */
   note?: string;
+  /** Escada livre: trajeto normalizado (o último ponto é o centro do último espelho). */
+  path?: Vec2[];
+  /** Escada livre: nº de lances. */
+  runs?: number;
+  /** Escada livre: nº de patamares (giro, em linha e passagem). */
+  landings?: number;
+  /** Escada livre: metros de trajeto estendido para completar N espelhos. */
+  extended?: number;
+  /** Escada livre: metros de trajeto que sobram depois do espelho N. */
+  slack?: number;
 }
 
 /** Aviso de uma reta cujo comprimento clicado passa do que a altura pede: a escada termina antes do clique. */
@@ -139,7 +151,7 @@ export type StairRunPlanResult = StairRunPlan | { error: string };
 export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
   const { shape, width, turn } = i.options;
   if (shape === 'spiral') return { error: 'O caracol é planejado por planSpiralRun (3 cliques).' };
-  if (shape === 'free') return { error: 'A escada livre é planejada pelo trajeto de cliques.' };
+  if (shape === 'free') return { error: 'A escada livre é planejada por planStairRunFree.' };
   const landingDepth = i.options.landingDepth ?? width;
   if (!(width > 0)) return { error: 'A largura do lance deve ser positiva.' };
   if (shape === 'lshape' && !(landingDepth >= width)) return { error: 'O patamar da escada em L deve ter profundidade ≥ largura do lance.' };
@@ -180,6 +192,42 @@ export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
     return { error: e instanceof RangeError ? e.message : 'Não foi possível gerar a escada.' };
   }
   return { parts, risers: N, riserHeight, tread, note };
+}
+
+/** Entrada do plano da escada livre: o trajeto de cliques vale como o desenho inteiro. */
+export interface StairFreePlanInput {
+  path: Vec2[];
+  H: number;
+  type: StairType;
+  options: StairRunToolOptions;
+  fixed?: StairFixed;
+}
+
+/**
+ * Plano da escada livre: cada trecho reto vira um lance e cada giro, um patamar. O motor (`planStairFree`) devolve os
+ * componentes em croqui; aqui eles viram peças da ferramenta com `generatedBy 'free'`, junto do trajeto normalizado e
+ * dos números do plano (lances, patamares, extensão e sobra).
+ */
+export function planStairRunFree(i: StairFreePlanInput): StairRunPlanResult {
+  const plan = planStairFree(i.path, i.H, i.type, {
+    width: i.options.width,
+    ...(i.options.landingDepth !== undefined ? { landingDepth: i.options.landingDepth } : {}),
+    ...(i.fixed ? { fixed: i.fixed } : {}),
+  });
+  if ('error' in plan) return plan;
+  const out: StairRunPlan = {
+    parts: fromSketches(plan.parts, 'free'),
+    risers: plan.risers,
+    riserHeight: plan.riserHeight,
+    tread: plan.tread,
+    path: plan.path,
+    runs: plan.runs,
+    landings: plan.landings,
+    extended: plan.extended,
+    slack: plan.slack,
+  };
+  if (plan.note) out.note = plan.note;
+  return out;
 }
 
 /** Componentes do gerador para o croqui (cada lance recebe a origem `generatedBy`). */

@@ -1,24 +1,62 @@
-import type { ReactElement } from 'react';
-import { formatRampSlope, type RampType } from '@hestia/model';
+import { useMemo, type ReactElement } from 'react';
+import { formatRampSlope, rampNormRowFor, type RampType } from '@hestia/model';
+import { fmtNum, useI18n } from '../../editor/i18n.ts';
+import { SchematicViews, type SchematicView } from '../schematic/SchematicDrawing.tsx';
+import { buildRampSectionDrawing } from './rampSectionDrawing.ts';
 
-/**
- * Prévia simples do corte do lance da rampa: a parte inclinada (face superior) e a espessura estrutural, subindo da
- * esquerda para a direita, com a inclinação padrão do tipo. Ilustrativa, não é o corte do projeto.
- */
+const TEXT = {
+  pt: {
+    tabs: 'Prévia da rampa',
+    section: 'Corte',
+    plan: 'Planta',
+    empty: 'Preencha a inclinação para ver o desenho.',
+    sectionAria: 'Corte da rampa: inclinação {slope}, desnível por lance até {rise} m, espessura {e} cm',
+    planAria: 'Planta esquemática da rampa em U, largura {w} m',
+  },
+  en: {
+    tabs: 'Ramp preview',
+    section: 'Section',
+    plan: 'Plan',
+    empty: 'Fill in the slope to see the drawing.',
+    sectionAria: 'Ramp section: slope {slope}, rise per flight up to {rise} m, thickness {e} cm',
+    planAria: 'Schematic U-shaped ramp plan, width {w} m',
+  },
+} as const;
+
+const fill = (s: string, params: Record<string, string>): string => s.replace(/\{(\w+)\}/g, (_, k: string) => params[k] ?? '');
+
+/** Prévia técnica da rampa: corte com cotas e triângulo de inclinação, e planta esquemática em U. */
 export function RampSectionPreview({ type }: { type: RampType }): ReactElement {
-  const slope = Math.max(type.defaultSlope, 0);
-  const t = Math.min(8, Math.max(4, type.structuralDepth * 40));
-  return (
-    <svg viewBox="0 0 100 58" width="100%" role="img" aria-label="Prévia do corte da rampa" style={{ background: 'var(--bg-soft)', borderRadius: 6 }}>
-      <line x1={4} y1={44} x2={96} y2={44} stroke="var(--fg-soft)" strokeWidth={0.5} />
-      <polygon
-        points={`8,${38} 88,16 88,${16 + t} 8,${38 + t}`}
-        fill="var(--accent-soft)"
-        stroke="var(--accent)"
-        strokeWidth={0.8}
-      />
-      <line x1={8} y1={38} x2={88} y2={16} stroke="var(--fg-soft)" strokeWidth={0.5} strokeDasharray="3 2" />
-      <text x={8} y={55} fontSize={4.6} fill="var(--fg-soft)">i = {formatRampSlope(slope)}</text>
-    </svg>
-  );
+  const lang = useI18n((s) => s.lang);
+  const txt = TEXT[lang];
+  const views = useMemo(() => {
+    const fmt = (n: number, dec: number): string => fmtNum(n, dec, lang);
+    try {
+      const section = buildRampSectionDrawing(type, { view: 'section', lang, fmt });
+      const plan = buildRampSectionDrawing(type, { view: 'plan', lang, fmt });
+      const slope = type.defaultSlope;
+      const row = rampNormRowFor(type, slope);
+      const slopeTxtRaw = formatRampSlope(slope);
+      const slopeTxt = lang === 'en' ? slopeTxtRaw.replace(/,/g, '.') : slopeTxtRaw;
+      const riseValue = row?.maxRise ?? (type.normTable.length > 0 ? type.normTable[type.normTable.length - 1]!.maxRise : slope);
+      return [
+        {
+          id: 'section',
+          label: txt.section,
+          drawing: section,
+          ariaLabel: fill(txt.sectionAria, { slope: slopeTxt, rise: fmt(riseValue, 2), e: fmt(type.structuralDepth * 100, 1) }),
+        },
+        {
+          id: 'plan',
+          label: txt.plan,
+          drawing: plan,
+          ariaLabel: fill(txt.planAria, { w: fmt(type.defaultWidth, 2) }),
+        },
+      ] satisfies SchematicView[];
+    } catch {
+      return null;
+    }
+  }, [type, lang, txt]);
+  if (!views) return <p className="stt-preview-empty">{txt.empty}</p>;
+  return <SchematicViews tabsLabel={txt.tabs} views={views} />;
 }

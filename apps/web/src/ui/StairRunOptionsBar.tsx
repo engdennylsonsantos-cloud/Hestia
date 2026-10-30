@@ -11,7 +11,7 @@ const HINT: Record<StairRunShape, string> = {
   ushape: 'Clique o centro do 1º espelho, depois a direção de subida (ou digite o ângulo em graus).',
   winder: 'Clique o centro do 1º espelho, depois a direção de subida (ou digite o ângulo em graus).',
   spiral: 'Caracol: clique o centro, o raio externo e o ângulo inicial; gire para a varredura (ou digite os valores). Enter confirma.',
-  free: 'Escada livre: o trajeto é definido por cliques.',
+  free: 'Escada livre: clique os pontos do trajeto; Enter conclui, A ajusta, Backspace volta.',
 };
 
 /** Raio interno padrão (m) do caracol, como em `SPIRAL_DEFAULT_INNER`. */
@@ -32,7 +32,8 @@ export function StairRunOptionsBar(): ReactElement {
     useUi.setState({ options: { ...cur, stairRun: { ...(cur.stairRun ?? o), ...patch } } });
   };
   const spiral = o.shape === 'spiral';
-  const turnable = o.shape !== 'straight' && !spiral;
+  const turnable = o.shape !== 'straight' && o.shape !== 'free' && !spiral;
+  const landable = o.shape === 'lshape' || o.shape === 'ushape' || o.shape === 'free';
   const types = stairTypesForShape(p, o.shape);
   const typeValue = stairTypeForShape(p, o.shape, o.typeId) ?? '';
   return (
@@ -59,6 +60,20 @@ export function StairRunOptionsBar(): ReactElement {
         <label>
           Largura
           <NumField id="opt-stairwidth" value={o.width} onCommit={(v) => set({ width: Math.max(0.1, v) })} quantity="length" min={0.1} />
+        </label>
+      )}
+      {landable && (
+        <label>
+          Prof. patamar
+          <NumField
+            id="opt-stairlanding"
+            value={o.landingDepth ?? null}
+            placeholder="largura"
+            min={0.1}
+            onCommit={(v) => set({ landingDepth: Math.max(0.1, v) })}
+            onClear={() => set({ landingDepth: undefined })}
+            quantity="length"
+          />
         </label>
       )}
       {turnable && (

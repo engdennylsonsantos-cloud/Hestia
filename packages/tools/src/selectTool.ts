@@ -24,6 +24,7 @@ import { sectionMarkAt, sectionMarkIdsInBox } from './sectionMarkPick.ts';
 import { DIM_MIN_LENGTH, dimensionGeometry, dimensionPoints, sectionPoints } from '@hestia/model';
 import { gridGhosts, gridHandlePreview, gridIdsInBox, moveGrids, pickGridAt, selectedGrids } from './gridGeom.ts';
 import { stairHandlePreview } from './stairGrips.ts';
+import { stairFreeHandlePreview } from './stairFreeGrips.ts';
 import { spiralHandlePreview } from './stairSpiralGrips.ts';
 import { rampHandlePreview } from './rampGrips.ts';
 import type { PointerInfo } from './types.ts';
@@ -164,7 +165,7 @@ export class SelectTool extends ToolBase {
     const grip = gripHoldAt(this.env, p.raw);
     this.inf = grip ? { point: grip.at, kind: 'endpoint', guides: [] } : null;
     // Alças do piso, laje ou telhado selecionado: vértices, meio das arestas, foco e seta do caimento.
-    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()), ...spiralHandlePreview(pr, this.env.selection()), ...gridHandlePreview(pr, this.env.selection()), ...rampHandlePreview(pr, this.env.selection()));
+    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()), ...stairFreeHandlePreview(pr, this.env.selection()), ...spiralHandlePreview(pr, this.env.selection()), ...gridHandlePreview(pr, this.env.selection()), ...rampHandlePreview(pr, this.env.selection()));
     // Alça da cota selecionada: sob o cursor, a cota destaca-se (arrastar muda o deslocamento).
     const dgHover = this.mode === 'idle' ? dimGripAt(pr, this.env.levelId(), this.env.selection(), p.raw, this.env.metersPerPixel(), this.planId()) : null;
     if (dgHover) this.items.push({ kind: 'highlight', ids: [dgHover] });

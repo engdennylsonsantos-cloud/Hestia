@@ -354,7 +354,12 @@ export function layoutLevels(group: THREE.Group, camera: THREE.Camera, forward: 
   const p1 = projetar(bubbleP);
   const p2 = projetar(otherP);
   // Rotação no plano da tela para o texto seguir a linha da esquerda (billboard continua de pé e legível).
-  const angulo = Math.atan2(-(p2.y - p1.y) / aspecto, p2.x - p1.x);
+  // NDC tem y para cima, então o ângulo da linha na tela (y para cima, x em pixels) é
+  // atan2(Δy_ndc / aspecto, Δx_ndc); o sinal negativo espelhava o sprite.
+  let angulo = Math.atan2((p2.y - p1.y) / aspecto, p2.x - p1.x);
+  // Texto sempre legível: nunca de cabeça para baixo (ângulo em (−π/2, π/2]).
+  if (angulo > Math.PI / 2) angulo -= Math.PI;
+  else if (angulo <= -Math.PI / 2) angulo += Math.PI;
 
   for (const view of info.views) {
     const z = view.datum.elevation;
@@ -384,7 +389,8 @@ export function layoutLevels(group: THREE.Group, camera: THREE.Camera, forward: 
       cx - along.x * tique, cy - along.y * tique, z1, cx + along.x * tique, cy + along.y * tique, z1,
       cx - along.x * tique, cy - along.y * tique, z2, cx + along.x * tique, cy + along.y * tique, z2,
     ]);
-    dim.label.position.set(cx + n.x * 0.7, cy + n.y * 0.7, (z1 + z2) / 2);
+    // Etiqueta sobre a própria linha de cota, no meio do intervalo entre os dois níveis.
+    dim.label.position.set(cx, cy, (z1 + z2) / 2);
   }
 }
 

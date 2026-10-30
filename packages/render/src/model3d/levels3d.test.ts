@@ -107,6 +107,49 @@ describe('datum de nível no 3D (duas linhas)', () => {
     expect(plano.position.z).toBeCloseTo(0, 6);
   });
 
+  it('texto gira no plano da tela no mesmo ângulo da linha da esquerda', () => {
+    // NDC tem y para cima; em pixels o eixo y da tela também, mas o x é esticado pelo aspecto.
+    for (const [x, y] of [[20, -20], [-20, 20]] as const) {
+      const g = buildLevels(buildTemplate('house2'), null);
+      const { camera, forward } = cameraAt(x, y, 15);
+      layoutLevels(g, camera, forward);
+      const info = dados(g);
+      const v = info.views[0]!;
+      const pos = v.line.geometry.getAttribute('position') as THREE.BufferAttribute;
+      // As pontas visíveis da linha da esquerda, na elevação do nível.
+      const a = new THREE.Vector3(pos.getX(0), pos.getY(0), pos.getZ(0)).project(camera);
+      const b = new THREE.Vector3(pos.getX(1), pos.getY(1), pos.getZ(1)).project(camera);
+      const anguloNaTela = Math.atan2((b.y - a.y) / camera.aspect, b.x - a.x);
+      const rotacao = (v.text.material as THREE.SpriteMaterial).rotation;
+      expect(rotacao).toBeCloseTo(anguloNaTela, 1);
+      // Sem o espelhamento do sinal, o texto não fica "de cabeça para baixo".
+      expect(Math.abs(rotacao)).toBeLessThan(Math.PI / 2);
+      // A linha começa na bolha (a ponta mais à esquerda do lado esquerdo).
+      expect(pos.getX(0)).toBeCloseTo(v.bubble.position.x, 6);
+      expect(pos.getY(0)).toBeCloseTo(v.bubble.position.y, 6);
+    }
+  });
+
+  it('etiqueta da cota fica sobre a linha, no meio do intervalo entre os níveis', () => {
+    const g = buildLevels(buildTemplate('house2'), 'lv_0');
+    const { camera, forward } = cameraAt(-20, 20, 15);
+    layoutLevels(g, camera, forward);
+    const info = dados(g);
+    const dim = info.dimensions[0]!;
+    const pos = dim.line.geometry.getAttribute('position') as THREE.BufferAttribute;
+    // Sobre a linha de cota: mesma posição no plano (x, y) das duas pontas.
+    expect(dim.label.position.x).toBeCloseTo(pos.getX(0), 6);
+    expect(dim.label.position.y).toBeCloseTo(pos.getY(0), 6);
+    expect(dim.label.position.x).toBeCloseTo(pos.getX(1), 6);
+    expect(dim.label.position.y).toBeCloseTo(pos.getY(1), 6);
+    // No meio do intervalo: entre as elevações dos dois níveis (0 e 3 m).
+    expect(dim.label.position.z).toBeCloseTo((pos.getZ(0) + pos.getZ(1)) / 2, 6);
+    expect(dim.label.position.z).toBeCloseTo(1.5, 6);
+    // Continua com o tamanho que garante a área de clique.
+    expect(dim.label.scale.x).toBeCloseTo(2.6, 6);
+    expect(dim.label.scale.y).toBeCloseTo(0.8, 6);
+  });
+
   it('dispose libera e esvazia o grupo', () => {
     const g = buildLevels(buildTemplate('house2'), 'lv_0');
     expect(g.children.length).toBeGreaterThan(0);

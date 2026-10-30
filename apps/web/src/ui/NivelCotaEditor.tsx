@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef, useState, type ReactElement } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactElement } from 'react';
 import type { DimensionHit } from '@hestia/render';
 import { editor } from '../editor/controller.ts';
 
@@ -10,6 +10,8 @@ interface Edicao {
   levelId: string;
   neighborId: string;
   side: 'below' | 'above';
+  /** Contador da abertura: o efeito de foco roda a cada abertura, mesmo repetindo a mesma cota. */
+  abertura: number;
 }
 
 /** O que a vista chama para abrir/fechar o editor da cota. */
@@ -20,7 +22,8 @@ export interface NivelCotaEditorHandle {
 }
 
 /**
- * Editor da cota entre os eixos das bolhas: um input posicionado sobre a etiqueta no 3D. Editar a cota move o nível
+ * Editor da cota entre os eixos das bolhas: um input **no lugar** da etiqueta no 3D. Enquanto o input está aberto a
+ * etiqueta 3D (sprite) fica escondida, para não aparecerem dois elementos sobrepostos. Editar a cota move o nível
  * **selecionado** (o vizinho fica fixo). Enter aplica, Esc cancela; clicar fora também aplica (a vista chama
  * `fecharSeAberto` no `pointerdown`).
  */
@@ -28,6 +31,17 @@ export const NivelCotaEditor = forwardRef<NivelCotaEditorHandle>(function NivelC
   const [edicao, setEdicao] = useState<Edicao | null>(null);
   const edicaoRef = useRef<Edicao | null>(null);
   edicaoRef.current = edicao;
+  // Etiqueta 3D escondida pelo editor aberto (o sprite continua no grupo; só a visibilidade muda).
+  const etiquetaRef = useRef<DimensionHit['label'] | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const aberturas = useRef(0);
+
+  /** Devolve a etiqueta 3D à cena (se ela ainda existir) e esquece a referência. */
+  const mostrarEtiqueta = (): void => {
+    const label = etiquetaRef.current;
+    etiquetaRef.current = null;
+    if (label) label.visible = true;
+  };
 
   const fechar = (aplicar: boolean): void => {
     const d = edicaoRef.current;
@@ -43,10 +57,18 @@ export const NivelCotaEditor = forwardRef<NivelCotaEditorHandle>(function NivelC
       }
     }
     setEdicao(null);
+    // A etiqueta volta ao 3D: o input sai de cena no mesmo quadro.
+    mostrarEtiqueta();
   };
 
   useImperativeHandle(ref, () => ({
     abrir: (hit, rect) => {
+      // Uma cota por vez: se outra estava aberta, a etiqueta dela volta antes.
+      mostrarEtiqueta();
+      // A etiqueta 3D sai de cena: o input ocupa exatamente o lugar dela (um elemento só na tela).
+      hit.label.visible = false;
+      etiquetaRef.current = hit.label;
+      aberturas.current += 1;
       setEdicao({
         left: ((hit.ndc.x + 1) / 2) * rect.width,
         top: ((1 - hit.ndc.y) / 2) * rect.height,
@@ -55,6 +77,7 @@ export const NivelCotaEditor = forwardRef<NivelCotaEditorHandle>(function NivelC
         levelId: hit.levelId,
         neighborId: hit.neighborId,
         side: hit.side,
+        abertura: aberturas.current,
       });
     },
     fecharSeAberto: () => {
@@ -64,16 +87,37 @@ export const NivelCotaEditor = forwardRef<NivelCotaEditorHandle>(function NivelC
     },
   }));
 
+  // O `autoFocus` pode se perder com o pointer capture do canvas (o foco padrão do clique vem depois do handler):
+  // reforça o foco (e a seleção) no quadro seguinte a cada abertura.
+  const abertura = edicao?.abertura;
+  useEffect(() => {
+    if (abertura === undefined) return;
+    const t = setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 0);
+    return () => clearTimeout(t);
+  }, [abertura]);
+
+  // Se o componente sair da tela com a cota aberta, a etiqueta não pode ficar escondida para sempre.
+  useEffect(() => () => {
+    const label = etiquetaRef.current;
+    etiquetaRef.current = null;
+    if (label) label.visible = true;
+  }, []);
+
   if (!edicao) return null;
   return (
     <div
       className="level-dim-edit"
-      style={{ left: edicao.left, top: edicao.top }}
+      style={{ left: edicao.left, top: edicao.top, fontSize: 14 }}
       onPointerDown={(e) => e.stopPropagation()}
       onPointerUp={(e) => e.stopPropagation()}
     >
       <input
+        ref={inputRef}
         autoFocus
+        style={{ width: 90, fontSize: 14 }}
         value={edicao.value}
         onChange={(e) => setEdicao({ ...edicao, value: e.target.value })}
         onFocus={(e) => e.currentTarget.select()}

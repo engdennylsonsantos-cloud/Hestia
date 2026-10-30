@@ -36,14 +36,40 @@ const segmentRef = (a: Vec2, b: Vec2): WallRefLine | null => {
   return { p: a, d: norm(d), segment: [a, b] };
 };
 
-/** Maior raio ainda contido nos trechos finitos das referências, quando disponível. */
+/**
+ * Intervalo de raios em que a semirreta a partir do centro encontra o trecho finito da referência; null se não encontra.
+ * O trecho está sobre a reta que passa pelo centro, então a distância ao longo da semirreta é a projeção dos extremos.
+ */
+export function rayRadiusRange(center: Vec2, dir: Vec2, seg: [Vec2, Vec2]): [number, number] | null {
+  const t0 = dot(sub(seg[0], center), dir);
+  const t1 = dot(sub(seg[1], center), dir);
+  const hi = Math.max(t0, t1);
+  if (hi <= 1e-6) return null;
+  return [Math.max(0, Math.min(t0, t1)), hi];
+}
+
+/** Raios em que o arco toca as duas referências ao mesmo tempo; null se nenhum raio serve às duas. */
+export function commonRadiusRange(center: Vec2, from: Vec2, to: Vec2, segA?: [Vec2, Vec2], segB?: [Vec2, Vec2]): [number, number] | null {
+  const ia: [number, number] | null = segA ? rayRadiusRange(center, from, segA) : [0, Infinity];
+  const ib: [number, number] | null = segB ? rayRadiusRange(center, to, segB) : [0, Infinity];
+  if (!ia || !ib) return null;
+  const lo = Math.max(ia[0], ib[0]);
+  const hi = Math.min(ia[1], ib[1]);
+  return hi >= lo ? [lo, hi] : null;
+}
+
+/** Usa a semirreta oposta quando a escolhida não encontra o trecho da referência (o trecho fica do outro lado do encontro). */
+export function orientTowardReference(center: Vec2, dir: Vec2, seg?: [Vec2, Vec2]): Vec2 {
+  if (!seg || rayRadiusRange(center, dir, seg)) return dir;
+  const flipped = { x: -dir.x, y: -dir.y };
+  return rayRadiusRange(center, flipped, seg) ? flipped : dir;
+}
+
+/** Raio do arco limitado ao intervalo comum: as duas pontas caem sempre dentro dos trechos selecionados. */
 function clampToReferences(center: Vec2, from: Vec2, to: Vec2, a: WallRefLine, b: WallRefLine, radius: number): number {
-  const extent = (line: WallRefLine, direction: Vec2): number | null => {
-    if (!line.segment) return null;
-    return Math.max(0, dot(sub(line.segment[0], center), direction), dot(sub(line.segment[1], center), direction));
-  };
-  const limits = [extent(a, from), extent(b, to)].filter((x): x is number => x !== null && x > 0.05);
-  return limits.length ? Math.min(radius, ...limits.map((x) => x * 0.92)) : radius;
+  const range = commonRadiusRange(center, from, to, a.segment, b.segment);
+  if (!range) return radius;
+  return Math.min(Math.max(radius, range[0]), range[1]);
 }
 
 /** Resolve também grades, linhas de detalhe e separadores; desconhecidas mantêm a geometria gravada. */
@@ -93,9 +119,9 @@ export function resolveAngularDimension(p: Project, levelId: Id, d: Dimension): 
   if (!ra || !rb) return d;
   const center = intersection(ra.p, ra.d, rb.p, rb.d);
   if (!center) return d;
-  const from = orient(ra, a.from);
-  const to = orient(rb, a.to);
-  const radius = a.side === 'reflex' ? a.radius : clampToReferences(center, from, to, ra, rb, a.radius);
+  const from = orientTowardReference(center, orient(ra, a.from), ra.segment);
+  const to = orientTowardReference(center, orient(rb, a.to), rb.segment);
+  const radius = clampToReferences(center, from, to, ra, rb, a.radius);
   const data = angularDimensionData(center, from, to, radius, a.side, a.refA, a.refB, a.base);
   return { ...d, a: center, b: add(center, mul(data.to, radius)), angular: { ...a, ...data } };
 }

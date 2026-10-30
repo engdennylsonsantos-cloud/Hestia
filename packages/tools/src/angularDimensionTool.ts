@@ -11,7 +11,7 @@ import {
   type Dimension,
 } from '@hestia/model';
 import { alignFeaturesAt, type AlignFeature } from './alignFeatures.ts';
-import { frameOfWall, pointAt } from '@hestia/engine';
+import { commonRadiusRange, frameOfWall, orientTowardReference, pointAt } from '@hestia/engine';
 import { ToolBase, viewPlanId } from './base.ts';
 import type { PointerInfo, PreviewItem } from './types.ts';
 
@@ -138,8 +138,12 @@ export class AngularDimensionTool extends ToolBase {
   /** Centro e direções de referência; null se as retas são paralelas. */
   private geometry(): { center: Vec2; a: RefLine; b: RefLine } | null {
     if (!this.refA || !this.refB) return null;
-    const a = this.refLine(this.refA);
-    const b = this.refLine(this.refB);
+    return this.pairGeometry(this.refA, this.refB);
+  }
+
+  private pairGeometry(a0: AlignFeature, b0: AlignFeature): { center: Vec2; a: RefLine; b: RefLine } | null {
+    const a = this.refLine(a0);
+    const b = this.refLine(b0);
     const center = intersection(a.feature.line.p, a.from, b.feature.line.p, b.from);
     if (!center) return null;
     const orient = (r: RefLine): Vec2 => {
@@ -147,7 +151,8 @@ export class AngularDimensionTool extends ToolBase {
       const byClick = len(click) > 1e-3 ? click : null;
       const byFallback = r.fallback ? sub(r.fallback, center) : null;
       const toward = byClick && len(byClick) > 1e-6 ? byClick : byFallback && len(byFallback) > 1e-6 ? byFallback : r.from;
-      return dot(r.from, toward) >= 0 ? r.from : { x: -r.from.x, y: -r.from.y };
+      const d = dot(r.from, toward) >= 0 ? r.from : { x: -r.from.x, y: -r.from.y };
+      return orientTowardReference(center, d, r.segment);
     };
     return { center, a: { ...a, to: orient(a) }, b: { ...b, to: orient(b) } };
   }
@@ -162,20 +167,12 @@ export class AngularDimensionTool extends ToolBase {
     return inside ? 'minor' : 'major';
   }
 
-  /** Raio limitado ao trecho visível das referências: o arco não ultrapassa as linhas selecionadas. */
-  private radiusAt(g: { center: Vec2; a: RefLine; b: RefLine }, cursor: Vec2, external = false): number {
-    const maxFor = (r: RefLine): number => {
-      const seg = r.segment;
-      if (!seg) return Infinity;
-      // A interseção pode cair dentro do trecho (projeções nos dois lados) ou fora dele.
-      // O maior avanço positivo dos extremos é o comprimento disponível nessa semirreta.
-      return Math.max(0, dot(sub(seg[0], g.center), r.to), dot(sub(seg[1], g.center), r.to));
-    };
-    const limit = Math.min(maxFor(g.a), maxFor(g.b));
+  /** Raio pelo cursor, limitado ao intervalo em que o arco toca as duas referências; null se não há tal raio. */
+  private radiusAt(g: { center: Vec2; a: RefLine; b: RefLine }, cursor: Vec2): number | null {
+    const range = commonRadiusRange(g.center, g.a.to, g.b.to, g.a.segment, g.b.segment);
+    if (!range) return null;
     const wanted = Math.max(MIN_RADIUS, dist(cursor, g.center));
-    // A volta externa precisa poder se afastar: o cursor manda no raio. O limite de trecho só protege o lado interno.
-    if (external) return wanted;
-    return Number.isFinite(limit) && limit > MIN_RADIUS ? Math.min(wanted, limit * 0.92) : wanted;
+    return Math.min(Math.max(wanted, range[0]), range[1]);
   }
 
   /** Dados da cota no lado escolhido pelo cursor: interno = menor; externo = volta >180°. */
@@ -189,9 +186,8 @@ export class AngularDimensionTool extends ToolBase {
 
   private makePreview(cursor: Vec2): void {
     const g = this.geometry();
-    if (!g) { this.previewDim = null; return; }
-    const selected = this.sideAt(g.center, g.a.to, g.b.to, cursor);
-    const radius = this.radiusAt(g, cursor, selected === 'major');
+    const radius = g ? this.radiusAt(g, cursor) : null;
+    if (!g || radius === null) { this.previewDim = null; return; }
     const angular = this.angularData(g, radius, cursor);
     const o = this.env.options();
     const dim: Dimension = {
@@ -253,9 +249,8 @@ export class AngularDimensionTool extends ToolBase {
     this.raw = p.raw;
     if (this.placing) {
       const g = this.geometry();
-      if (!g || !this.previewDim?.angular) { this.env.say('As referências não formam um ângulo.'); return; }
-      const selected = this.sideAt(g.center, g.a.to, g.b.to, p.raw);
-      const radius = this.radiusAt(g, p.raw, selected === 'major');
+      const radius = g ? this.radiusAt(g, p.raw) : null;
+      if (!g || radius === null || !this.previewDim?.angular) { this.env.say('Sem raio que toque as duas referências: escolha linhas que se encontrem.'); return; }
       const angular = this.angularData(g, radius, p.raw);
       const o = this.env.options();
       const dimension: Dimension = {
@@ -289,9 +284,13 @@ export class AngularDimensionTool extends ToolBase {
       this.env.say('Escolha uma segunda referência diferente da primeira.');
       return;
     }
-    const trial = this.geometryWith(this.refA, cand);
+    const trial = this.pairGeometry(this.refA, cand);
     if (!trial) {
       this.env.say('As duas referências são paralelas: escolha linhas que se cruzam.');
+      return;
+    }
+    if (!commonRadiusRange(trial.center, trial.a.to, trial.b.to, trial.a.segment, trial.b.segment)) {
+      this.env.say('Esses trechos não se tocam em nenhum raio: escolha outra referência.');
       return;
     }
     this.refB = cand;
@@ -299,21 +298,6 @@ export class AngularDimensionTool extends ToolBase {
     this.makePreview(p.raw);
     this.refreshItems();
     this.env.say('Mova o cursor para o lado do ângulo e para o raio do arco; clique para criar a cota.');
-  }
-
-  private geometryWith(a0: AlignFeature, b0: AlignFeature): { center: Vec2; a: RefLine; b: RefLine } | null {
-    const a = this.refLine(a0);
-    const b = this.refLine(b0);
-    const center = intersection(a.feature.line.p, a.from, b.feature.line.p, b.from);
-    if (!center) return null;
-    const orient = (r: RefLine): Vec2 => {
-      const click = sub(r.anchor, center);
-      const byClick = len(click) > 1e-3 ? click : null;
-      const byFallback = r.fallback ? sub(r.fallback, center) : null;
-      const toward = byClick && len(byClick) > 1e-6 ? byClick : byFallback && len(byFallback) > 1e-6 ? byFallback : r.from;
-      return dot(r.from, toward) >= 0 ? r.from : { x: -r.from.x, y: -r.from.y };
-    };
-    return { center, a: { ...a, to: orient(a) }, b: { ...b, to: orient(b) } };
   }
 
   override confirm(): void {

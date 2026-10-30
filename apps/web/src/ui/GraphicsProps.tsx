@@ -137,6 +137,7 @@ export function View3DGroup(): ReactElement {
       </Row>
       <Row label="Sombras"><Check id="v3-shadows" checked={v.shadows} onChange={(x) => edit({ shadows: x })} /></Row>
       <Row label="Arestas"><Check id="v3-edges" checked={v.edges} onChange={(x) => edit({ edges: x })} /></Row>
+      <Row label="Mostrar níveis"><Check id="v3-levels" checked={v.showLevels !== false} onChange={(x) => edit({ showLevels: x })} /></Row>
       <Row label="Sol: azimute" htmlFor="v3-az"><NumField id="v3-az" value={(v.sunAzimuth * Math.PI) / 180} quantity="angle" min={0} max={2 * Math.PI} onCommit={(x) => edit({ sunAzimuth: (x * 180) / Math.PI })} /></Row>
       <Row label="Sol: elevação" htmlFor="v3-el"><NumField id="v3-el" value={(v.sunElevation * Math.PI) / 180} quantity="angle" min={0} max={Math.PI / 2} onCommit={(x) => edit({ sunElevation: (x * 180) / Math.PI })} /></Row>
       <Row label="Fundo">

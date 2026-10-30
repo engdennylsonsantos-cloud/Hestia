@@ -83,6 +83,7 @@ export function FileMenu(): ReactElement | null {
           {item(pt ? 'Novo' : 'New', () => go(() => useUi.setState({ dialog: 'start' })))}
           {item(pt ? 'Abrir' : 'Open', () => go(() => document.getElementById('file-open')?.click()))}
           {item(pt ? 'Importar IFC…' : 'Import IFC…', () => ifcRef.current?.click(), { title: pt ? 'Abre um arquivo .ifc do Revit ou de outro programa BIM.' : 'Open a .ifc from Revit or another BIM program.' })}
+          {item(pt ? 'Importar CAD (DXF)…' : 'Import CAD…', () => go(() => useUi.setState({ dialog: 'importCad' })), { title: pt ? 'Insere um desenho DXF no nível, como um objeto só, com as camadas do arquivo.' : 'Insert a DXF drawing on the level as a single object.' })}
           {item(pt ? 'Salvar' : 'Save', () => go(() => void editor.save()), { title: 'Ctrl+S' })}
           <hr />
           {item(pt ? 'Exportar' : 'Export', () => setSection('export'), { on: section === 'export', arrow: true })}

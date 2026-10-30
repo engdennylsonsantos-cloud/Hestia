@@ -12,6 +12,7 @@ import { PlanLabels, type PlanLabelsHandle } from './PlanLabels';
 import { ViewportOverlays } from './ViewportOverlays.tsx';
 import { abrirMenuDeContexto, viewDoMenu } from './useCanvasContextMenu.ts';
 import { useDark } from './useDark.ts';
+import { abrirNivelNoClique } from './nivelPick3d.ts';
 import { criarMontagemVista3d, type Montagem3dProgressiva } from './montagem3dProgressiva.ts';
 import { QuadroPlanta } from './quadroPlanta.ts';
 import { medirQuadro, useContarCommitPerf, usePerfDaUrl } from '../debug/perf/index.ts';
@@ -162,7 +163,7 @@ export function ViewportCanvas(): ReactElement {
       }
       // Sombras e arestas são da vista 3D no projeto (decisão 0015 §1): a chave inclui a versão do projeto.
       const v3 = view3dOf(p);
-      const key = `${editor.store.version}|${dark}|${v3.shadows}|${v3.edges}|${v3.openOpenings === true}`;
+      const key = `${editor.store.version}|${dark}|${v3.shadows}|${v3.edges}|${v3.openOpenings === true}|${v3.showLevels !== false}`;
       if (key !== modelKey.current) {
         modelKey.current = key;
         // Os níveis entram em fatias (ver montagem3dProgressiva.ts): a tela não espera o projeto inteiro.
@@ -428,7 +429,8 @@ export function ViewportCanvas(): ReactElement {
           useUi.setState({ status: 'Modo de seleção ativado.' });
         }
       } else {
-        clickSelect3d(el?.id ?? null, e.shiftKey || e.ctrlKey || e.metaKey);
+        // Clicar na linha de nível abre os níveis com aquele destacado (como no Revit); senão, seleciona o elemento.
+        if (!abrirNivelNoClique(model.current.scene, model.current.orbit.camera, host.current!.getBoundingClientRect(), s)) clickSelect3d(el?.id ?? null, e.shiftKey || e.ctrlKey || e.metaKey);
       }
     }
     // Clique sem arrasto no corte ou na elevação: o mesmo caminho da 3D (clickSelect3d, que usa selectionAfterClick).

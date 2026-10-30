@@ -138,3 +138,36 @@ export const TAB_MODIFICAR: RibbonTab = {
   label: t('Modificar', 'Modify'),
   panels: [P_SELECT, P_PROPS, P_CLIPBOARD, P_GEOMETRY, P_MODIFY, P_VIEW_MOD, P_MEASURE, P_CREATE, P_SELECTION_EXTRA],
 };
+
+/**
+ * Aba Inserir: por enquanto só o Importar CAD (DXF) funciona; o resto segue `soon` (o roteiro do Revit). O "Vincular CAD"
+ * depende de um arquivo externo estável, que o projeto portátil do Hestia não tem — fica para depois.
+ */
+export const TAB_INSERIR: RibbonTab = {
+  id: 'inserir',
+  label: t('Inserir', 'Insert'),
+  panels: [
+    panel(
+      'ins-vincular',
+      t('Vincular', 'Link'),
+      soon(t('Vincular Revit', 'Link Revit'), 'link'),
+      soon(t('Vincular IFC', 'Link IFC'), 'link'),
+      soon(t('Vincular CAD', 'Link CAD'), 'link'),
+      soon(t('Topografia', 'Topography')),
+      soon(t('Nuvem de pontos', 'Point Cloud')),
+    ),
+    panel(
+      'ins-importar',
+      t('Importar', 'Import'),
+      act('importCad', 'large', t('Importar CAD (DXF)', 'Import CAD')),
+      soon(t('Importar PDF', 'Import PDF'), 'sheet'),
+      soon(t('Imagem', 'Image'), 'sheet'),
+    ),
+    panel(
+      'ins-biblioteca',
+      t('Carregar da biblioteca', 'Load from Library'),
+      soon(t('Carregar família', 'Load Family'), 'open'),
+      soon(t('Carregar como grupo', 'Load as Group'), 'layers'),
+    ),
+  ],
+};

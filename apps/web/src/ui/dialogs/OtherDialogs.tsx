@@ -17,6 +17,8 @@ export { OpeningTypeDialog } from './openingType/OpeningTypeDialog.tsx';
 export function LevelsDialog(): ReactElement {
   const p = useProject();
   const arg = useUi((s) => s.dialogArg);
+  // Destaque da linha: o nível selecionado no 3D manda; sem ele, vale o `dialogArg` (clique na linha de nível do 3D).
+  const destaque = useUi((s) => s.selectedLevel) ?? arg;
   const [err, setErr] = useState('');
   const run = (fn: () => void): void => {
     try {
@@ -32,7 +34,7 @@ export function LevelsDialog(): ReactElement {
         <thead><tr><th>Nome</th><th>Elevação</th><th /></tr></thead>
         <tbody>
           {p.levels.map((l) => (
-            <tr key={l.id} style={l.id === arg ? { background: 'var(--sel-bg, rgba(0,0,0,0.06))' } : undefined} data-selected={l.id === arg ? 'true' : undefined}>
+            <tr key={l.id} style={l.id === destaque ? { background: 'var(--sel-bg, rgba(0,0,0,0.06))' } : undefined} data-selected={l.id === destaque ? 'true' : undefined}>
               <td><TextField value={l.name} onCommit={(v) => run(() => editor.store.exec({ type: 'upsertLevel', level: { ...l, name: v || l.name } }))} /></td>
               <td><NumField value={l.elevation} quantity="length" onCommit={(v) => run(() => editor.store.exec({ type: 'upsertLevel', level: { ...l, elevation: v } }))} /></td>
               <td><button className="btn small danger" onClick={() => run(() => editor.store.exec({ type: 'deleteLevel', id: l.id }))}>Excluir</button></td>

@@ -38,6 +38,7 @@ import { AnnotationProps, selectedNote } from './AnnotationProps.tsx';
 import { SectionViewProps, selectedView } from './SectionViewProps.tsx';
 import { LevelGraphicsGroup, SectionGraphicsGroup, View3DGroup } from './GraphicsProps.tsx';
 import { LevelField } from './LevelField.tsx';
+import { LevelProps } from './LevelProps.tsx';
 import { UnderlayRow } from './ViewOptionRows.tsx';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
 import { ProfileRow } from './ProfileRow.tsx';
@@ -413,7 +414,10 @@ export function Properties(): ReactElement {
   const placing = count === 0 && hasPlacementProperties(tool);
   const areaPlan = count === 0 && !placing && planId ? activeAreaPlan(p, planId) : undefined;
   const perim = usePerimeter();
-  const panelLabel = perim.active ? PERIMETER_TITLE[perim.target] : placing ? `Colocar ${TOOL_LABEL[tool]}` : selectionLabel({ walls: walls.length, ops: ops.length, floors: floors.length, slabs: slabs.length, ceilings: ceilings.length, roofs: roofs.length, stairs: stairs.length, ramps: ramps.length, rooms: rooms.length, generics: generics.length, cads: cads.length, grade, view });
+  // Nível selecionado no 3D: só ocupa o painel quando não há elementos na seleção nem ferramenta em colocação.
+  const selectedLevel = useUi((s) => s.selectedLevel);
+  const nivelSelecionado = count === 0 && !placing ? p.levels.find((l) => l.id === selectedLevel) : undefined;
+  const panelLabel = perim.active ? PERIMETER_TITLE[perim.target] : placing ? `Colocar ${TOOL_LABEL[tool]}` : nivelSelecionado ? `Nível ${nivelSelecionado.name}` : selectionLabel({ walls: walls.length, ops: ops.length, floors: floors.length, slabs: slabs.length, ceilings: ceilings.length, roofs: roofs.length, stairs: stairs.length, ramps: ramps.length, rooms: rooms.length, generics: generics.length, cads: cads.length, grade, view });
   return (
     <aside className="side" aria-label="Propriedades">
       <PanelHead panel="props" name="Propriedades" closeLabel="Fechar as propriedades" extra={<span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>{panelLabel}</span>}>
@@ -435,6 +439,7 @@ export function Properties(): ReactElement {
           : grade ? <GridProperties grid={grade} />
           : note ? <AnnotationProps dim={note.dim} text={note.text} line={note.line} region={note.region} tag={note.tag} planId={planId} />
           : view ? <SectionViewProps view={view} />
+          : nivelSelecionado ? <LevelProps />
           : areaPlan ? <AreaPlanProperties plan={areaPlan} />
           : count > 0 ? (
           <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso, laje, telhado, escada, rampa ou ambiente) para editar propriedades.</div>

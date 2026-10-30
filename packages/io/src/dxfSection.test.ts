@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyProject, type Project } from '@hestia/model';
-import { DXF_LINE_WEIGHT_DEFAULT } from './dxf.ts';
 import {
   DXF_SECTION_LAYER_LEVELS,
   DXF_SECTION_LAYER_SILHOUETTE,
@@ -53,22 +52,17 @@ describe('camadas do corte e da elevação', () => {
 });
 
 describe('exportSectionDxf', () => {
-  it('escreve cada camada com o código 370 da largura dada (centésimos de mm, valor DXF válido)', () => {
+  it('aceita lineWeights mas não o escreve: o 370 é do R2000 e o AutoCAD recusa o arquivo R12 que o leva', () => {
     const text = exportSectionDxf(withSection(), 'corte_a', { ...geo, lineWeights: { CORTE_PAREDE: 50, CORTE_JANELA_PROJECAO: 18, CORTE_CONTORNO: 0 } });
-    expect(layerWeight(text, 'CORTE_PAREDE')).toBe('50');
-    expect(layerWeight(text, 'CORTE_JANELA_PROJECAO')).toBe('18');
-    expect(layerWeight(text, 'CORTE_CONTORNO')).toBe('0');
+    expect(layerWeight(text, 'CORTE_PAREDE')).toBeUndefined();
+    expect(text).not.toContain('370\r\n');
+    expect(text).toBe(exportSectionDxf(withSection(), 'corte_a', geo));
   });
 
   it('sem lineWeights a tabela de camadas não leva 370 (como antes)', () => {
     const text = exportSectionDxf(withSection(), 'corte_a', geo);
     expect(layerWeight(text, 'CORTE_PAREDE')).toBeUndefined();
     expect(text).not.toContain('370\r\n');
-  });
-
-  it('camada sem largura informada leva o padrão do DXF', () => {
-    const text = exportSectionDxf(withSection(), 'corte_a', { ...geo, lineWeights: {} });
-    expect(layerWeight(text, 'CORTE_PAREDE')).toBe(String(DXF_LINE_WEIGHT_DEFAULT));
   });
 
   it('o contorno externo sai em CORTE_CONTORNO e a unidade é o metro com z para cima', () => {

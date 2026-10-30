@@ -91,6 +91,15 @@ export function notesDxfOf(p: Project, levelId: Id, scale: number): DxfNotes {
   return { lines, texts, otherLines, regions: (level?.detailRegions ?? []).map((r) => r.boundary) };
 }
 
+/**
+ * Texto para o grupo 1 do R12: o que não é ASCII visível vira `\U+XXXX`. O AutoCAD lê o R12 em ANSI (sem
+ * `$DWGCODEPAGE`), então o UTF-8 cru sairia como dois caracteres por acento; e uma quebra de linha no valor partiria o
+ * par código/valor do arquivo. O `\U+XXXX` é lido por todas as versões do AutoCAD.
+ */
+export function dxfEscapeText(text: string): string {
+  return text.replace(/[^\x20-\x7e]/g, (ch) => `\\U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`);
+}
+
 /** Registros do TEXT (centrado no ponto de alinhamento, código 72=1 e 73=2) como pares [código, valor]. */
 export function dxfTextRecords(t: DxfNoteText): Array<[number, string | number]> {
   // units-ok: coordenada DXF (formato de máquina)
@@ -105,7 +114,7 @@ export function dxfTextRecords(t: DxfNoteText): Array<[number, string | number]>
     [30, '0.000000'],
     // units-ok: altura de texto DXF (formato de máquina)
     [40, t.height.toFixed(6)],
-    [1, t.text],
+    [1, dxfEscapeText(t.text)],
     // units-ok: ângulo DXF (formato de máquina)
     [50, t.rotation.toFixed(6)],
     [72, 1],

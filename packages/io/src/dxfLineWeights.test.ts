@@ -12,7 +12,6 @@ import {
   DXF_LAYER_STAIR_ARROW,
   DXF_LAYER_STAIR_CUT,
   DXF_LAYER_WALL_ABOVE,
-  DXF_LINE_WEIGHT_DEFAULT,
   dxfLayerOfMaterial,
   dxfLayersOf,
   dxfLineRoleOf,
@@ -108,7 +107,7 @@ describe('dxfLineRoleOf (categoria de cada camada da planta)', () => {
   });
 });
 
-describe('lineWeights no DXF (código 370 na tabela LAYER)', () => {
+describe('lineWeights no DXF (o 370 da tabela LAYER é do R2000: o R12 não o escreve)', () => {
   const geo: DxfLevelGeometry = {
     clusters: [{ regions: [{ materialId: mat.id, polygons: [[SQ]] }], silhouette: [] }],
     openings: [{ center: { x: 2, y: 0 }, u: { x: 1, y: 0 }, width: 0.8, thickness: 0.14 }],
@@ -120,12 +119,10 @@ describe('lineWeights no DXF (código 370 na tabela LAYER)', () => {
     expect(exportDxf(project, 'lv_0', { ...geo, lineWeights: undefined })).toBe(text);
   });
 
-  it('cada camada leva o 370 arredondado; camada sem entrada sai com -3 (padrão)', () => {
+  it('lineWeights é aceito mas nenhuma camada leva 370 e o texto é o mesmo (o AutoCAD recusa o R12 com ele)', () => {
     const text = exportDxf(project, 'lv_0', { ...geo, lineWeights: { [dxfLayerOfMaterial(mat.name)]: 70, [DXF_LAYER_OPENINGS]: 36 } });
-    const table = layerTable(text);
-    expect(table.get(dxfLayerOfMaterial(mat.name))).toBe(70);
-    expect(table.get(DXF_LAYER_OPENINGS)).toBe(35);
-    expect(table.get('0')).toBe(DXF_LINE_WEIGHT_DEFAULT);
+    for (const [, w] of layerTable(text)) expect(w).toBeUndefined();
+    expect(text).toBe(exportDxf(project, 'lv_0', geo));
   });
 
   it('entrada de camada que não está na geometria não entra na tabela', () => {

@@ -20,7 +20,7 @@ describe('ambientes no DXF da planta (decisão 0018, camadas AMBIENTES e AMBIENT
     expect(onLayer(dxf, 'AMBIENTES')).toBe(true);
     expect(onLayer(dxf, 'AMBIENTES_TEXTO')).toBe(true);
     expect(dxf).toContain('Sala (101)');
-    expect(dxf).toMatch(/Sala \(101\) · \d+,\d\d m²/);
+    expect(dxf).toMatch(/Sala \(101\) \\U\+00B7 \d+,\d\d m\\U\+00B2/);
   });
 
   it('categoria "ambiente" oculta na vista: nada sai', () => {

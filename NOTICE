@@ -1,0 +1,17 @@
+Hestia
+Copyright (c) 2026 Dennylson Santos and contributors.
+
+The software is licensed under the MIT License. See LICENSE.
+
+The Hestia name, wordmark, logo and the hestiabim.com domain are project marks
+of Dennylson Santos. They are not licensed under the MIT License. Forks and
+distributions must use a different name and logo and must not suggest official
+endorsement.
+
+Contributions are accepted under the MIT License (inbound = outbound). No
+Contributor License Agreement (CLA) is required. Contributions are voluntary and
+do not create any right to payment, royalties, revenue sharing or ownership of
+the project.
+
+Third-party dependencies keep their own licenses. See the package manifests and
+their respective license files.

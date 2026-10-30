@@ -310,15 +310,25 @@ export function gripHoldAt(env: ToolEnv, at: Vec2): GripHold | null {
   return null;
 }
 
+/**
+ * Alça de anotação sob o cursor (hoje só a extremidade da linha de separação). A planta de área desliga as alças de
+ * modelo, mas esta continua: a linha de separação é anotação e a vista permite editá-la.
+ */
+export function annotationGripHoldAt(env: ToolEnv, at: Vec2): GripHold | null {
+  return roomSeparatorGrip(env, at);
+}
+
 /** Alças desenhadas no piso, laje ou telhado selecionado (vértices e meio das arestas), com o foco e a seta de caimento. */
-export function ringHandlePreview(p: Project, sel: Id[], focus: GripFocus | null): PreviewItem[] {
-  // Extremidades das linhas de separação selecionadas (uma alça em cada ponta).
+export function ringHandlePreview(p: Project, sel: Id[], focus: GripFocus | null, grips = true): PreviewItem[] {
+  // Extremidades das linhas de separação selecionadas (uma alça em cada ponta). Elas são anotação: continuam na planta
+  // de área, mesmo quando as alças de modelo estão desligadas.
   const items: PreviewItem[] = [];
   for (const level of p.levels) {
     for (const r of level.roomSeparators ?? []) {
       if (sel.includes(r.id)) items.push({ kind: 'point', at: r.a }, { kind: 'point', at: r.b });
     }
   }
+  if (!grips) return items;
   const f = sel.length === 1 ? p.elements[sel[0]!] : undefined;
   if (!(isFloor(f) || isSlab(f) || isRoof(f))) return items;
   const n = f.boundary.length;

@@ -16,7 +16,7 @@ import { commitCeilingBoundary, commitOutlineBoundary } from './outlineEdit.ts';
 import { lengthUnitName, parseQuantityText } from './numeric.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { execWithHostedLoss } from './hostedGuard.ts';
-import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
+import { gripHoldAt, annotationGripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
 import { pickStairAt, stairEndpoints, stairIdsInBox } from './stairPick.ts';
 import { pickRampAt, rampEndpoints, rampIdsInBox } from './rampPick.ts';
 import { annotationAt, annotationIdsInBox, detailItemAt, dimGripAt, dimTextGripAt, signedOffset, textGripAt, viewAnnotationsOf } from './annotationPick.ts';
@@ -41,6 +41,13 @@ const fmtLen = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'lengt
 
 /** Shift ou Ctrl (Cmd no Mac): o clique e a janela somam à seleção (Ctrl alterna quem já está selecionado). */
 const soma = (p: PointerInfo): boolean => p.shift || p.ctrl;
+
+/**
+ * Categorias de modelo: na planta de área elas só se selecionam (clique e janela). Arrasto, alças e fantasmas de mover
+ * são de edição, e a planta de área é vista de análise/anotação. Anotação, vista e separador de ambiente não são modelo.
+ */
+const MODELO = new Set<AnyHit['kind']>(['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'stair', 'ramp', 'generic', 'room', 'grid']);
+const ehModelo = (kind: AnyHit['kind']): boolean => MODELO.has(kind);
 
 export class SelectTool extends ToolBase {
   readonly id = 'select';
@@ -69,6 +76,11 @@ export class SelectTool extends ToolBase {
   /** Planta de área da vista (null/ausente = planta de piso): as anotações e as alças dela são as da planta. */
   private planId(): Id | undefined {
     return this.env.areaPlanId?.() ?? undefined;
+  }
+
+  /** Planta de área: elementos de modelo não se movem nem mostram alças (a vista é de análise/anotação). */
+  private get somenteLeitura(): boolean {
+    return this.planId() !== undefined;
   }
 
   /** Arrasto da alça da cota: o deslocamento é a distância do cursor à linha a–b, no lado do cursor. */
@@ -162,10 +174,18 @@ export class SelectTool extends ToolBase {
     const hit = this.hitAt(p.raw);
     this.hover = hit?.id ?? null;
     this.items = this.hover ? [{ kind: 'highlight', ids: [this.hover] }] : [];
-    const grip = gripHoldAt(this.env, p.raw);
+    // Na planta de área a alça de modelo nem aparece: sem prévia, o cursor não sinaliza uma edição que não existe.
+    const semAlcaDeModelo = this.somenteLeitura && hit !== null && ehModelo(hit.kind);
+    const grip = this.somenteLeitura
+      ? (annotationGripHoldAt(this.env, p.raw) ?? (semAlcaDeModelo ? null : gripHoldAt(this.env, p.raw)))
+      : gripHoldAt(this.env, p.raw);
     this.inf = grip ? { point: grip.at, kind: 'endpoint', guides: [] } : null;
-    // Alças do piso, laje ou telhado selecionado: vértices, meio das arestas, foco e seta do caimento.
-    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()), ...stairFreeHandlePreview(pr, this.env.selection()), ...spiralHandlePreview(pr, this.env.selection()), ...gridHandlePreview(pr, this.env.selection()), ...rampHandlePreview(pr, this.env.selection()));
+    // Alças do piso, laje ou telhado selecionado: vértices, meio das arestas, foco e seta do caimento. Na planta de
+    // área ficam só as alças do separador de ambiente (as de modelo não são desenhadas).
+    if (this.mode === 'idle') {
+      this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus, !this.somenteLeitura));
+      if (!this.somenteLeitura) this.items.push(...stairHandlePreview(pr, this.env.selection()), ...stairFreeHandlePreview(pr, this.env.selection()), ...spiralHandlePreview(pr, this.env.selection()), ...gridHandlePreview(pr, this.env.selection()), ...rampHandlePreview(pr, this.env.selection()));
+    }
     // Alça da cota selecionada: sob o cursor, a cota destaca-se (arrastar muda o deslocamento).
     const dgHover = this.mode === 'idle' ? dimGripAt(pr, this.env.levelId(), this.env.selection(), p.raw, this.env.metersPerPixel(), this.planId()) : null;
     if (dgHover) this.items.push({ kind: 'highlight', ids: [dgHover] });
@@ -247,7 +267,13 @@ export class SelectTool extends ToolBase {
     this.moveBase = null;
     const sel = this.env.selection();
     const planId = this.planId();
-    const hold = gripHoldAt(this.env, p.raw);
+    const somenteLeitura = this.somenteLeitura;
+    const hit = this.hitAt(p.raw);
+    // Na planta de área a alça de modelo não pega o clique (não existe alça desenhada); a do separador de ambiente,
+    // que é anotação, continua. As alças de cota/texto são testadas logo abaixo, depois deste bloco.
+    const hold = somenteLeitura
+      ? (annotationGripHoldAt(this.env, p.raw) ?? (hit !== null && ehModelo(hit.kind) ? null : gripHoldAt(this.env, p.raw)))
+      : gripHoldAt(this.env, p.raw);
     if (hold) {
       this.hold = hold;
       this.mode = 'grip';
@@ -259,9 +285,13 @@ export class SelectTool extends ToolBase {
     if (dg) { this.dimGrip = dg; this.dimOffset = null; this.mode = 'dimgrip'; return; }
     const tg = textGripAt(pr, this.env.levelId(), sel, p.raw, mpp, planId);
     if (tg) { this.textGrip = tg; this.textAt = null; this.mode = 'textmove'; return; }
-    const hit = this.hitAt(p.raw);
     // Linha de separação selecionada não se arrasta (não é movível pelo arrasto): o clique só (des)seleciona no soltar.
     if (hit && sel.includes(hit.id) && hit.kind !== 'roomSeparator') {
+      // Na planta de área o modelo já selecionado fica em `pending`: o clique seleciona e o arrasto vira janela.
+      if (somenteLeitura && ehModelo(hit.kind)) {
+        this.mode = 'pending';
+        return;
+      }
       if (hit.kind === 'door' || hit.kind === 'window') {
         this.mode = 'opening';
         this.openingId = hit.id;
@@ -276,7 +306,8 @@ export class SelectTool extends ToolBase {
     const moved = dist(p.raw, this.downPt) > 4 * mpp;
     const pr = this.env.project();
     if (this.mode === 'pending' && moved) this.mode = 'window';
-    if (this.mode === 'dragwait' && moved) this.mode = 'moving';
+    // Defesa extra: a planta de área nunca chega a `moving` (o `down` não entra em `dragwait` para modelo).
+    if (this.mode === 'dragwait' && moved && !this.somenteLeitura) this.mode = 'moving';
     this.items = [];
     if (this.mode === 'dimgrip') this.dragDimGrip(p);
     if (this.mode === 'dimtext') {

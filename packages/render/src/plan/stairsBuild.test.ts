@@ -10,7 +10,8 @@ import {
   stairBody,
   type StairComponentSketch,
 } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type Project, type StairLanding, type StairRun } from '@hestia/model';
+import { ProjectStore, createEmptyProject, defaultStairTypeId, makeSlab, makeStair, type Project, type StairLanding, type StairRun } from '@hestia/model';
+import { pointInMulti } from '@hestia/geom';
 import { buildStairSolids } from '../model3d/stairSolids.ts';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
 import { stairFills } from './stairs.ts';
@@ -190,5 +191,35 @@ describe('numeração contínua dos degraus na planta (decisão 0011 §1 item 6)
     const sk = generateStraightRun({ start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, width: 1.2, risers: 16, tread: P });
     const p = stairProject([{ id: 'run', kind: 'run', ...sk }]);
     expect(treadLabels(p)).toEqual(range(1, 16));
+  });
+
+  /** O mesmo projeto com laje no nível de topo cobrindo a faixa à frente do último espelho (o lance sobe em +x). */
+  function coveredProject(): Project {
+    const s = new ProjectStore(project());
+    s.exec({
+      type: 'addSlab',
+      slab: makeSlab({ id: 'laje', typeId: 'ls_mac15', levelId: 'lv_1', boundary: [{ x: -1, y: -1 }, { x: 6, y: -1 }, { x: 6, y: 1 }, { x: -1, y: 1 }] }),
+    });
+    return s.project;
+  }
+
+  it('sem laje sobre o último espelho: 17 espelhos numeram 1..17 (a chegada é o último degrau)', () => {
+    expect(treadLabels(project())).toEqual(range(1, 17));
+  });
+
+  it('com laje sobre o último espelho: 17 espelhos numeram 1..16 (o piso do nível é o degrau de chegada)', () => {
+    expect(treadLabels(coveredProject())).toEqual(range(1, 16));
+  });
+
+  it('com laje sobre o último espelho: a chegada não é desenhada e a seta termina no último espelho', () => {
+    const p = coveredProject();
+    const [st] = resolveStairsOnLevel(p, 'lv_0');
+    const o = stairFills(p, [st!], LIGHT, false, 'medium', VIEW);
+    // Centro da chegada: a faixa de N·P a (N+1)·P, na largura do lance (y = 0).
+    const centroChegada = { x: N * P + P / 2, y: 0 };
+    expect(o.fills.some((f) => pointInMulti(centroChegada, f.polygons))).toBe(false);
+    expect(o.strokes.some((t) => t.closed && pointInMulti(centroChegada, [[t.pts]]))).toBe(false);
+    const shaft = o.strokes.find((t) => !t.closed && t.pts.length === N)!;
+    expect(Math.max(...shaft.pts.map((q) => q.x))).toBeCloseTo(N * P, 9);
   });
 });

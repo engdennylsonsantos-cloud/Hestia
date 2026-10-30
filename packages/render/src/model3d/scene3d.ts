@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- a cena 3D reúne o port GPU (faixas/sombras) e o alizar/esquadrias do plano; extrair depois. */
 import * as THREE from 'three';
-import { applyPartialStructure, frameOfWall, resolveCeilings, junctionLevel, resolveFloors, resolveRamps, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
+import { applyPartialStructure, frameOfWall, resolveCeilings, junctionLevel, resolveFloors, resolveRamps, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTop, type ResolvedLevel } from '@hestia/engine';
 import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
 import { DARK, LIGHT } from '../plan/types.ts';
 import { projetoDaJuncao } from '../plan/viewContext.ts';
@@ -485,7 +485,8 @@ export class ModelScene {
     // Junção do nível sobre o projeto reduzido (a mesma redução da planta, `projetoDaJuncao`): o resultado é o do projeto inteiro.
     const juncao = junctionLevel(this.reduzirJuncao ? projetoDaJuncao(p, lv.levelId) : p, lv.levelId);
     // Escadas do nível (decisão 0011 §1): uma malha por material do tipo; escada com erro não gera malha. A chegada
-    // monolítica termina na face inferior da laje que cobre o último espelho (decisão 0012 §2, `stairArrivalTopZ`).
+    // monolítica termina na face inferior da laje que cobre o último espelho (decisão 0012 §2, `stairArrivalTop`); sem
+    // laje nem piso sobre o último espelho, fecha no próprio nível (`topZ`), flush com o piso do nível de cima.
     // Paredes com a junção (0023 F4): cada faixa é extrudada só nas partes que sobram dela, como o corte e a planta. As camadas
     // de prismas retangulares viram caixas instanciadas (`paredesInstanciadas3d.ts`); o resto segue como geometria.
     const caixas = this.instanciar ? new CaixasDoNivel() : null;
@@ -499,7 +500,7 @@ export class ModelScene {
       ...(shown('slab') ? buildSlabSolids(resolveSlabs(p, lv.levelId), juncao) : []),
       ...buildRoofSolids(roofs),
       ...eave.batches,
-      ...(shown('stair') ? buildStairSolids(escadas.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s) ?? s.topZ) : []),
+      ...(shown('stair') ? buildStairSolids(escadas.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTop(p, s).top) : []),
       ...(shown('stair') ? buildRampSolids(rampas.filter((r) => r.levelId === lv.levelId)) : []),
       ...(shown('generic') ? buildGenericSolids(p, lv.levelId) : []),
     ];

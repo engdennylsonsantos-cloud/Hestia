@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { resolverZoom } from './zoomOps.ts';
-import { createEmptyProject, type DetailLevel, type Project } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeSlab, type DetailLevel, type Project } from '@hestia/model';
 import { straightStair } from '../stairFixture.helper.ts';
 import type { ResolvedStairStep } from '@hestia/engine';
-import { multiArea } from '@hestia/geom';
+import { multiArea, pointInMulti } from '@hestia/geom';
 import { belowStairOps, planFootprint, stairFills, stairSelectionOps, STAIR_CUT_HEIGHT, treadNumber } from './stairs.ts';
 import { defaultPaint } from './style.ts';
 
@@ -152,5 +152,59 @@ describe('numeração contínua dos degraus (decisão 0011 §1 item 6)', () => {
   it('sem altura real do espelho, o número cai no índice do lance', () => {
     const s = { ...straightStair({ risers: 4, tread: P, riserH: H, width: 1 }), riserHeight: 0 };
     expect(treadNumber(s, s.steps[1]!)).toBe(2);
+  });
+});
+
+/** Projeto com laje no nível de topo (lv_1) cobrindo a faixa à frente do último espelho: a escada sobe em +y, de 0 a N·p. */
+function projectWithSlab(): Project {
+  const s = new ProjectStore(createEmptyProject());
+  s.exec({
+    type: 'addSlab',
+    slab: makeSlab({ id: 'laje', typeId: 'ls_mac15', levelId: 'lv_1', boundary: [{ x: -1, y: -1 }, { x: 2, y: -1 }, { x: 2, y: 5 }, { x: -1, y: 5 }] }),
+  });
+  return s.project;
+}
+
+const opsIn = (p: Project, detail: DetailLevel = 'medium', s = stair()) => resolverZoom(stairFills(p, [s], LIGHT, false, detail, VIEW), VIEW.zoom);
+
+/** Centro da chegada (o degrau nº N): a faixa de N·p a N·p + p, na largura do lance. */
+const arrivalCenter = { x: 0.5, y: N * P + P / 2 };
+const filledAt = (o: ReturnType<typeof opsIn>, at: { x: number; y: number }): boolean => o.fills.some((f) => pointInMulti(at, f.polygons));
+const outlinedAt = (o: ReturnType<typeof opsIn>, at: { x: number; y: number }): boolean => o.strokes.some((t) => t.closed && pointInMulti(at, [[t.pts]]));
+
+describe('chegada na planta: último degrau só quando o nível de topo não é fechado (decisão 0012 §2)', () => {
+  it('com laje sobre o último espelho: a chegada não é preenchida nem contornada, e a numeração para em N−1', () => {
+    const o = opsIn(projectWithSlab());
+    expect(filledAt(o, arrivalCenter)).toBe(false);
+    expect(outlinedAt(o, arrivalCenter)).toBe(false);
+    expect(o.labels.map((l) => l.text)).not.toContain(String(N));
+    expect(o.labels.map((l) => l.text)).toEqual(['SOBE', ...Array.from({ length: N - 1 }, (_, i) => String(i + 1))]);
+  });
+
+  it('com laje: no grosseiro, o preenchimento é a união dos passos, sem a chegada', () => {
+    const o = opsIn(projectWithSlab(), 'coarse');
+    expect(o.fills).toHaveLength(1);
+    expect(filledAt(o, arrivalCenter)).toBe(false);
+    expect(filledAt(o, { x: 0.5, y: (N - 1) * P + P / 2 })).toBe(true);
+  });
+
+  it('com laje: a seta "SOBE" termina no último espelho, sem sobrar além dele', () => {
+    const o = opsIn(projectWithSlab());
+    // Sem o ponto da chegada, a caminhada tem um ponto por espelho e a ponta fica no meio do último.
+    const shaft = o.strokes.find((t) => !t.closed && t.pts.length === N)!;
+    expect(shaft.pts[shaft.pts.length - 1]!.y).toBeCloseTo(N * P, 9);
+    expect(Math.max(...shaft.pts.map((q) => q.y))).toBeLessThanOrEqual(N * P + 1e-9);
+  });
+
+  it('com laje: a pegada de seleção/fantasma continua incluindo a chegada', () => {
+    const s = stair();
+    expect(multiArea(planFootprint(s))).toBeGreaterThan(multiArea(s.footprint) + 1e-9);
+  });
+
+  it('sem laje nem piso: a chegada continua desenhada, preenchida, contornada e numerada N', () => {
+    const o = opsIn(PROJECT);
+    expect(filledAt(o, arrivalCenter)).toBe(true);
+    expect(outlinedAt(o, arrivalCenter)).toBe(true);
+    expect(o.labels.find((l) => l.text === String(N))!.at.y).toBeCloseTo(N * P + P / 2, 6);
   });
 });

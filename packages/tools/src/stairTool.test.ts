@@ -166,7 +166,8 @@ describe('ferramenta Escada: croqui reto por cliques', () => {
     boundaries(t);
     risers(t, [0, 1, 2]);
     t.move(P(8, 8));
-    expect(t.preview().filter((i) => i.kind === 'polygon' && i.tone === 'tread')).toHaveLength(2);
+    // Sem nível de topo na barra (topLevelId null), a escada criada fecha no nível: 2 degraus + a chegada.
+    expect(t.preview().filter((i) => i.kind === 'polygon' && i.tone === 'tread')).toHaveLength(3);
   });
 });
 

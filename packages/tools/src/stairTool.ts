@@ -5,7 +5,7 @@ import { ToolBase } from './base.ts';
 import type { InferContext } from './infer.ts';
 import { parseQuantityText } from './numeric.ts';
 import { pickStairAt, stairSnapPoints } from './stairPick.ts';
-import { chainItems, curveItems, treadItems } from './stairPreview.ts';
+import { chainItems, curveItems, treadItems, type TreadPreviewContext } from './stairPreview.ts';
 import {
   analyzeDraft,
   componentsFromParts,
@@ -483,9 +483,23 @@ export class StairTool extends ToolBase {
    */
   refresh(): void {
     this.report = analyzeDraft(this.st.parts, this.limits(), unitsOf(this.env.project()));
-    this.treads = treadItems(this.st.parts, this.report.riserHeight);
+    this.treads = treadItems(this.st.parts, this.treadContext());
     this.pickItems = this.pickPreview();
     this.items = buildItems(this.st, this.cursor, this.treads, this.report, this.pickItems);
+  }
+
+  /**
+   * Contexto da prévia dos degraus: o tipo e o nível de topo da escada em edição ou, no croqui novo, os da escada que a
+   * criação faria. Sem `topLevelId` explícito, vale "sem cobertura" — é assim que a escada é criada (`draftStair`), e a
+   * chegada fecha no nível (`stairArrivalTop`).
+   */
+  private treadContext(): TreadPreviewContext {
+    const p = this.env.project();
+    const s = this.stairId ? p.elements[this.stairId] : undefined;
+    const typeId = isStair(s) ? s.typeId : stairTypeId(p, this.opts.typeId);
+    const type = typeId ? p.stairTypes[typeId] ?? null : null;
+    const topLevelId = isStair(s) ? s.topLevelId : (draftStair(p, this.creationOptions(), this.env.levelId())?.topLevelId ?? null);
+    return { project: p, type, topLevelId, risers: this.report.created, riserHeight: this.report.riserHeight };
   }
 
   /** Mensagem de status: a mensagem pedida, senão o 1º erro do croqui, senão a dica do sub-modo. */

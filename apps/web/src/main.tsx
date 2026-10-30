@@ -23,6 +23,8 @@ if (new URLSearchParams(location.search).has('debug')) {
       useUi: s.useUi,
       resolveSlabs: e.resolveSlabs,
       resolveFloors: e.resolveFloors,
+      resolveStairs: e.resolveStairs,
+      stairArrivalTop: e.stairArrivalTop,
       resolveLevel: e.resolveLevel,
       junctionLevel: e.junctionLevel,
       cutLevelByJunction: e.cutLevelByJunction,

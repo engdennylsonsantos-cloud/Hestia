@@ -20,7 +20,7 @@ export interface StairBodyPiece {
 
 /** Comprimento máximo da chegada, atrás do último espelho (m). */
 export const STAIR_ARRIVAL_MAX_LENGTH = 0.3;
-/** Espessura da laje de cima usada quando nenhuma laje ou piso cobre o último espelho (m): topo = topZ − este valor. */
+/** Espessura da laje de cima usada quando `stairBody` é chamado sem `arrivalTopZ` (m): topo = topZ − este valor. O 3D/corte sempre passam a cota. */
 export const STAIR_ARRIVAL_SLAB_DEFAULT = 0.15;
 
 const EPS = 1e-9;
@@ -54,9 +54,10 @@ export function pieceVolume(piece: StairBodyPiece): number {
  * do tipo (padrão liso); nenhuma peça desce abaixo do piso base. Piso e espelho: degraus com espessura `treadThickness`
  * e patamares com `landingThickness`, sem chegada. Escada com erro: sem peças.
  *
- * Chegada (monolítico): o topo é `opts.arrivalTopZ` (cota absoluta, em geral a face inferior da laje que cobre o último
- * espelho, `stairArrivalTopZ`). Sem ele, vale `topZ − opts.slabThickness` (padrão 0,15 m). Com `arrivalTopZ`, a parte da
- * chegada cujo fundo fica acima desse topo é cortada, então a peça nunca tem espessura negativa.
+ * Chegada (monolítico): o topo é `opts.arrivalTopZ` (cota absoluta). O 3D e o corte passam `stairArrivalTop(...).top`: a
+ * face inferior da laje/piso que cobre o último espelho ou, sem cobertura, o próprio `topZ` (chegada flush com o nível).
+ * Sem `arrivalTopZ`, vale o recuo antigo `topZ − opts.slabThickness` (padrão 0,15 m), só para chamadas isoladas. Com
+ * `arrivalTopZ`, a parte da chegada cujo fundo fica acima desse topo é cortada, então a peça nunca tem espessura negativa.
  */
 export function stairBody(stair: ResolvedStair, opts: { slabThickness?: number; arrivalTopZ?: number } = {}): { pieces: StairBodyPiece[] } {
   if (stair.issues.some((i) => i.severity === 'error')) return { pieces: [] };
@@ -65,6 +66,18 @@ export function stairBody(stair: ResolvedStair, opts: { slabThickness?: number; 
   if (type.runStyle !== 'monolithic') return { pieces: assembledPieces(stair) };
   const arrivalTop = opts.arrivalTopZ ?? stair.topZ - (opts.slabThickness ?? STAIR_ARRIVAL_SLAB_DEFAULT);
   return { pieces: monolithicPieces(stair, type, arrivalTop) };
+}
+
+/**
+ * Frente da chegada a partir dos dois últimos espelhos, na ordem de subida (`last` = espelho N, `prev` = N − 1): a linha
+ * do último espelho, o sentido da subida e o comprimento até a próxima linha (limitado a `STAIR_ARRIVAL_MAX_LENGTH`).
+ * Função pura: serve ao corpo (3D/corte) e à prévia da ferramenta, que ainda não tem uma escada resolvida.
+ */
+export function arrivalFrameFrom(last: { a: Vec2; b: Vec2 }, prev: { a: Vec2; b: Vec2 }): StairArrivalFrame | null {
+  const dv = sub(mid(last.a, last.b), mid(prev.a, prev.b));
+  const pl = Math.hypot(dv.x, dv.y);
+  if (!(pl > EPS)) return null;
+  return { a: last.a, b: last.b, u: mul(dv, 1 / pl), length: Math.min(pl, STAIR_ARRIVAL_MAX_LENGTH) };
 }
 
 /**
@@ -81,10 +94,7 @@ export function stairArrivalFrame(stair: ResolvedStair): StairArrivalFrame | nul
   const top = byNumber.get(N);
   const prevTop = byNumber.get(N - 1);
   if (!top || !prevTop) return null;
-  const dv = sub(mid(top.a, top.b), mid(prevTop.a, prevTop.b));
-  const pl = Math.hypot(dv.x, dv.y);
-  if (!(pl > EPS)) return null;
-  return { a: top.a, b: top.b, u: mul(dv, 1 / pl), length: Math.min(pl, STAIR_ARRIVAL_MAX_LENGTH) };
+  return arrivalFrameFrom(top, prevTop);
 }
 
 /** Espelhos pelo nº global, derivado da cota da base do espelho (z0 = base + (nº − 1)·h): cada linha de emenda existe uma vez. */

@@ -1,5 +1,5 @@
 import { add, difference, dist, dot, intersection, lerp, mul, multiArea, norm, perp, pointInMulti, rotate, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { sampleChain, spiralParamsOf, stairArrivalFrame, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep, type SpiralParams } from '@hestia/engine';
+import { sampleChain, spiralParamsOf, stairArrivalFrame, stairArrivalTop, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep, type SpiralParams } from '@hestia/engine';
 import { isStair, unitsOf, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -164,7 +164,7 @@ function landingConnector(s: ResolvedStair, ciA: number, ciB: number, prev: Vec2
  * ou os pontos médios dos espelhos em ordem de subida. Um lance só tem espelhos resolvidos quando o croqui é válido
  * (o motor valida a caminhada), então a explícita usada aqui já foi aceita. Lances sem espelho resolvido não entram.
  */
-export function climbWalk(p: Project, s: ResolvedStair, risers: ResolvedStairRiser[]): Vec2[] {
+export function climbWalk(p: Project, s: ResolvedStair, risers: ResolvedStairRiser[], arrival: { covered: boolean } = stairArrivalTop(p, s)): Vec2[] {
   const model = p.elements[s.id];
   const components = isStair(model) ? model.components : [];
   const byComponent = new Map<number, ResolvedStairRiser[]>();
@@ -180,10 +180,13 @@ export function climbWalk(p: Project, s: ResolvedStair, risers: ResolvedStairRis
     out.push(...walk);
     prev = { ci, walk };
   }
-  // E termina no último degrau (a chegada), que a planta desenha depois do último espelho.
-  const last = arrivalRing(s);
-  const lastAt = last && out.length > 0 ? labelPoint([[last]]) : null;
-  if (lastAt) out.push(lastAt);
+  // E termina no último degrau desenhado: a chegada, quando ela é um degrau da própria escada (sem laje/piso no nível de
+  // topo); com laje/piso, o degrau de chegada é o piso do nível e a seta para no último espelho, sem sobrar além dele.
+  if (!arrival.covered) {
+    const last = arrivalRing(s);
+    const lastAt = last && out.length > 0 ? labelPoint([[last]]) : null;
+    if (lastAt) out.push(lastAt);
+  }
   return out;
 }
 
@@ -308,6 +311,10 @@ function postOps(p: Project, s: ResolvedStair, spirals: ReadonlyMap<number, Spir
  * Caracol (decisão 0014 §1 item 9): as voltas sobrepõem-se em planta. Degrau acima do corte não pinta sobre a volta de
  * baixo (`aboveFill`); o rótulo de cima sai para dentro do setor (`treadLabelAt`) e, acima do corte, em tom claro
  * (`tone: 'soft'`); o poste é um círculo (`postOps`).
+ *
+ * Chegada (`stairArrivalTop`): sem laje/piso fechando o nível de topo, ela é o último degrau da escada e sai preenchida,
+ * contornada e numerada N; com laje/piso, o degrau de chegada é o piso do nível e a planta termina no último espelho (a
+ * pegada de seleção/fantasma continua incluindo a chegada).
  */
 export function stairFills(
   p: Project,
@@ -336,13 +343,16 @@ export function stairFills(
     const m = p.materials[s.type.materialId];
     const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);
     const spirals = spiralByComponent(p, s);
+    // A chegada só é degrau da própria escada quando o nível de topo não é fechado por laje/piso: com laje/piso, o degrau
+    // de chegada é o piso do nível e a planta termina no último espelho.
+    const arrival = stairArrivalTop(p, s);
     const post = postOps(p, s, spirals, cutZ, fillBase, dark, lineColor, paint);
     const inView = (z: number): boolean => z <= viewTop + 1e-9;
     if (detail === 'coarse') {
       const seen = steps.filter((st) => inView(st.z));
       if (seen.length === 0 && s.steps.length > 0) continue;
       const footprint = seen.length === s.steps.length ? s.footprint : union(...seen.map((st) => [[st.polygon]]));
-      const last = inView(s.topZ) ? arrivalRing(s) : null;
+      const last = !arrival.covered && inView(s.topZ) ? arrivalRing(s) : null;
       out.fills.push({ polygons: last ? union(footprint, [[last]]) : footprint, color, alpha: 1 });
       out.fills.push(...post.fills);
       continue;
@@ -354,7 +364,7 @@ export function stairFills(
       if (fill) out.fills.push({ polygons: fill, color, alpha: 1 });
       out.strokes.push(outlineOps(st.polygon, st.z, lineColor, cutZ, projecao));
     }
-    const last = arrivalRing(s);
+    const last = arrival.covered ? null : arrivalRing(s);
     if (last) {
       if (inView(s.topZ)) out.fills.push({ polygons: [[last]], color, alpha: 1 });
       out.strokes.push(outlineOps(last, s.topZ, lineColor, cutZ, projecao));
@@ -363,7 +373,7 @@ export function stairFills(
     out.strokes.push(...post.strokes);
     const risers = risersInClimbOrder(s).filter((r) => r.z1 <= topZ + 1e-9);
     for (const r of risers) out.strokes.push({ pts: riserPoints(r), closed: false, ...corte, color: theme.ink, alpha: 1 });
-    const walk = climbWalk(p, s, risers);
+    const walk = climbWalk(p, s, risers, arrival);
     out.strokes.push(...climbArrow(walk, theme.ink, corte));
     if (walk.length >= 2) {
       const u = norm(sub(walk[1]!, walk[0]!));

@@ -2,6 +2,7 @@ import { dist, boxesOverlap, boxOf, intersectSegments, type Vec2 } from '@hestia
 import { wallMid } from './wallGeom.ts';
 import { isGeneric, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { toLocal, wallEndCorners } from '@hestia/engine';
+import { cadDrawingIdsInBox as cadBoxIds, cadNear, cadSnapIndexes } from './snapCad.ts';
 import { candidatesAt, wallIndexOf } from './pickIndex.ts';
 
 export interface Hit {
@@ -118,6 +119,19 @@ export function idsInBox(p: Project, levelId: Id, a: Vec2, b: Vec2): Id[] {
     if (hit) ids.push(w.id);
   }
   return ids;
+}
+
+/**
+ * Desenho CAD importado cujo traço passa a até `tol` do ponto (clique na linha). Desenho com `visible: false` fica de
+ * fora: o que não se vê não se seleciona.
+ */
+export function cadAt(p: Project, levelId: Id, at: Vec2, mpp: number): Id | null {
+  return cadNear(cadSnapIndexes(p, [levelId]), at, 4 * mpp);
+}
+
+/** Desenhos CAD inteiramente dentro da janela (seleção de janela esquerda→direita). */
+export function cadIdsInBox(p: Project, levelId: Id, a: Vec2, b: Vec2): Id[] {
+  return cadBoxIds(cadSnapIndexes(p, [levelId]), a, b);
 }
 
 /**

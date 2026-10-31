@@ -267,9 +267,9 @@ nível com topos diferentes) e `parede-dentro-da-laje` (parede cruzando camada d
     a traz de volta. Use **HH**, **HI** e **HR**; ligue **RH** (Revelar) e confira o contorno azul. Repita no 3D e abra o
     menu de contexto e a barra de controle da vista.
 12. **CAD importado**: em **Inserir → Importar CAD (DXF)**, importe um DXF; clique numa linha na planta e confira
-    **Gerenciar CAD** (também em **Gerenciar → Gerenciar projeto**) e o nó **CAD importado** no Navegador. Com uma
-    ferramenta de desenho, aproxime o cursor de uma extremidade, do meio e de um cruzamento e confira a captura nas
-    linhas.
+    **Gerenciar CAD** (também na aba **Gerenciar**, painel **Gerenciar projeto**) e o nó **CAD importado** no
+    Navegador. Com uma ferramenta de desenho, aproxime o cursor de uma extremidade, do meio e de um cruzamento e confira
+    a captura nas linhas.
 
 ## Como rodar
 

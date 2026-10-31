@@ -1,6 +1,6 @@
 # 07 · Status da versão de teste
 
-Estado em 2026-10-30, conferido no código, nos testes e nos documentos de decisão desta árvore (esquema 19). Os
+Estado em 2026-10-31, conferido no código, nos testes e nos documentos de decisão desta árvore (esquema 19). Os
 checklists de [docs/paridade](paridade/) são a fonte por elemento; `docs/paridade/ORDEM.json` registra o portão, e os
 nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sobram são não bloqueantes (ver
 "Pendências"). A revisão de 2026-10-30 acrescenta visibilidade por vista, prewarm da 3D e CAD importado; os números de
@@ -61,6 +61,11 @@ teste citados abaixo continuam os das rodadas de 2026-10-22/23.
 - Tipos de escada com seção ao vivo; corpo monolítico; furo derivado por laje/piso; avisos de norma e folga de cabeça.
 - Planta com numeração contínua, 3D, corte, DXF, quantitativos e tabela com CSV.
 
+**Rampas**
+- Ferramenta Rampa com formas reta, L, U e livre, modo por comprimento ou inclinação, patamares e chegada.
+- Tipo com norma editável (NBR 9050, ADA ou personalizada), largura, inclinação e desnível; avisos do modo ao vivo.
+- Representação em planta, corte, 3D e DXF; mover/copiar/colar, seleção e alças de vértices.
+
 **Aberturas por família** — 35 feitos, 7 fora de escopo, 0 pendentes (`docs/paridade/aberturas.md`; decisão 0017).
 - Dez famílias em `OPENING_FAMILIES`: portas giro, dupla, correr, pivotante e vão livre; janelas fixa, basculante,
   maxim-ar, correr (2 ou 3 folhas) e vão livre. Combinação fora das famílias é recusada.
@@ -115,6 +120,8 @@ elevação são anotações de primeira classe (0030): número, título, rótulo
 estável das elevações; seleção, propriedades, mover/copiar/girar/espelhar, prancha e DXF (`CORTES`/`ELEVACOES`) usam a
 mesma geometria em mm de papel. Etiquetas de parede, rótulos de ambiente e rótulos de escada também usam fonte em
 mm de papel (e as etiquetas de parede seguem a visibilidade da categoria `anotação`).
+- **Grades/eixos**: criação, seleção, alças, mover/copiar, captura e painel de propriedades; entram na planta e no IFC
+  de entrada/saída quando o arquivo traz `IfcGrid`.
 
 **Avisos do projeto** (0029): o painel soma aos avisos do modelo três leituras da geometria resolvida —
 `abertura-fora-da-parede` (offset + largura passa do eixo), `parede-topo-desnivelado` (paredes colineares do mesmo
@@ -130,6 +137,11 @@ nível com topos diferentes) e `parede-dentro-da-laje` (parede cruzando camada d
 - **Gráficos de vista** (0015): escala, detalhe, estilo e substituições por categoria; pesos de linha reais nas pranchas,
   PDF e DXF (código 370). **Linhas finas** vêm ligadas por padrão em todo projeto e valem só na tela (botão na aba
   Vista; desabilitado no 3D e na prancha); o usuário desliga na vista quando quiser.
+- **IFC (entrada)**: **Arquivo → Importar IFC…** abre IFC4/IFC2X3 e monta um projeto editável. O mapeamento cobre
+  `IfcBuildingStorey`, `IfcWall`, `IfcDoor`, `IfcWindow`, `IfcSlab` (piso/laje), `IfcCovering` de forro, `IfcSpace` e
+  `IfcGrid`; objetos sem classe nativa entram como geometria genérica quando têm representação. A leitura roda no
+  `ifcWorker` e devolve o relatório do que entrou, do que ficou aproximado e do que foi ignorado
+  (`apps/web/src/editor/ifcImport.ts`, `packages/io/src/ifcImport/`).
 - **IFC4 (exportação)**: **Exportar IFC** com IfcSite, IfcBuilding, IfcBuildingStorey, IfcWall, IfcDoor, IfcWindow,
   IfcOpeningElement (com relações de vazio e preenchimento), IfcSlab, IfcRoof, IfcStair, IfcStairFlight e camadas de
   material. Não exporta IfcSpace nem IfcCovering.
@@ -166,9 +178,10 @@ nível com topos diferentes) e `parede-dentro-da-laje` (parede cruzando camada d
 
 ## O que ainda não existe
 
-- **Interoperabilidade e nuvem**: IFC de entrada (o código só escreve IFC), importador do Hestia 1 (J3), nuvem e link de
-  compartilhamento (Fase 8). O CAD importado é DXF e entra como referência por nível; não há DWG nem CAD vinculado
-  (link), e o desenho não vira elemento BIM.
+- **Interoperabilidade e nuvem**: mapeamento nativo completo de todas as classes IFC (telhados, escadas e rampas
+  podem entrar como geometria genérica), importador do Hestia 1 (J3), nuvem e link de compartilhamento (Fase 8). O CAD
+  importado é DXF e entra como referência por nível; não há DWG nem CAD vinculado (link), e o desenho não vira elemento
+  BIM.
 - **Guarda-corpo e corrimão** (escadas C4, decisão do dono de 2026-10-21); **escada de vários andares** (C6).
 - **Pilares, vigas, sapatas e cortina de vidro**: o modelo não tem esses elementos.
 - **Aberturas**: vão em arco e formas não retangulares (0017 §8); verga e peitoril na planta quando o corte passa por
@@ -270,6 +283,8 @@ nível com topos diferentes) e `parede-dentro-da-laje` (parede cruzando camada d
     **Gerenciar CAD** (também na aba **Gerenciar**, painel **Gerenciar projeto**) e o nó **CAD importado** no
     Navegador. Com uma ferramenta de desenho, aproxime o cursor de uma extremidade, do meio e de um cruzamento e confira
     a captura nas linhas.
+13. **IFC de entrada**: em **Arquivo → Importar IFC…**, abra um IFC4/IFC2X3 e confira níveis, paredes, aberturas,
+    lajes, forros, ambientes e grades. Leia o relatório do que entrou, do que ficou aproximado e do que foi ignorado.
 
 ## Como rodar
 

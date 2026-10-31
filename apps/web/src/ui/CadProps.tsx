@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import type { CadDrawing } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
+import { frameCad, removeCad } from '../editor/cadActions.ts';
 import { Group, NumField, Row, TextField } from './fields.tsx';
 
 /**
@@ -42,6 +43,15 @@ export function CadProps({ items }: { items: CadDrawing[] }): ReactElement {
           <Row label="Traços" readOnly><span className="val">{c.paths.length}</span></Row>
           <Row label="Textos" readOnly><span className="val">{c.texts.length}</span></Row>
           <Row label="Unidade de origem" readOnly><span className="val">{c.unit}</span></Row>
+          <Row label="Captura">
+            <span className="val">Linhas e vértices (Snap → CAD importado)</span>
+          </Row>
+          <Row label="Ações" readOnly>
+            <span style={{ display: 'inline-flex', gap: 6 }}>
+              <button className="btn small" onClick={() => frameCad(c)}>Enquadrar</button>
+              <button className="btn small" onClick={() => removeCad(c)}>Excluir</button>
+            </span>
+          </Row>
         </Group>
       ))}
     </>

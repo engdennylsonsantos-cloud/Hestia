@@ -52,6 +52,7 @@ import { GraphicsVisibilityDialog } from './ui/dialogs/GraphicsVisibilityDialog.
 import { LineWeightsDialog } from './ui/dialogs/LineWeightsDialog.tsx';
 import { DxfExportDialog } from './ui/dialogs/DxfExportDialog.tsx';
 import { ImportCadDialog } from './ui/dialogs/ImportCadDialog.tsx';
+import { ManageCadDialog } from './ui/dialogs/ManageCadDialog.tsx';
 import { MoveLevelDialog } from './ui/MoveLevel.tsx';
 import { GridTypeDialog } from './ui/dialogs/GridTypeDialog.tsx';
 import { TextDialog, useCaixaDeTextoAberta } from './ui/dialogs/TextDialog.tsx';
@@ -134,6 +135,8 @@ function Dialogs(): ReactElement | null {
       return <DxfExportDialog />;
     case 'importCad':
       return <ImportCadDialog />;
+    case 'manageCad':
+      return <ManageCadDialog />;
     case 'moveLevel':
       return <MoveLevelDialog onClose={() => useUi.setState({ dialog: null })} />;
     case 'cotasAuto':

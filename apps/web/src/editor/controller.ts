@@ -116,6 +116,8 @@ export class Editor {
     semear: (id, valor) => this.fluxo.resolucao.semear(id, valor),
   };
   private sectionCache = new Map<Id, { project: Project; value: SectionResult }>();
+  /** Caixa pedida antes de a vista ter viewport (ex.: enquadrar um CAD ao abrir a planta dele): aplicada na criação. */
+  private pendingBox: PlanBox | null = null;
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
   fileName = 'projeto.hestia.json';
 
@@ -220,8 +222,26 @@ export class Editor {
       const box = this.frameBox();
       if (box) Object.assign(v, fitBox(v, box));
     }
+    if (!cur && this.pendingBox) {
+      Object.assign(v, fitBox(v, this.pendingBox));
+      this.pendingBox = null;
+    }
     this.viewports.set(id, v);
     return v;
+  }
+
+  /**
+   * Enquadra a vista atual numa caixa (m). Sem viewport ainda (a vista acabou de ser aberta e o canvas vai montar),
+   * guarda a caixa para `ensureViewport` aplicar na criação.
+   */
+  zoomToBox(box: PlanBox | null): void {
+    if (!box) return;
+    const v = this.viewport();
+    if (!v) {
+      this.pendingBox = box;
+      return;
+    }
+    this.setViewport(fitBox(v, box));
   }
 
   zoomExtents(): void {

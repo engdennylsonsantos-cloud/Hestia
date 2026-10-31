@@ -363,6 +363,12 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     hint: t('Insere um desenho DXF no nível, como um objeto só, com as camadas do arquivo.', 'Insert a DXF drawing on the level as a single object, with the file layers.'),
     run: openDialog('importCad'),
   },
+  manageCad: {
+    label: t('Gerenciar CAD', 'Manage CAD'),
+    icon: 'layers',
+    hint: t('Lista os desenhos DXF importados: visibilidade, enquadramento, renomear e excluir.', 'Lists imported DXF drawings: visibility, framing, rename and delete.'),
+    run: openDialog('manageCad'),
+  },
   levels: { label: t('Nível', 'Level'), icon: 'level', hint: t('Cria e edita os níveis do projeto.', 'Create and edit project levels.'), run: openDialog('levels') },
   lineWeights: { label: t('Espessuras de linha', 'Line Weights'), icon: 'detail', hint: t('Pesos de linha por escala, por categoria e limites de detalhe.', 'Line weights by scale and category.'), run: openDialog('lineWeights') },
   units: {

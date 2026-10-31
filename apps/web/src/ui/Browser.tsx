@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { useProject } from '../editor/controller.ts';
 import { FamiliesTree } from './browser/Families.tsx';
+import { CadTree } from './browser/Cad.tsx';
 import { Node, Tree } from './browser/Tree.tsx';
 import { SchedulesTree, SheetsTree, ViewsTree } from './browser/Views.tsx';
 import { PanelHead } from './PanelHead.tsx';
@@ -22,6 +23,7 @@ export function Browser(): ReactElement {
           <ViewsTree />
           <SchedulesTree />
           <SheetsTree />
+          <CadTree />
           <FamiliesTree />
           <Node id="g:groups" label="Grupos" group empty="Ainda não disponível." />
           <Node id="g:links" label="Links do Revit" group empty="Ainda não disponível." />

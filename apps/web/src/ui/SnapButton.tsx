@@ -21,6 +21,7 @@ const ITEMS: SnapItemDef[] = [
   { key: 'alignment', label: 'Rastreamento Dinâmico', symbol: '☩', shortcut: 'F11', hint: 'Linhas-guia pontilhadas de alinhamento com outros pontos' },
   { key: 'faces', label: 'Faces de Parede', symbol: '⚏', hint: 'Cantos e arestas das faces de acabamento' },
   { key: 'core', label: 'Faces do Núcleo', symbol: '◇', hint: 'Cantos e arestas da alvenaria estrutural' },
+  { key: 'cad', label: 'CAD importado (DXF)', symbol: '⠿', hint: 'Vértices, meios, pontos e cruzamentos das linhas do desenho importado' },
   { key: 'grid', label: 'Pela grade', symbol: '⊞', hint: 'Captura nos pontos da grade visível (intervalo em Propriedades da vista; automático pelo zoom)' },
 ];
 
@@ -35,6 +36,7 @@ const ALL_ON: SnapOptions = {
   alignment: true,
   endpoint: true,
   midpoint: true,
+  cad: true,
 };
 
 const ALL_OFF: SnapOptions = {
@@ -48,6 +50,7 @@ const ALL_OFF: SnapOptions = {
   alignment: false,
   endpoint: false,
   midpoint: false,
+  cad: false,
 };
 
 /** Botão Snap da barra de status com checklist de capturas (AutoCAD Object Snap / Revit Snaps). */
@@ -97,7 +100,7 @@ export function SnapButton(): ReactElement {
         aria-expanded={open}
         aria-controls={open ? popId : undefined}
         onClick={() => setOpen((o) => !o)}
-        title="Capturas de desenho (F3): extremidades, meios, interseções e alinhamento"
+        title="Capturas de desenho (F3): extremidades, meios, interseções, alinhamento e CAD importado"
       >
         <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="3" />

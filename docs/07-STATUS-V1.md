@@ -1,9 +1,10 @@
 # 07 · Status da versão de teste
 
-Estado em 2026-10-22, conferido no código, nos testes e nos documentos de decisão desta árvore (esquema 19). Os
+Estado em 2026-10-30, conferido no código, nos testes e nos documentos de decisão desta árvore (esquema 19). Os
 checklists de [docs/paridade](paridade/) são a fonte por elemento; `docs/paridade/ORDEM.json` registra o portão, e os
 nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sobram são não bloqueantes (ver
-"Pendências").
+"Pendências"). A revisão de 2026-10-30 acrescenta visibilidade por vista, prewarm da 3D e CAD importado; os números de
+teste citados abaixo continuam os das rodadas de 2026-10-22/23.
 
 ## O que está pronto
 
@@ -136,11 +137,38 @@ nível com topos diferentes) e `parede-dentro-da-laje` (parede cruzando camada d
   se também falhar, o texto vai para a área de transferência. Nome sem acento (`nomeArquivo.ts`). Pelo código, DXF e IFC
   caem nessa cadeia dentro do link; a lista de extensões aceitas pela plataforma não foi conferida.
 - **GPU/CPU**: WebGL2 por padrão; WebGPU com `?gpu=webgpu`; planta em CPU com `?cpu=1`.
+- **Visibilidade por vista** (estilo Revit): **Ocultar na vista** permanente, com desfazer, em planta, planta de área,
+  planta de cobertura, corte/elevação e 3D. O alvo fica no modelo (`level.hidden`, `level.roofHidden`,
+  `areaPlan.hidden`, `view.hidden` e `view3d.hidden`; `viewHiddenCommands.ts`). Ocultação e isolamento temporários por
+  elemento ou categoria (**HH/HC/HI/IC**), restauração (**HR**) e **Revelar elementos ocultos** (**RH**) com contorno
+  azul; reexibir seleção/categoria (**EU/VU**) e reexibir tudo na vista. Menu de contexto (Ocultar na vista →
+  Elementos/Categoria, Isolar temporariamente, Reexibir) e barra de controle da vista com os mesmos controles. Atalhos
+  configuráveis (HH, HR, EH, RH etc.) na tela **Atalhos de teclado**, com perfis Revit (padrão) e Simples, importar e
+  exportar. O estado temporário é por vista e não é gravado no arquivo do projeto.
+- **Prewarm da 3D**: ao abrir o projeto, a resolução dos níveis ainda não prontos é agendada em tempo ocioso, sem as
+  junções (`preaquecerNiveis`, `fluxoEdicao.ts`). Se ela termina antes da primeira abertura do 3D, a montagem aplica
+  todos os níveis num único `update` e o primeiro quadro já vem completo (`montagem3dProgressiva.ts`); se faltar algum,
+  a montagem progressiva por fatias continua valendo. Depois da primeira montagem, uma edição refaz só o nível editado
+  e os vizinhos por cota.
+
+**CAD importado (DXF)** — desenho de referência por nível, integrado à seleção, ao Navegador e à captura (revisão de
+2026-10-30).
+- Importação DXF (`apps/web/src/editor/cadImport.ts`, `packages/io/src/dxfImport.ts`): traços e textos em metros,
+  camadas com cor ACI, unidade do `$INSUNITS` e `offsetZ`; o desenho é um objeto só (`CadDrawing`) e entra no desfazer.
+  Sai na planta e no 3D (os traços; os textos ficam fora do 3D) e no DXF com camadas `CAD_<DESENHO>_<CAMADA>`.
+- **Seleção e gerenciador**: clique na linha e seleção por janela na planta, mover/girar/espelhar com os demais
+  elementos, Enquadrar/Excluir nas Propriedades; diálogo **Gerenciar CAD** (nome, nível, visibilidade e conteúdo) e nó
+  **CAD importado** no Navegador com mostrar/ocultar, selecionar, enquadrar e excluir (`cadActions.ts`,
+  `ManageCadDialog.tsx`). "Gerenciar links" segue desativado: no Revit ele é para CAD vinculado, não importado.
+- **Captura nas linhas e vértices** (`packages/tools/src/snapCad.ts`): extremidade, ponto médio, ponto sobre a linha,
+  perpendicular e cruzamento entre traços, com índice espacial de 1 m por desenho e a opção `cad` no Snap, ligada por
+  padrão.
 
 ## O que ainda não existe
 
 - **Interoperabilidade e nuvem**: IFC de entrada (o código só escreve IFC), importador do Hestia 1 (J3), nuvem e link de
-  compartilhamento (Fase 8).
+  compartilhamento (Fase 8). O CAD importado é DXF e entra como referência por nível; não há DWG nem CAD vinculado
+  (link), e o desenho não vira elemento BIM.
 - **Guarda-corpo e corrimão** (escadas C4, decisão do dono de 2026-10-21); **escada de vários andares** (C6).
 - **Pilares, vigas, sapatas e cortina de vidro**: o modelo não tem esses elementos.
 - **Aberturas**: vão em arco e formas não retangulares (0017 §8); verga e peitoril na planta quando o corte passa por
@@ -152,15 +180,39 @@ nível com topos diferentes) e `parede-dentro-da-laje` (parede cruzando camada d
 - **Ambientes**: sem geometria 3D própria (D2); sem piso de acabamento gerado (C3). A linha separadora (A5) está implementada.
 - **Forros**: o forro criado a partir de ambiente acompanha o contorno dele (0021 §4; decisão P-5 de 2026-10-22, 0023 §13),
   implementada: soltar (alça, propriedade ou mover) e revincular ao ambiente no painel "Contorno".
-- **Pranchas**: carimbo com logotipo e campos personalizados, modelos (E1); quantitativos na prancha (E2); imagem do 3D (B5);
-  pan (D7).
+- **Pranchas**: carimbo com logotipo e campos personalizados, modelos (E1); quantitativos na prancha (E2). No 3D
+  vetorial da prancha faltam hachura, sombreado e transparência; as linhas ocultas são omitidas (não tracejadas), a
+  espessura é única (0,18 mm), a amostragem de 0,35 mm pode perder oclusores finos, não há escala métrica e o pan do
+  conteúdo não desloca o 3D (0040 §6–7).
 - **Paredes**: parede inclinada (A6), espessura variável (A9), contorno vertical livre (A10), regiões gráficas na elevação
   (B9), cotas associativas de parede (H5).
 - **Telhados**: seta de inclinação e águas livres na tela (A5, fora da v1); mansarda automática (v2).
 - **Limites conhecidos**: CV-2 e CV-3; seleção em corte unido por material pode apontar o vizinho do mesmo material; sem
   seleção por janela no 3D; intervalo de vista por nível, não por vista.
+- **Visibilidade**: "Ocultar na vista → Por filtro" ainda não existe (o submenu mostra Elementos e Categoria); a
+  ocultação permanente vale nas vistas de modelo, não na prancha; a temporária é por vista e não é gravada no arquivo.
+- **Modelos de exemplo no app**: o diálogo **Novo** mostra só Em branco, Abrir projeto e o último projeto salvo no
+  navegador; os modelos de exemplo/teste saíram da UI. A Casa de alto padrão continua como fixture de teste
+  (`packages/model/src/templateCasaAltoPadrao.ts`, `packages/engine/src/casaAltoPadrao.test.ts`) e o site publica um
+  `.hestia.json` para download.
 - **Checklists desatualizados**: `aberturas.md` C3 e C4 estão `[-]`, mas os campos existem no tipo e na tela; `escadas.md`
   C7, `paredes.md` J1 e `pisos.md` E5 marcam IFC como fora de escopo, mas a exportação IFC4 existe.
+
+## Correções recentes (2026-10-30)
+
+- **Cliques no canvas**: o `pointerdown` é adiado até a vista existir (máximo de 30 quadros, sem duplicar); a cota
+  dinâmica somente leitura não captura mais o clique; o fantasma da prévia é indexado pela instância da ferramenta e só
+  aparece para cota acionável; o limiar de arraste passou de 3 para 6 px; Espaço é resetado em blur e
+  `visibilitychange`; `pointercancel` cancela sem clique fantasma. `suppressNextClick` e `tagDrag` zeram em
+  activate/setTool/setView/load/Esc, e o editor de cota do nível fecha sem aplicar fora da vista, do nível ou do
+  projeto de origem. As alças de abertura só respondem ao botão esquerdo (meio = pan, direito = menu) e o ViewCube não
+  engole mais as margens transparentes.
+- **Diálogo Novo**: mostra apenas **Em branco**, **Abrir projeto** e o último projeto salvo no navegador; os modelos de
+  exemplo/teste saíram da UI.
+- Evidências: `tests/e2e/cliques-perdidos.mjs` (6 cenários), `rotuloArraste.test.ts`, `cliqueAdiado.test.ts`,
+  `planGestosLimiar.test.ts`, `dimsHit.test.ts`, `nivelCotaEditorContexto.test.ts`, `OpeningFlipGrips.test.ts` e
+  `viewcubePonteiro.test.ts`; `tests/e2e/flow.mjs` foi atualizado para o menu Arquivo, os treeitems e a tolerância de
+  1 cm.
 
 ## Pendências não bloqueantes
 
@@ -186,10 +238,12 @@ nível com topos diferentes) e `parede-dentro-da-laje` (parede cruzando camada d
 - **Close-ups 3D do L** (`tests/e2e/escadas-closeup.mjs`): tolerância própria de 1,5% (d) e 25% (f), porque o WebGL por
   software rasteriza sombras de outro jeito.
 
-## Roteiro de teste manual (10 minutos)
+## Roteiro de teste manual (cerca de 15 minutos)
 
-1. `npm run dev`; em **Novo**, escolha **Casa de alto padrão, 2 pavimentos**. Confira os dois níveis, 32 paredes, 38
-   aberturas, 2 pisos, 1 laje, 1 telhado, 1 escada e as vistas (contagens conferidas em `casaAltoPadrao.test.ts`).
+1. `npm run dev`; em **Novo**, escolha **Abrir projeto** e abra um `.hestia.json` de exemplo (o site publica um; a Casa
+   de alto padrão é fixture em `packages/model/src/templateCasaAltoPadrao.ts`). Com ela, confira os dois níveis, 32
+   paredes, 38 aberturas, 2 pisos, 1 laje, 1 telhado, 1 escada e as vistas (contagens conferidas em
+   `casaAltoPadrao.test.ts`).
 2. **Aberturas**: selecione uma janela e abra **Editar tipo…**; confira família, folhas, símbolo e a seção **Acabamento**.
    Marque um tipo como favorito (estrela). Com **D** e **J**, insira porta e janela (**Tab** troca o lado, **Espaço** a
    dobradiça) e abra a **Tabela de portas e janelas**.
@@ -198,7 +252,8 @@ nível com topos diferentes) e `parede-dentro-da-laje` (parede cruzando camada d
 4. **Forros**: use **Forro em todos os ambientes** e confira o forro no 3D e no corte. Em **Direção da vista**, escolha
    **Para cima (planta de forro)** e confira que a planta baixa não mostra o forro.
 5. **Pranchas e PDF**: em **Pranchas**, crie uma **Nova prancha** A3 paisagem, adicione uma planta 1:100 e um corte 1:50,
-   arraste a vista e troque a escala. Clique em **Exportar PDF** e confira o carimbo, os pesos de linha e o aviso do 3D.
+   arraste a vista e troque a escala. Insira também uma vista 3D por ponto de vista e confira os traços e a legenda
+   "Sem escala". Clique em **Exportar PDF** e confira o carimbo e os pesos de linha.
 6. **Cotas e DXF**: na planta, use **Y** e **X**; apague uma anotação (Ctrl+Z desfaz). Clique em **Exportar DXF** e
    confira as camadas `COTAS`, `TEXTOS`, `AMBIENTES` e, na planta de forro, `FORRO`.
 7. **Cortes e 3D**: com **K**, desenhe um corte e use **Gerar elevações** para abrir a Sul; clique numa parede e numa
@@ -208,6 +263,13 @@ nível com topos diferentes) e `parede-dentro-da-laje` (parede cruzando camada d
 9. **Escadas**: em **Tipos de escada**, altere um tipo e confira a numeração dos degraus.
 10. **Exportação e arquivo**: clique em **Exportar IFC** e confira que o arquivo abre; grave o `.hestia.json`, feche, reabra
     e confira que ambientes, forros e pranchas voltaram. Abra o painel de avisos e use **Ir para**.
+11. **Visibilidade**: na planta, selecione uma parede e use **EH** (Ocultar na vista); confira que ela some e que Ctrl+Z
+    a traz de volta. Use **HH**, **HI** e **HR**; ligue **RH** (Revelar) e confira o contorno azul. Repita no 3D e abra o
+    menu de contexto e a barra de controle da vista.
+12. **CAD importado**: em **Inserir → Importar CAD (DXF)**, importe um DXF; clique numa linha na planta e confira
+    **Gerenciar CAD** (também em **Gerenciar → Gerenciar projeto**) e o nó **CAD importado** no Navegador. Com uma
+    ferramenta de desenho, aproxime o cursor de uma extremidade, do meio e de um cruzamento e confira a captura nas
+    linhas.
 
 ## Como rodar
 
@@ -222,17 +284,19 @@ npm run build          # build da aplicação em apps/web/dist
 npm run build:artifact # gera apps/web/dist/artifact.html
 npm run e2e            # fluxo no navegador (requer Chromium do Playwright)
 node tests/e2e/pranchas.mjs            # pranchas: aba, vistas, carimbo e PDF (requer build e Chromium)
+node tests/e2e/pranchas-3d.mjs         # 3D vetorial na prancha, sem imagem e "Sem escala" (requer build e Chromium)
+node tests/e2e/cliques-perdidos.mjs    # cliques no canvas e diálogo Novo (requer build e Chromium)
 node tests/e2e/visual-regression.mjs   # regressão visual da planta (--update regrava as referências)
 node tests/e2e/visual-regression-gpu.mjs   # regressão visual da planta no caminho GPU, 6 casos (--update regrava as referências em baseline-gpu/)
 npm run parity         # percentual de paridade por elemento
 ```
 
-Os fluxos de navegador estão em `tests/e2e/*.mjs` (23 fluxos; `helpers.mjs` é auxiliar).
+Os fluxos de navegador e as capturas estão em `tests/e2e/*.mjs` (`helpers.mjs` é auxiliar).
 
 ## Qualidade e verificação
 
 - Checklists (feitos + fora de escopo + pendentes): paredes 68+15+0, pisos 44+7+0, lajes 42+3+0, telhados 43+1+0,
-  escadas 36+4+0, aberturas 36+7+0, ambientes 24+4+0, forros 33+0+0, pranchas 19+4+0. O portão de 95% e os bloqueantes
+  escadas 36+4+0, aberturas 36+7+0, ambientes 24+4+0, forros 33+0+0, pranchas 34+2+0. O portão de 95% e os bloqueantes
   são verificados por `scripts/check-parity.mjs` no lint e no CI.
 - `npx vitest run --maxWorkers=4` em 2026-10-23: 293 arquivos e 3577 testes, todos passando (120 s). O `npm run check`
   padrão estourou dois timeouts por carga nesta máquina (`predio10` e `ifcExport`); os mesmos testes passam em

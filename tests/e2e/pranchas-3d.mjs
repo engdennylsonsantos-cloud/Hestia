@@ -94,7 +94,8 @@ try {
   });
 
   await rep.step('4 — inserir a vista 3D pelo diálogo "Adicionar vistas"', async () => {
-    await page.locator('.sheet-vcb').getByRole('button', { name: 'Adicionar vista' }).click();
+    // O nome acessível do botão da barra é o título descritivo (o texto visível é "Adicionar vista").
+    await page.locator('.sheet-vcb').getByRole('button', { name: 'Adiciona uma planta, corte ou 3D a esta prancha' }).click();
     await page.getByText('Adicionar vistas', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Limpar', exact: true }).click();
 

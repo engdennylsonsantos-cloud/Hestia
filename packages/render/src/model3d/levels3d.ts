@@ -56,11 +56,58 @@ export interface LevelsGroupData {
   layout: { corner: LevelCorner | null; leftSide: LevelSide | null; bubbleEnd: 'a' | 'b' | null };
 }
 
-/** Cor da linha de datum dos níveis não selecionados. */
-const COR_LINHA = 0x374151;
+/** Cores do datum de níveis: linha, seleção, texto, bolha, cota e plano. */
+export interface LevelPalette {
+  /** Linha de datum dos níveis não selecionados. */
+  line: number;
+  /** Azul do nível selecionado: linha, bolha, cota e plano. */
+  selected: number;
+  /** Texto do nome e da cota do nível. */
+  text: number;
+  /** Fundo da bolha. */
+  bubble: number;
+  /** Borda e quadrantes da bolha. */
+  bubbleBorder: number;
+  /** Fundo da etiqueta da cota. */
+  dimension: number;
+  /** Borda da etiqueta e texto da cota. */
+  dimensionBorder: number;
+  /** Texto da etiqueta da cota. */
+  dimensionText: number;
+  /** Plano do nível selecionado. */
+  plane: number;
+}
 
-/** Azul do Revit: nível selecionado, plano, bolha e cota. */
-const COR_SELECIONADO = 0x1565c0;
+/** Paleta clara (visual atual, fundo claro do editor). */
+const PALETA_CLARA: LevelPalette = {
+  line: 0x374151,
+  selected: 0x1565c0,
+  text: 0x1f2937,
+  bubble: 0xffffff,
+  bubbleBorder: 0x1565c0,
+  dimension: 0xffffff,
+  dimensionBorder: 0x1565c0,
+  dimensionText: 0x0d47a1,
+  plane: 0x1565c0,
+};
+
+/** Paleta escura: linhas e texto claros, fundos escuros e azul claro para a seleção. */
+const PALETA_ESCURA: LevelPalette = {
+  line: 0xcbd5e1,
+  selected: 0x60a5fa,
+  text: 0xe5e7eb,
+  bubble: 0x0f172a,
+  bubbleBorder: 0x93c5fd,
+  dimension: 0x0f172a,
+  dimensionBorder: 0x93c5fd,
+  dimensionText: 0xe5e7eb,
+  plane: 0x60a5fa,
+};
+
+/** Paleta do datum de níveis; `dark` acompanha o tema do editor. Devolve uma cópia para não ser mutada. */
+export function levelPalette(dark: boolean): LevelPalette {
+  return { ...(dark ? PALETA_ESCURA : PALETA_CLARA) };
+}
 
 /** Tracejado da linha de datum (m). */
 const DASH = 0.3;
@@ -93,13 +140,14 @@ const HISTERESE_PONTA = 0.01;
 const OPACIDADE_PLANO = 0.18;
 
 /** Grupo do datum: duas linhas, bolha e texto por nível, o plano do selecionado e as cotas dos vizinhos. */
-export function buildLevels(p: Project, selected: Id | null): THREE.Group {
+export function buildLevels(p: Project, selected: Id | null, dark = false): THREE.Group {
   const grupo = new THREE.Group();
+  const cores = levelPalette(dark);
   const data = levelDataOf(p);
   const box = levelProjectBox(p);
   const views: LevelView[] = [];
   const dimensions: DimensionView[] = [];
-  const texturaBolha = texturaDaBolha();
+  const texturaBolha = texturaDaBolha(cores);
   const materialBolha = new THREE.SpriteMaterial({
     ...(texturaBolha ? { map: texturaBolha } : {}),
     transparent: true,
@@ -108,19 +156,19 @@ export function buildLevels(p: Project, selected: Id | null): THREE.Group {
   });
   for (const d of data) {
     const selecionado = d.levelId === selected;
-    const line = linhaDoDatum(d, selecionado, 'line');
-    const lineBack = linhaDoDatum(d, selecionado, 'lineBack');
+    const line = linhaDoDatum(d, selecionado, 'line', cores);
+    const lineBack = linhaDoDatum(d, selecionado, 'lineBack', cores);
     const bubble = bolhaDoDatum(d, materialBolha);
-    const text = textoDoDatum(d);
+    const text = textoDoDatum(d, cores);
     grupo.add(line, lineBack, bubble, text);
-    if (selecionado) grupo.add(planoDoNivel(d, box));
+    if (selecionado) grupo.add(planoDoNivel(d, box, cores));
     views.push({ datum: d, line, lineBack, bubble, text });
   }
   if (selected !== null) {
     const i = data.findIndex((d) => d.levelId === selected);
     if (i >= 0) {
-      if (i > 0) dimensions.push(dimensao(data[i]!, data[i - 1]!, 'below'));
-      if (i < data.length - 1) dimensions.push(dimensao(data[i]!, data[i + 1]!, 'above'));
+      if (i > 0) dimensions.push(dimensao(data[i]!, data[i - 1]!, 'below', cores));
+      if (i < data.length - 1) dimensions.push(dimensao(data[i]!, data[i + 1]!, 'above', cores));
     }
     for (const dim of dimensions) grupo.add(dim.line, dim.extensions, dim.ticks, dim.label);
   }
@@ -137,9 +185,9 @@ export function buildLevels(p: Project, selected: Id | null): THREE.Group {
 }
 
 /** Linha tracejada do datum (esquerda ou fundo); as pontas são atualizadas em `layoutLevels`. */
-function linhaDoDatum(d: LevelDatum, selecionado: boolean, kind: 'line' | 'lineBack'): THREE.Line {
+function linhaDoDatum(d: LevelDatum, selecionado: boolean, kind: 'line' | 'lineBack', cores: LevelPalette): THREE.Line {
   const material = new THREE.LineDashedMaterial({
-    color: selecionado ? COR_SELECIONADO : COR_LINHA,
+    color: selecionado ? cores.selected : cores.line,
     dashSize: selecionado ? DASH_SELECIONADO : DASH,
     gapSize: GAP,
   });
@@ -161,8 +209,8 @@ function bolhaDoDatum(d: LevelDatum, material: THREE.SpriteMaterial): THREE.Spri
 }
 
 /** Texto (nome + cota) em billboard; a rotação no plano da tela é ajustada em `layoutLevels` para seguir a linha. */
-function textoDoDatum(d: LevelDatum): THREE.Sprite {
-  const textura = texturaDoTexto(d.text);
+function textoDoDatum(d: LevelDatum, cores: LevelPalette): THREE.Sprite {
+  const textura = texturaDoTexto(d.text, cores);
   const material = new THREE.SpriteMaterial({
     ...(textura ? { map: textura } : {}),
     transparent: true,
@@ -171,6 +219,8 @@ function textoDoDatum(d: LevelDatum): THREE.Sprite {
     depthTest: false,
   });
   const sprite = new THREE.Sprite(material);
+  // Pivô na borda esquerda: o texto cresce a partir dela e a rotação não desloca o início.
+  sprite.center.set(0, 0.5);
   sprite.scale.set(LARGURA_TEXTO, ALTURA_TEXTO, 1);
   sprite.renderOrder = 20;
   sprite.userData = { levelId: d.levelId, datumKind: 'text' };
@@ -179,12 +229,12 @@ function textoDoDatum(d: LevelDatum): THREE.Sprite {
 }
 
 /** Plano azul do nível selecionado: o retângulo entre as duas linhas (a caixa da obra). */
-function planoDoNivel(d: LevelDatum, box: LevelBox): THREE.Mesh {
+function planoDoNivel(d: LevelDatum, box: LevelBox, cores: LevelPalette): THREE.Mesh {
   const { minX, maxX, minY, maxY } = box;
   const largura = maxX - minX;
   const altura = maxY - minY;
   const material = new THREE.MeshBasicMaterial({
-    color: COR_SELECIONADO,
+    color: cores.plane,
     transparent: true,
     opacity: OPACIDADE_PLANO,
     side: THREE.DoubleSide,
@@ -197,14 +247,19 @@ function planoDoNivel(d: LevelDatum, box: LevelBox): THREE.Mesh {
 }
 
 /** Cota entre o nível selecionado e um vizinho: linha de cota, linhas de chamada, tiques e etiqueta. */
-function dimensao(sel: LevelDatum, vizinho: LevelDatum, side: DimensionSide): DimensionView {
+function dimensao(
+  sel: LevelDatum,
+  vizinho: LevelDatum,
+  side: DimensionSide,
+  cores: LevelPalette,
+): DimensionView {
   const info: DimensionInfo = {
     levelId: sel.levelId,
     neighborId: vizinho.levelId,
     side,
     value: Math.abs(sel.elevation - vizinho.elevation),
   };
-  const material = new THREE.LineBasicMaterial({ color: COR_SELECIONADO, depthTest: false });
+  const material = new THREE.LineBasicMaterial({ color: cores.selected, depthTest: false });
   const geometria = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
   const line = new THREE.Line(geometria, material);
   line.userData = { dimension: info };
@@ -216,7 +271,7 @@ function dimensao(sel: LevelDatum, vizinho: LevelDatum, side: DimensionSide): Di
   const ticks = segmentos(material);
   ticks.userData = { dimension: info };
   ticks.renderOrder = 24;
-  const textura = texturaDaCota(info.value);
+  const textura = texturaDaCota(info.value, cores);
   const label = new THREE.Sprite(
     new THREE.SpriteMaterial({
       ...(textura ? { map: textura } : {}),
@@ -297,7 +352,7 @@ export function layoutLevels(group: THREE.Group, camera: THREE.Camera, forward: 
   const { box, data } = info;
   camera.updateMatrixWorld();
   const zRef = (Math.min(...data.map((d) => d.elevation)) + Math.max(...data.map((d) => d.elevation))) / 2;
-  const projetar = (p: Vec2): THREE.Vector3 => new THREE.Vector3(p.x, p.y, zRef).project(camera);
+  const projetar = (p: Vec2, z = zRef): THREE.Vector3 => new THREE.Vector3(p.x, p.y, z).project(camera);
   const lados = ladosDaCaixa(box);
   const cantos = cantosDaCaixa(box, lados);
   const xCanto = new Map<LevelCorner, number>();
@@ -351,23 +406,22 @@ export function layoutLevels(group: THREE.Group, camera: THREE.Camera, forward: 
   const backEnd = { x: backOther.x + alongBack.x * MARGEM_LINHA, y: backOther.y + alongBack.y * MARGEM_LINHA };
   const along = normalizar({ x: otherP.x - bubbleP.x, y: otherP.y - bubbleP.y });
   const aspecto = aspectoDaCamera(camera);
-  const p1 = projetar(bubbleP);
-  const p2 = projetar(otherP);
-  // Rotação no plano da tela para o texto seguir a linha da esquerda (billboard continua de pé e legível).
-  // NDC tem y para cima, então o ângulo da linha na tela (y para cima, x em pixels) é
-  // atan2(Δy_ndc / aspecto, Δx_ndc); o sinal negativo espelhava o sprite.
-  let angulo = Math.atan2((p2.y - p1.y) / aspecto, p2.x - p1.x);
-  // Texto sempre legível: nunca de cabeça para baixo (ângulo em (−π/2, π/2]).
-  if (angulo > Math.PI / 2) angulo -= Math.PI;
-  else if (angulo <= -Math.PI / 2) angulo += Math.PI;
 
+  // O pivô do texto é a borda esquerda (centro em (0, 0.5)): o texto começa depois da bolha, na direção da linha, e
+  // gira em torno desse ponto sem deslocar o início.
+  const inicioTexto = LADO_BOLHA / 2 + GAP_TEXTO;
   for (const view of info.views) {
     const z = view.datum.elevation;
+    // Rotação no plano da tela para o texto seguir a linha da esquerda (billboard continua de pé e legível). A
+    // projeção é feita na elevação do próprio nível; em NDC o y já está para cima e o x é esticado pelo aspecto,
+    // então o ângulo em pixels é atan2(Δy, Δx * aspecto).
+    const a = projetar(bubbleP, z);
+    const b = projetar(otherP, z);
+    const angulo = anguloLegivel(Math.atan2(b.y - a.y, (b.x - a.x) * aspecto));
     moverLinha(view.line, bubbleP.x, bubbleP.y, z, otherP.x, otherP.y, z);
     moverLinha(view.lineBack, melhor.p.x, melhor.p.y, z, backEnd.x, backEnd.y, z);
     view.bubble.position.set(bubbleP.x, bubbleP.y, z);
-    const t = LADO_BOLHA / 2 + GAP_TEXTO + LARGURA_TEXTO / 2;
-    view.text.position.set(bubbleP.x + along.x * t, bubbleP.y + along.y * t, z + ALTURA_TEXTO / 2 + 0.08);
+    view.text.position.set(bubbleP.x + along.x * inicioTexto, bubbleP.y + along.y * inicioTexto, z);
     (view.text.material as THREE.SpriteMaterial).rotation = angulo;
   }
   const n = esquerda.n;
@@ -398,6 +452,14 @@ export function layoutLevels(group: THREE.Group, camera: THREE.Camera, forward: 
 function normalizar(v: Vec2): Vec2 {
   const l = Math.hypot(v.x, v.y) || 1;
   return { x: v.x / l, y: v.y / l };
+}
+
+/** Ângulo de uma reta no intervalo (−π/2, π/2], para o texto nunca ficar de cabeça para baixo. */
+function anguloLegivel(angulo: number): number {
+  let a = angulo;
+  while (a > Math.PI / 2) a -= Math.PI;
+  while (a <= -Math.PI / 2) a += Math.PI;
+  return a;
 }
 
 /** Proporção largura/altura da tela, para a rotação do texto ser a mesma da linha em pixels. */
@@ -439,11 +501,16 @@ function canvasComContexto(
   return ctx ? { canvas, ctx } : null;
 }
 
+/** Cor numérica do three.js em `#rrggbb`, para o canvas 2D. */
+function hex(cor: number): string {
+  return `#${cor.toString(16).padStart(6, '0')}`;
+}
+
 /**
- * Textura da bolha do nível: círculo branco com borda azul e 4 quadrantes, 2 opostos preenchidos de azul (como o
- * Level Head–Circle do Revit). Sem canvas (testes), devolve `null` e a bolha fica só com o material.
+ * Textura da bolha do nível: círculo com a cor de fundo da paleta, borda azul e 4 quadrantes, 2 opostos preenchidos
+ * (como o Level Head–Circle do Revit). Sem canvas (testes), devolve `null` e a bolha fica só com o material.
  */
-function texturaDaBolha(): THREE.CanvasTexture | null {
+function texturaDaBolha(cores: LevelPalette): THREE.CanvasTexture | null {
   const alvo = canvasComContexto(128, 128);
   if (!alvo) return null;
   const { ctx } = alvo;
@@ -452,26 +519,26 @@ function texturaDaBolha(): THREE.CanvasTexture | null {
   ctx.clearRect(0, 0, 128, 128);
   ctx.beginPath();
   ctx.arc(centro, centro, raio, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = hex(cores.bubble);
   ctx.fill();
   ctx.save();
   ctx.beginPath();
   ctx.arc(centro, centro, raio, 0, Math.PI * 2);
   ctx.clip();
-  ctx.fillStyle = '#1565c0';
+  ctx.fillStyle = hex(cores.bubbleBorder);
   ctx.fillRect(centro - raio, centro - raio, raio, raio);
   ctx.fillRect(centro, centro, raio, raio);
   ctx.restore();
   ctx.beginPath();
   ctx.arc(centro, centro, raio - 2, 0, Math.PI * 2);
   ctx.lineWidth = 5;
-  ctx.strokeStyle = '#1565c0';
+  ctx.strokeStyle = hex(cores.bubbleBorder);
   ctx.stroke();
   return texturaDeCanvas(alvo.canvas);
 }
 
-/** Textura do texto do nível: fundo transparente, fonte legível, cor escura, alinhado à esquerda. */
-function texturaDoTexto(texto: string): THREE.CanvasTexture | null {
+/** Textura do texto do nível: fundo transparente, fonte legível, cor da paleta, alinhado à esquerda. */
+function texturaDoTexto(texto: string, cores: LevelPalette): THREE.CanvasTexture | null {
   const alvo = canvasComContexto(768, 128);
   if (!alvo) return null;
   const { ctx } = alvo;
@@ -482,25 +549,25 @@ function texturaDoTexto(texto: string): THREE.CanvasTexture | null {
   if (largura > 748) ctx.font = `bold ${Math.floor((64 * 748) / largura)}px sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#1f2937';
+  ctx.fillStyle = hex(cores.text);
   ctx.fillText(texto, 10, 64);
   return texturaDeCanvas(alvo.canvas);
 }
 
-/** Textura da etiqueta da cota: `3,00 m` em fundo branco com borda azul. */
-function texturaDaCota(value: number): THREE.CanvasTexture | null {
+/** Textura da etiqueta da cota: valor em fundo e borda da paleta. */
+function texturaDaCota(value: number, cores: LevelPalette): THREE.CanvasTexture | null {
   const alvo = canvasComContexto(320, 96);
   if (!alvo) return null;
   const { ctx } = alvo;
   ctx.clearRect(0, 0, 320, 96);
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = hex(cores.dimension);
   ctx.fillRect(2, 2, 316, 92);
-  ctx.strokeStyle = '#1565c0';
+  ctx.strokeStyle = hex(cores.dimensionBorder);
   ctx.lineWidth = 4;
   ctx.strokeRect(2, 2, 316, 92);
   // units-ok: rótulo da cota de nível no 3D (m)
   const texto = `${value.toFixed(2).replace('.', ',')} m`;
-  ctx.fillStyle = '#0d47a1';
+  ctx.fillStyle = hex(cores.dimensionText);
   ctx.font = 'bold 44px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

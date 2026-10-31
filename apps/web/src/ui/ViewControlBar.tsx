@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { PLAN_VISUAL_STYLES, levelGraphicsOf, sectionGraphicsOf, view3dOf, type View3DSettings, type ViewGraphics } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
-import { editLevelGraphics, editSectionGraphics, editView3D, type GraphicsEdit } from '../editor/graphicsActions.ts';
+import { editLevelGraphics, editSectionGraphics, editView3D, showLevelsOn, type GraphicsEdit } from '../editor/graphicsActions.ts';
 import { useI18n } from '../editor/i18n.ts';
 import { useUi } from '../editor/state.ts';
 import { DETAIL_LABEL, PLAN_SCALES, VISUAL_STYLE_LABEL } from './graphicsLabels.ts';
@@ -34,7 +34,7 @@ export function ViewControlBar(): ReactElement | null {
   };
   const editPlan = (patch: Partial<Pick<ViewGraphics, 'scale' | 'detail' | 'style'>>): void =>
     report(view === 'section' ? editSectionGraphics(editor.store, patch) : editLevelGraphics(editor.store, levelId, patch));
-  const edit3d = (patch: Partial<Pick<View3DSettings, 'style' | 'shadows' | 'edges' | 'openOpenings'>>): void => report(editView3D(editor.store, patch));
+  const edit3d = (patch: Partial<Pick<View3DSettings, 'style' | 'shadows' | 'edges' | 'openOpenings' | 'showLevels'>>): void => report(editView3D(editor.store, patch));
 
   const scale = !is3d ? (g as ViewGraphics).scale : 0;
   const v3 = is3d ? (g as View3DSettings) : null;
@@ -100,6 +100,21 @@ export function ViewControlBar(): ReactElement | null {
     items.push(grouped('sombras', 1, toggle(pt ? 'Sombras' : 'Shadows', 'sun', v3.shadows, () => edit3d({ shadows: !v3.shadows }), pt ? 'Liga ou desliga as sombras do sol' : 'Toggle sun shadows'), true));
     items.push(grouped('arestas', 1, toggle(pt ? 'Arestas' : 'Edges', 'cube', v3.edges, () => edit3d({ edges: !v3.edges }), pt ? 'Mostra as arestas dos elementos' : 'Show element edges'), false));
     items.push(grouped('vaos', 1, toggle(pt ? 'Abrir vãos' : 'Open openings', 'door', v3.openOpenings === true, () => edit3d({ openOpenings: !(v3.openOpenings === true) }), pt ? 'Mostra portas e janelas abertas' : 'Show doors and windows open'), false));
+    // Níveis de referência (datum) no 3D: só ícone, como os demais alternadores da barra. Ausente no projeto = ligados.
+    const levelsOn = showLevelsOn(v3);
+    const levelsTip = pt ? 'Mostrar/ocultar níveis de referência' : 'Show/hide reference levels';
+    const levelsBtn = (
+      <button
+        className={`vcb-btn${levelsOn ? ' on' : ''}`}
+        aria-pressed={levelsOn}
+        aria-label={levelsTip}
+        title={levelsTip}
+        onClick={() => edit3d({ showLevels: !levelsOn })}
+      >
+        <Icon name="levels" size={14} />
+      </button>
+    );
+    items.push(grouped('niveis', 1, levelsBtn, false));
   }
   SOON.forEach((label, i) => {
     const en = SOON_EN[i] ?? label;

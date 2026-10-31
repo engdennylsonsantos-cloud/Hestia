@@ -267,8 +267,22 @@ async function medirProjeto(n) {
 
   // 6. Clique de pick na 3D: pointerup até a seleção mudar.
   // A interface nova abre as vistas pelo navegador de projeto (árvore, duplo clique) em vez do antigo botão da lista.
+  const inicio3d = Date.now();
   await page.getByRole('treeitem', { name: 'Modelo 3D' }).dblclick();
   await page.waitForFunction(() => window.__hestia3dModel, null, { timeout: 60000 });
+  await esperarQuadros(page);
+  medidas.abrir3DPrimeiroQuadro = { ms: Date.now() - inicio3d };
+  // Carga completa: todos os níveis da montagem progressiva na cena (não só o primeiro quadro).
+  try {
+    await page.waitForFunction(() => {
+      const m = window.__hestia3dMontagem;
+      return !!m && m.montados === window.__hestia.editor.project.levels.length;
+    }, null, { timeout: 60000, polling: 50 });
+    medidas.abrir3DCargaCompleta = { ms: Date.now() - inicio3d };
+  } catch {
+    medidas.abrir3DCargaCompleta = 'PENDENTE';
+    pendencias.push(`[${rotulo}] abrir 3D: a montagem não concluiu todos os níveis em 60 s`);
+  }
   await page.waitForTimeout(2000);
   await page.evaluate(() => window.__hestia3dModel.fit());
   await page.waitForTimeout(400);
@@ -311,6 +325,52 @@ async function medirProjeto(n) {
     medidas.pick3D = { cliques: tempos.length, tempo: resumo(tempos) };
     if (!tempos.length) pendencias.push(`[${rotulo}] pick 3D: nenhum clique mudou a seleção dentro de 3 s`);
   }
+
+  // 7. Órbita e pan na 3D: do evento ao quadro seguinte pintado (rAF duplo).
+  const medirLatencia3d = async (button, passos) => {
+    await page.evaluate(() => {
+      window.__lat3 = [];
+      window.__medir3d = (t0) => requestAnimationFrame(() => requestAnimationFrame(() => window.__lat3.push(performance.now() - t0)));
+      if (!window.__lat3Ouvinte) {
+        window.__lat3Ouvinte = true;
+        window.addEventListener('pointermove', (e) => { if (e.buttons) window.__medir3d(performance.now()); }, true);
+      }
+    });
+    const cx = caixa3d.x + caixa3d.width / 2;
+    const cy = caixa3d.y + caixa3d.height / 2;
+    for (let r = 0; r < RUNS; r++) {
+      await page.mouse.move(cx, cy);
+      await page.mouse.down({ button });
+      for (let k = 1; k <= passos; k++) await page.mouse.move(cx + k * 3, cy + k * 2);
+      await page.mouse.up({ button });
+    }
+    return page.evaluate(() => window.__lat3.splice(0));
+  };
+  const orbita3d = await medirLatencia3d('left', 30);
+  const pan3d = await medirLatencia3d('middle', 30);
+  medidas.orbitar3D = { passos: orbita3d.length, tempo: resumo(orbita3d) };
+  medidas.pan3D = { passos: pan3d.length, tempo: resumo(pan3d) };
+  if (!orbita3d.length) pendencias.push(`[${rotulo}] órbita 3D: nenhuma amostra (o arrasto não chegou ao canvas)`);
+  if (!pan3d.length) pendencias.push(`[${rotulo}] pan 3D: nenhuma amostra (o botão do meio não chegou ao canvas)`);
+
+  // 8. Edição na 3D: move a parede alvo pelo store e mede até o segundo quadro pintado.
+  const edicao3d = [];
+  let editou3d = 0;
+  for (let r = 0; r < RUNS; r++) {
+    const dx = r % 2 === 0 ? DESLOCAMENTO_M : 0;
+    const res = await page.evaluate(async ([id, dx, x, ya, yb]) => {
+      const t0 = performance.now();
+      window.__hestia.editor.store.exec({ type: 'setWallEnds', id, a: { x: x + dx, y: ya }, b: { x: x + dx, y: yb } });
+      await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+      const w = window.__hestia.editor.project.elements[id];
+      return { ms: performance.now() - t0, ok: !!w && Math.abs(w.a.x - (x + dx)) < 1e-9 };
+    }, [idParede, dx, PAREDE_X, PAREDE_Y_A, PAREDE_Y_B]);
+    edicao3d.push(res.ms);
+    if (res.ok) editou3d++;
+  }
+  medidas.edicaoParede3D = { edicoes: edicao3d.length, confirmadasNoStore: editou3d, tempo: resumo(edicao3d) };
+  if (editou3d < RUNS) pendencias.push(`[${rotulo}] edição 3D: o store não refletiu a mudança em ${RUNS - editou3d} repetição(ões)`);
+
   await page.close().catch(() => {});
   return medidas;
 }

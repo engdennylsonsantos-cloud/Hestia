@@ -1,4 +1,4 @@
-import { DEFAULT_CATEGORY_STYLES, DEFAULT_LINE_WEIGHTS, DEFAULT_PROJECT_GRAPHICS, graphicsOf, levelGraphicsOf, sectionGraphicsOf, view3dOf, type Command, type Id, type Project, type ProjectStore } from '@hestia/model';
+import { DEFAULT_CATEGORY_STYLES, DEFAULT_LINE_WEIGHTS, DEFAULT_PROJECT_GRAPHICS, graphicsOf, levelGraphicsOf, sectionGraphicsOf, view3dOf, type Command, type Id, type Project, type ProjectStore, type View3DSettings } from '@hestia/model';
 
 /** Resultado de uma edição de gráficos: `error` traz a mensagem pt-BR de quem recusou (nada é gravado). */
 export interface GraphicsEdit {
@@ -124,6 +124,11 @@ export type ThinLinesTarget = { levelId: Id } | 'section';
 /** Linhas finas da vista ativa ligadas? Sem o campo salvo, ligadas (padrão do Hestia). */
 export function thinLinesOn(p: Project, target: ThinLinesTarget): boolean {
   return (target === 'section' ? sectionGraphicsOf(p) : levelGraphicsOf(p, target.levelId)).thinLines === true;
+}
+
+/** Níveis de referência (datum) ligados no 3D? Sem o campo salvo, ligados (padrão do Hestia). */
+export function showLevelsOn(v3: Pick<View3DSettings, 'showLevels'> | undefined | null): boolean {
+  return v3?.showLevels !== false;
 }
 
 /** Liga ou desliga as linhas finas (só na tela, a plotagem não muda) da vista. Grava no projeto, em um passo de desfazer. */

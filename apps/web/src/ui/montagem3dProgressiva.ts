@@ -1,6 +1,6 @@
 import type { ResolvedLevel } from '@hestia/engine';
 import type { Id, Project } from '@hestia/model';
-import type { Scene3DOptions } from '@hestia/render';
+import { chavesDeNivel, type Scene3DOptions } from '@hestia/render';
 import { useUi } from '../editor/state.ts';
 import { criarFonteNiveisWorker } from './montagem3dNiveis.ts';
 
@@ -8,6 +8,8 @@ import { criarFonteNiveisWorker } from './montagem3dNiveis.ts';
 export const LOTE_INICIAL = 3;
 /** Teto do lote: fatias grandes demais voltam a travar a tela mesmo com o orçamento. */
 export const LOTE_MAXIMO = 8;
+/** Com worker, níveis recebidos por atualização de cena: evita um `ModelScene.update` O(projeto) por nível. */
+export const NIVEIS_POR_APLICACAO = 3;
 /** Orçamento (ms) de uma fatia quando não se informa outro. */
 export const ORCAMENTO_PADRAO_MS = 12;
 /** Prazo (ms) de uma resposta do worker antes de calcular o nível na thread da interface (rede de segurança). */
@@ -90,6 +92,15 @@ function agendarPadrao(tarefa: () => void): void {
 }
 
 /**
+ * Chave de conteúdo de cada nível (`chavesDeNivel`): duas chaves iguais garantem a mesma geometria resolvida. A marca da
+ * vista fica de fora — tema, arestas e sombras mudam a malha da cena, não a resolução do nível, então não podem custar
+ * uma re-resolução.
+ */
+function chavesDoProjeto(p: Project): Map<Id, string> {
+  return chavesDeNivel(p, '');
+}
+
+/**
  * Monta a 3D por níveis, em fatias, sem bloquear a tela.
  *
  * Com worker (`worker` em `OpcoesMontagem`), a thread da interface não calcula nenhum nível: a primeira fatia traz só o
@@ -105,6 +116,11 @@ function agendarPadrao(tarefa: () => void): void {
  * idêntica à montagem completa (`ModelScene.update` com todos os níveis).
  *
  * Cancelamento: `iniciar` (outro projeto ou outra chave) e `cancelar` invalidam os pedidos e as fatias por geração.
+ *
+ * Atualização incremental (`atualizar`): depois da primeira montagem, uma edição não remonta o projeto inteiro. As chaves
+ * de conteúdo por nível (`chavesDeNivel`) dizem quais níveis continuam válidos; só o editado e os vizinhos por cota (a
+ * chave deles inclui o conteúdo do vizinho) voltam para a fila. Tema e mostrar/ocultar níveis não mudam geometria: só
+ * reaplicam a cena.
  */
 export class Montagem3dProgressiva {
   private geracao = 0;
@@ -112,8 +128,16 @@ export class Montagem3dProgressiva {
   private pendentes: Id[] = [];
   private prontos = new Map<Id, ResolvedLevel>();
   private projeto: Project | null = null;
+  /** Chave de conteúdo de cada nível da geometria em `prontos` (ver `chavesDeNivel`). */
+  private chaves = new Map<Id, string>();
+  /** Níveis alterados nesta atualização: não podem usar o `pronto` do segundo plano (pode ser da versão anterior). */
+  private forcar = new Set<Id>();
+  /** Todos os níveis do projeto corrente já estão na cena (o projeto fica guardado para a próxima atualização). */
+  private concluido = false;
   private opcoes: Scene3DOptions | null = null;
   private lote = LOTE_INICIAL;
+  /** Níveis recebidos desde a última atualização da cena (agrupa as respostas do worker). */
+  private recebidosDesdeAplicar = 0;
   private readonly agendar: (tarefa: () => void) => void;
   private readonly relogio: () => number;
   private readonly orcamentoMs: number;
@@ -151,23 +175,45 @@ export class Montagem3dProgressiva {
 
   /** Começa a montagem de `p`: cancela a anterior, faz a primeira fatia na hora e segue no worker ou em fatias. */
   iniciar(p: Project, opt: Scene3DOptions, visivel: Id | null): void {
-    const geracao = ++this.geracao;
-    this.worker?.cancelar();
-    this.limparPrazo();
+    const geracao = this.interromper();
     this.projeto = p;
     this.opcoes = opt;
     this.ordemProjeto = p.levels.map((l) => l.id);
     this.pendentes = ordemDeMontagem(this.ordemProjeto, visivel);
+    this.chaves = chavesDoProjeto(p);
     this.prontos = new Map();
-    this.emVoo.clear();
-    this.recebidos.clear();
-    this.passoAgendado = false;
+    this.forcar.clear();
+    this.recebidosDesdeAplicar = 0;
     this.lote = this.worker ? 1 : LOTE_INICIAL;
     this.falhas = 0;
+    this.concluido = false;
     if (this.worker) this.worker.iniciar(p);
     // Primeira fatia na hora: com worker, só o visível (o primeiro quadro mostra o pavimento ativo).
     this.fatia(geracao);
     if (this.worker && this.pendentes.length > 0) this.bombear(geracao);
+  }
+
+  /**
+   * Atualiza a montagem para `p` sem remontar o que continua válido. A primeira chamada (sem projeto anterior) é o mesmo
+   * `iniciar`. As seguintes:
+   *   - mesmo projeto, ou os mesmos `elements` e `levels`: tema, arestas, sombras e mostrar/ocultar níveis só reaplicam a
+   *     cena — nenhum nível é re-resolvido;
+   *   - geometria nova: só os níveis com chave de conteúdo diferente (o editado e os vizinhos por cota) voltam para a
+   *     fila, na ordem de montagem com o visível primeiro (ver `revalidar`).
+   */
+  atualizar(p: Project, opt: Scene3DOptions, visivel: Id | null): void {
+    const anterior = this.projeto;
+    if (!anterior) return this.iniciar(p, opt, visivel);
+    this.projeto = p;
+    this.opcoes = opt;
+    this.ordemProjeto = p.levels.map((l) => l.id);
+    if (p === anterior || (p.elements === anterior.elements && p.levels === anterior.levels)) {
+      // Geometria igual: a cena recebe o tema/visibilidade novos com os níveis que já estão prontos.
+      this.aplicar();
+      if (this.pendentes.length === 0) this.concluir();
+      return;
+    }
+    this.revalidar(p, visivel);
   }
 
   /** Para a montagem em curso: os pedidos e as fatias agendadas não fazem mais nada. */
@@ -180,6 +226,11 @@ export class Montagem3dProgressiva {
     this.passoAgendado = false;
     this.projeto = null;
     this.pendentes = [];
+    this.prontos = new Map();
+    this.chaves = new Map();
+    this.forcar.clear();
+    this.recebidosDesdeAplicar = 0;
+    this.concluido = false;
   }
 
   /** Desliga o worker (desmontagem da vista). Depois disso a montagem ainda funciona em fatias síncronas. */
@@ -189,11 +240,57 @@ export class Montagem3dProgressiva {
     this.worker = null;
   }
 
+  /**
+   * Geometria mudou: compara a chave de conteúdo de cada nível (`chavesDeNivel`) com a da montagem guardada e mantém os
+   * que continuam iguais. Só entra na fila o que mudou — o nível editado, os vizinhos por cota e o que entrou ou saiu do
+   * projeto. O pipeline é o mesmo de `iniciar` (fatias ou worker), agora sobre uma fila pequena.
+   */
+  private revalidar(p: Project, visivel: Id | null): void {
+    const geracao = this.interromper();
+    const chaves = chavesDoProjeto(p);
+    const prontos = new Map<Id, ResolvedLevel>();
+    for (const id of this.ordemProjeto) {
+      const nivel = this.prontos.get(id);
+      if (nivel && this.chaves.get(id) === chaves.get(id)) prontos.set(id, nivel);
+    }
+    this.chaves = chaves;
+    this.prontos = prontos;
+    // Ordem de montagem do projeto (o visível primeiro), só com o que precisa ser re-resolvido.
+    this.pendentes = ordemDeMontagem(this.ordemProjeto, visivel).filter((id) => !prontos.has(id));
+    // O `pronto` do segundo plano pode ser da versão anterior do projeto; para os níveis alterados, resolvemos de novo.
+    this.forcar = new Set(this.pendentes);
+    this.recebidosDesdeAplicar = 0;
+    this.falhas = 0;
+    // Uma edição alcança poucos níveis: a primeira fatia (até `LOTE_INICIAL` deles) sai no mesmo quadro, sem o nível
+    // editado piscar fora da cena. O que sobrar (edição global) segue no worker, como em `iniciar`.
+    this.lote = LOTE_INICIAL;
+    if (this.pendentes.length === 0) {
+      this.aplicar();
+      return this.concluir();
+    }
+    this.concluido = false;
+    this.worker?.iniciar(p);
+    this.fatia(geracao);
+    if (this.worker && this.pendentes.length > 0) this.bombear(geracao);
+  }
+
+  /** Invalida a montagem em curso (fatias e pedidos) e devolve a geração nova. */
+  private interromper(): number {
+    const geracao = ++this.geracao;
+    this.worker?.cancelar();
+    this.limparPrazo();
+    this.emVoo.clear();
+    this.recebidos.clear();
+    this.passoAgendado = false;
+    return geracao;
+  }
+
   /** Uma fatia síncrona: resolve o próximo lote, atualiza a cena com o que está pronto e agenda a seguinte. */
   private fatia(geracao: number): void {
     if (geracao !== this.geracao || !this.projeto || !this.opcoes) return;
     const inicio = this.relogio();
     for (const id of this.pendentes.splice(0, this.lote)) this.prontos.set(id, this.nivel(id));
+    this.recebidosDesdeAplicar = 0;
     this.aplicar();
     if (this.pendentes.length === 0) return this.concluir();
     // Com worker, a partir daqui cada nível vem de um pedido (a fatia síncrona é só a primeira e a rede de segurança).
@@ -216,6 +313,8 @@ export class Montagem3dProgressiva {
     const pronto = this.op.fonte.pronto;
     if (pronto) {
       for (const id of this.pendentes) {
+        // Nível alterado: o `pronto` pode ser da versão anterior; pede ao worker (ou resolve na fatia).
+        if (this.forcar.has(id)) continue;
         const nivel = pronto.call(this.op.fonte, id);
         if (!nivel || this.recebidos.has(id)) continue;
         this.emVoo.delete(id);
@@ -269,7 +368,13 @@ export class Montagem3dProgressiva {
     this.recebidos.delete(id);
     this.pendentes = this.pendentes.filter((x) => x !== id);
     this.prontos.set(id, nivel);
-    this.aplicar();
+    this.recebidosDesdeAplicar++;
+    // Agrupa as respostas do worker: um `ModelScene.update` a cada 3 níveis, não a cada nível. O primeiro nível e o
+    // último sempre entram na cena na hora (primeiro quadro e conclusão).
+    if (this.pendentes.length === 0 || this.recebidosDesdeAplicar >= NIVEIS_POR_APLICACAO) {
+      this.recebidosDesdeAplicar = 0;
+      this.aplicar();
+    }
     if (this.pendentes.length === 0) return this.concluir();
     this.bombear(geracao);
   }
@@ -315,7 +420,9 @@ export class Montagem3dProgressiva {
   }
 
   private concluir(): void {
-    this.projeto = null;
+    // O projeto fica guardado: a próxima atualização compara as chaves com esta montagem em vez de recomeçar.
+    if (this.concluido) return;
+    this.concluido = true;
     this.limparPrazo();
     this.op.aoConcluir();
   }
@@ -325,8 +432,11 @@ export class Montagem3dProgressiva {
     const recebido = this.recebidos.get(id);
     if (recebido) {
       this.recebidos.delete(id);
+      this.forcar.delete(id);
       return recebido;
     }
+    // Nível alterado: não aceita o `pronto` (pode ser da versão anterior); resolve com o projeto atual.
+    if (this.forcar.delete(id)) return this.op.fonte.resolver(id);
     return this.op.fonte.pronto?.(id) ?? this.op.fonte.resolver(id);
   }
 }

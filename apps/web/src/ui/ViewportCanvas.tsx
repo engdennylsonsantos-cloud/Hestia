@@ -169,9 +169,12 @@ export function ViewportCanvas(): ReactElement {
       const key = `${editor.store.version}|${dark}|${v3.shadows}|${v3.edges}|${v3.openOpenings === true}|${v3.showLevels !== false}`;
       if (key !== modelKey.current) {
         modelKey.current = key;
-        // Os níveis entram em fatias (ver montagem3dProgressiva.ts): a tela não espera o projeto inteiro.
+        // Os níveis entram em fatias (ver montagem3dProgressiva.ts): a tela não espera o projeto inteiro. Depois da
+        // primeira montagem, `atualizar` só re-resolve os níveis que a edição alcançou — e nada no tema/visibilidade.
         montagem.current ??= criarMontagemVista3d(m, (id) => editor.resolved(id), (id) => editor.resolucaoPronta(id));
-        montagem.current.iniciar(p, { edges: v3.edges, shadows: v3.shadows, dark }, st.levelId);
+        // Gancho de depuração (`?debug=1`): o e2e de perf espera `montados` chegar ao total de níveis.
+        if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) Object.assign(window, { __hestia3dMontagem: montagem.current });
+        montagem.current.atualizar(p, { edges: v3.edges, shadows: v3.shadows, dark }, st.levelId);
         picker?.invalidar();
       }
       // O nível selecionado no datum (clique no 3D) é aplicado à cena a cada quadro; sem mudança, não refaz nada.

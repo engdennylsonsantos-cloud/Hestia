@@ -309,6 +309,7 @@ function view3dIssues(g: View3DSettings): string[] {
   if (!(Number.isFinite(g.sunElevation) && g.sunElevation >= 0 && g.sunElevation <= 90)) out.push('A elevação do sol deve estar entre 0 e 90 graus.');
   if (g.background !== null && !isHex(g.background)) out.push('A cor de fundo deve estar no formato #rrggbb, ou ser null para o padrão do tema.');
   if (g.openOpenings !== undefined && typeof g.openOpenings !== 'boolean') out.push('Abrir vãos no 3D deve ser sim ou não.');
+  if (g.showLevels !== undefined && typeof g.showLevels !== 'boolean') out.push('Mostrar níveis de referência no 3D deve ser sim ou não.');
   return out;
 }
 

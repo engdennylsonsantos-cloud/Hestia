@@ -96,8 +96,8 @@ export class ModelScene {
   private niveis: THREE.Group | null = null;
   /** Nível selecionado no 3D (o plano azul do datum); preservado quando o projeto é remontado. */
   private selectedLevel: Id | null = null;
-  /** Projeto e nível com que o grupo de níveis foi montado: evita refazer o datum a cada quadro. */
-  private niveisChave: { projeto: Project; levelId: Id | null } | null = null;
+  /** Assinatura do datum montado (ver `assinaturaDosNiveis`): igual = o datum continua válido, não refaz nada. */
+  private niveisAssinatura: string | null = null;
   /** Caixa do "Enquadrar": modelo + datum dos níveis (com a margem do texto/bolha em X). */
   private caixaEnquadramento = new THREE.Box3();
   /** Peças de picking do nível que se monta agora (no wireframe a malha não entra na cena: vai para cá). */
@@ -322,8 +322,8 @@ export class ModelScene {
     }
     this.buildPickLayer();
     // Datum dos níveis: uma vez para o projeto (não por nível), fora dos grupos de nível. O nível selecionado é o
-    // guardado, então a remontagem do projeto mantém a seleção.
-    this.reconstruirNiveis(p);
+    // guardado, então a remontagem do projeto mantém a seleção. Só refaz quando algo que ele desenha mudou (assinatura).
+    this.atualizarNiveis(p);
     // Níveis que saíram da cena e não estão mais no cache: liberados (os que ficaram no cache seguem para o reuso).
     const saiu = new Set([...antes, ...sobras, ...expulsas]);
     for (const e of atuais) saiu.delete(e);
@@ -393,25 +393,55 @@ export class ModelScene {
   }
 
   /**
-   * Seleciona um nível no 3D (o plano azul do datum) ou limpa (`null`). Libera o grupo anterior e reconstrói o datum com
-   * `buildLevels(p, levelId)`. É chamado no clique do 3D e também a cada montagem/atualização do projeto, para a seleção
-   * sobreviver à remontagem. Sem mudança de projeto nem de nível, não refaz nada.
+   * Seleciona um nível no 3D (o plano azul do datum) ou limpa (`null`). O datum é refeito só quando o que ele desenha
+   * muda (nível selecionado, níveis, caixa da obra, tema ou visibilidade — ver `assinaturaDosNiveis`). É chamado no
+   * clique do 3D e também a cada quadro da vista, então o caminho sem mudança tem de ser barato.
    */
   selecionarNivel(p: Project, levelId: Id | null): void {
-    if (this.niveisChave?.projeto === p && this.niveisChave.levelId === levelId) return;
+    // Atalho do quadro a quadro: mesmo projeto, mesmo nível e datum montado (o que a vista passa sem parar).
+    if (this.niveisAssinatura !== null && this.projeto === p && this.selectedLevel === levelId) return;
     this.selectedLevel = levelId;
-    this.reconstruirNiveis(p);
+    this.atualizarNiveis(p);
+  }
+
+  /**
+   * Refaz o datum dos níveis só quando a assinatura muda. Sem isso, cada fatia da montagem (e cada atualização do
+   * projeto) refaria as linhas, as bolhas, os textos e o plano de seleção de todos os níveis.
+   */
+  private atualizarNiveis(p: Project): void {
+    const assinatura = this.assinaturaDosNiveis(p);
+    if (assinatura === this.niveisAssinatura) return;
+    this.reconstruirNiveis(p, assinatura);
+  }
+
+  /**
+   * Assinatura barata do que o datum desenha: ids, nomes e cotas dos níveis, a caixa da obra (`levelProjectBox`), o
+   * nível selecionado, o tema e o mostrar/ocultar níveis. Tudo o mais que `update` recebe fica de fora.
+   */
+  private assinaturaDosNiveis(p: Project): string {
+    const b = levelProjectBox(p);
+    const niveis = p.levels.map((l) => `${l.id}\u0001${l.name}\u0001${l.elevation}`).join('\u0002');
+    return [
+      niveis,
+      b.minX,
+      b.minY,
+      b.maxX,
+      b.maxY,
+      this.selectedLevel ?? '-',
+      this.frame.dark ? 'escuro' : 'claro',
+      this.frame.view.showLevels !== false ? 'visiveis' : 'ocultos',
+    ].join('|');
   }
 
   /**
    * Refaz o datum dos níveis para o projeto e o nível selecionado guardados. `showLevels` desligado deixa o grupo vazio
    * (nada é adicionado); o picking e o toggle acham o grupo por `userData.levels`.
    */
-  private reconstruirNiveis(p: Project): void {
+  private reconstruirNiveis(p: Project, assinatura: string): void {
     this.liberarNiveis();
-    this.niveisChave = { projeto: p, levelId: this.selectedLevel };
+    this.niveisAssinatura = assinatura;
     if (this.frame.view.showLevels === false) return;
-    const grupo = buildLevels(p, this.selectedLevel);
+    const grupo = buildLevels(p, this.selectedLevel, this.frame.dark);
     grupo.userData = { ...grupo.userData, levels: true };
     this.niveis3d.add(grupo);
     this.niveis = grupo;
@@ -656,7 +686,7 @@ export class ModelScene {
   dispose(): void {
     this.detach();
     this.liberarNiveis();
-    this.niveisChave = null;
+    this.niveisAssinatura = null;
     this.faixasDeSombra = [];
     this.lotes.dispose();
     this.caixaUnitaria.dispose();

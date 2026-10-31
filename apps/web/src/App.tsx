@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useRef, type ReactElement } from 'react';
 import { editor } from './editor/controller.ts';
 import { useProjetoDerivado } from './editor/projetoDerivado.ts';
 import { useUi } from './editor/state.ts';
@@ -179,8 +179,10 @@ export function App(): ReactElement {
   const caixaTextoAberta = useCaixaDeTextoAberta();
 
   // O host (artefato) pode ter definido data-theme: guardamos o valor original e o devolvemos em "sistema".
-  const hostTheme = useRef<string | null>(document.documentElement.getAttribute('data-theme'));
-  useEffect(() => {
+  const hostTheme = useRef<string | null>(document.documentElement.getAttribute('data-theme') === 'light' ? null : document.documentElement.getAttribute('data-theme'));
+  // Antes da pintura: o `index.html` já entra com `data-theme="light"`; o efeito de layout troca para a escolha
+  // manual (ou devolve o tema do host em "sistema") sem o flash escuro do `prefers-color-scheme`.
+  useLayoutEffect(() => {
     const root = document.documentElement;
     if (theme === 'system') {
       if (hostTheme.current) root.setAttribute('data-theme', hostTheme.current);

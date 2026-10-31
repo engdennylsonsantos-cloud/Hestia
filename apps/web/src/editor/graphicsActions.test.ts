@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CATEGORY_STYLES, DEFAULT_LINE_WEIGHTS, DEFAULT_VIEW_3D, DEFAULT_VIEW_GRAPHICS, ProjectStore, createEmptyProject, graphicsOf, levelGraphicsOf, view3dOf } from '@hestia/model';
-import { alreadyApplied, editLevelGraphics, editProjectGraphics, editThinLines, editView3D, restoreLevelGraphicsDefault, restoreProjectGraphicsDefault, restoreView3DDefault, thinLinesOn } from './graphicsActions.ts';
+import { alreadyApplied, editLevelGraphics, editProjectGraphics, editThinLines, editView3D, restoreLevelGraphicsDefault, restoreProjectGraphicsDefault, restoreView3DDefault, showLevelsOn, thinLinesOn } from './graphicsActions.ts';
 
 const store = (): ProjectStore => new ProjectStore(createEmptyProject());
 
@@ -122,6 +122,25 @@ describe('editView3D (vista 3D: sombras, arestas, sol, fundo)', () => {
     const label = s.undoLabel;
     expect(editView3D(s, { sunAzimuth: 45 })).toEqual({ ok: true, error: null });
     expect(s.undoLabel).toBe(label);
+  });
+
+  it('níveis de referência: ausente = ligados; desligar grava, desfazer restaura e religar volta a mostrar', () => {
+    const s = store();
+    expect(showLevelsOn(view3dOf(s.project))).toBe(true);
+    expect(editView3D(s, { showLevels: false })).toEqual({ ok: true, error: null });
+    expect(view3dOf(s.project).showLevels).toBe(false);
+    expect(showLevelsOn(view3dOf(s.project))).toBe(false);
+    s.undo();
+    expect(showLevelsOn(view3dOf(s.project))).toBe(true);
+    expect(editView3D(s, { showLevels: true })).toEqual({ ok: true, error: null });
+    expect(showLevelsOn(view3dOf(s.project))).toBe(true);
+  });
+
+  it('recusa mostrar níveis com valor que não é sim ou não', () => {
+    const s = store();
+    const r = editView3D(s, { showLevels: 'sim' as never });
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe('Mostrar níveis de referência no 3D deve ser sim ou não.');
   });
 });
 

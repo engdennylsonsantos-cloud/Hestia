@@ -3,22 +3,22 @@ import { describe, expect, it } from 'vitest';
 import { LevelResolveCache, type ResolvedLevel } from '@hestia/engine';
 import { ClienteResolucao, type WorkerLike } from '@hestia/engine/src/worker/cliente.ts';
 import { projetoComPavimentos } from '@hestia/engine/src/worker/fixturePavimentos.ts';
-import type { Id, Project } from '@hestia/model';
+import { makeLevel, ProjectStore, type Id, type Project } from '@hestia/model';
 import { ModelScene, type Scene3DOptions } from '@hestia/render';
 import { criarFonteNiveisWorker } from './montagem3dNiveis.ts';
 import { Montagem3dProgressiva, ordemDeMontagem, proximoLote, type CenaMontagem, type FonteNiveis, type FonteWorker } from './montagem3dProgressiva.ts';
 
-/** Projeto mínimo só com os ids dos níveis (a montagem não lê mais nada além deles nos testes de fila). */
-const projetoDeIds = (ids: Id[]): Project => ({ levels: ids.map((id) => ({ id })) }) as unknown as Project;
+/** Projeto mínimo só com os ids dos níveis (a montagem só lê os níveis e a chave de conteúdo deles). */
+const projetoDeIds = (ids: Id[]): Project => ({ levels: ids.map((id, i) => ({ id, name: id, elevation: i * 3 })), elements: {} }) as unknown as Project;
 /** Nível falso: a montagem só repassa o objeto à cena. */
 const nivelFalso = (id: Id): ResolvedLevel => ({ levelId: id }) as unknown as ResolvedLevel;
 const OPT: Scene3DOptions = { edges: false, shadows: false, dark: false };
 
-/** Cena que anota cada atualização (ids dos níveis e o projeto). */
+/** Cena que anota cada atualização (ids dos níveis, o projeto e as opções). */
 class CenaAnotada implements CenaMontagem {
-  readonly chamadas: Array<{ ids: Id[]; projeto: Project }> = [];
-  update(p: Project, niveis: ResolvedLevel[]): void {
-    this.chamadas.push({ ids: niveis.map((n) => (n as unknown as { levelId: Id }).levelId), projeto: p });
+  readonly chamadas: Array<{ ids: Id[]; projeto: Project; opt: Scene3DOptions }> = [];
+  update(p: Project, niveis: ResolvedLevel[], opt: Scene3DOptions): void {
+    this.chamadas.push({ ids: niveis.map((n) => (n as unknown as { levelId: Id }).levelId), projeto: p, opt });
   }
 }
 
@@ -178,6 +178,127 @@ describe('Montagem3dProgressiva: fonte e cancelamento', () => {
   });
 });
 
+describe('Montagem3dProgressiva: atualização incremental', () => {
+  it('a primeira chamada de atualizar monta igual a iniciar', () => {
+    const ids = Array.from({ length: 8 }, (_, i) => `n${i}`);
+    const p = projetoDeIds(ids);
+
+    const porIniciar = new CenaAnotada();
+    const fonteIniciar = fonteContada();
+    const filaIniciar = filaManual();
+    new Montagem3dProgressiva({ cena: porIniciar, fonte: fonteIniciar, aoAtualizar: () => undefined, aoConcluir: () => undefined, agendar: filaIniciar.agendar }).iniciar(p, OPT, 'n3');
+    filaIniciar.rodar();
+
+    const porAtualizar = new CenaAnotada();
+    const fonteAtualizar = fonteContada();
+    const filaAtualizar = filaManual();
+    new Montagem3dProgressiva({ cena: porAtualizar, fonte: fonteAtualizar, aoAtualizar: () => undefined, aoConcluir: () => undefined, agendar: filaAtualizar.agendar }).atualizar(p, OPT, 'n3');
+    filaAtualizar.rodar();
+
+    expect(porAtualizar.chamadas.map((c) => c.ids)).toEqual(porIniciar.chamadas.map((c) => c.ids));
+    expect(fonteAtualizar.calculados).toEqual(fonteIniciar.calculados);
+  });
+
+  it('tema novo com o mesmo projeto reaplica a cena sem re-resolver nenhum nível', () => {
+    const ids = Array.from({ length: 6 }, (_, i) => `n${i}`);
+    const p = projetoDeIds(ids);
+    const cena = new CenaAnotada();
+    const fonte = fonteContada();
+    const fila = filaManual();
+    const m = new Montagem3dProgressiva({ cena, fonte, aoAtualizar: () => undefined, aoConcluir: () => undefined, agendar: fila.agendar });
+    m.atualizar(p, OPT, 'n0');
+    fila.rodar();
+    expect(fonte.calculados).toEqual(ids);
+    const antes = cena.chamadas.length;
+
+    const escuro: Scene3DOptions = { ...OPT, dark: true };
+    m.atualizar(p, escuro, 'n0');
+    // Nenhum `resolver` novo: a geometria resolvida não depende do tema.
+    expect(fonte.calculados).toEqual(ids);
+    // A cena recebeu o tema novo com todos os níveis já prontos.
+    expect(cena.chamadas).toHaveLength(antes + 1);
+    expect(cena.chamadas.at(-1)!.opt).toEqual(escuro);
+    expect(cena.chamadas.at(-1)!.ids).toEqual(ids);
+    expect(m.montados).toBe(ids.length);
+  });
+
+  it('editar uma parede re-resolve só o nível dela e os vizinhos de cota; a cena termina com todos', () => {
+    let projeto = projetoComPavimentos(8);
+    const ids = projeto.levels.map((l) => l.id);
+    const calculados: Id[] = [];
+    const cache = new LevelResolveCache();
+    const fonte: FonteNiveis = {
+      resolver: (id) => {
+        calculados.push(id);
+        return cache.get(projeto, id);
+      },
+    };
+    const cena = new CenaAnotada();
+    const fila = filaManual();
+    const m = new Montagem3dProgressiva({ cena, fonte, aoAtualizar: () => undefined, aoConcluir: () => undefined, agendar: fila.agendar });
+    m.atualizar(projeto, OPT, 'pav_4');
+    fila.rodar();
+    expect(calculados).toEqual(ordemDeMontagem(ids, 'pav_4'));
+    calculados.length = 0;
+
+    // Edição: uma parede do pav_4 muda de ponta. O projeto novo tem outro mapa de elementos e os mesmos níveis.
+    const store = new ProjectStore(projeto);
+    store.exec({ type: 'setWallEnds', id: 'pav_4_w1', b: { x: 12, y: 8 } });
+    projeto = store.project;
+    expect(projeto.elements).not.toBe(cena.chamadas.at(-1)!.projeto.elements);
+
+    m.atualizar(projeto, OPT, 'pav_4');
+    fila.rodar();
+    // Só a chave do nível editado e a dos vizinhos por cota (que incluem o conteúdo dele) mudou; o visível vem primeiro.
+    expect(calculados).toEqual(['pav_4', 'pav_3', 'pav_5']);
+    expect(cena.chamadas.at(-1)!.ids).toEqual(ids);
+    expect(cena.chamadas.at(-1)!.projeto).toBe(projeto);
+    expect(m.montados).toBe(ids.length);
+  }, 60_000);
+
+  it('níveis que entram e que saem deixam a cena coerente', () => {
+    let projeto = projetoComPavimentos(3);
+    const calculados: Id[] = [];
+    const cache = new LevelResolveCache();
+    const fonte: FonteNiveis = {
+      resolver: (id) => {
+        calculados.push(id);
+        return cache.get(projeto, id);
+      },
+    };
+    const cena = new CenaAnotada();
+    const fila = filaManual();
+    const m = new Montagem3dProgressiva({ cena, fonte, aoAtualizar: () => undefined, aoConcluir: () => undefined, agendar: fila.agendar });
+    m.atualizar(projeto, OPT, 'pav_1');
+    fila.rodar();
+    expect(m.montados).toBe(3);
+
+    // Um pavimento novo no topo: a lista de níveis entra no bloco global da chave (conservador), então todos os níveis
+    // são re-resolvidos — inclusive o novo — e a cena termina com os quatro.
+    calculados.length = 0;
+    const comCobertura = new ProjectStore(projeto);
+    comCobertura.exec({ type: 'upsertLevel', level: makeLevel({ id: 'pav_cobertura', name: 'Cobertura', elevation: 9 }) });
+    projeto = comCobertura.project;
+    m.atualizar(projeto, OPT, 'pav_1');
+    fila.rodar();
+    expect(new Set(calculados)).toEqual(new Set(['pav_0', 'pav_1', 'pav_2', 'pav_cobertura']));
+    expect(cena.chamadas.at(-1)!.ids).toEqual(['pav_0', 'pav_1', 'pav_2', 'pav_cobertura']);
+    expect(m.montados).toBe(4);
+
+    // O pavimento vazio sai: a cena perde o nível e mantém os outros três (o que saiu não fica na cena).
+    calculados.length = 0;
+    const semCobertura = new ProjectStore(projeto);
+    semCobertura.exec({ type: 'deleteLevel', id: 'pav_cobertura' });
+    projeto = semCobertura.project;
+    expect(projeto.levels.map((l) => l.id)).toEqual(['pav_0', 'pav_1', 'pav_2']);
+    m.atualizar(projeto, OPT, 'pav_1');
+    fila.rodar();
+    expect(new Set(calculados)).toEqual(new Set(['pav_0', 'pav_1', 'pav_2']));
+    expect(cena.chamadas.at(-1)!.ids).toEqual(['pav_0', 'pav_1', 'pav_2']);
+    expect(m.montados).toBe(3);
+  }, 60_000);
+});
+
 /** Conteúdo da cena: cada malha e linha com tipo, categoria, faixas de picking, matriz e posições. Na ordem da cena. */
 function assinatura(ms: ModelScene): string[] {
   const linhas: string[] = [];
@@ -319,7 +440,9 @@ describe('Montagem3dProgressiva: níveis no worker', () => {
       expect(worker.pedidos.filter((x) => x === id)).toHaveLength(1);
     }
     expect(fonte.calculados).toEqual(['c']);
-    expect(cena.chamadas.map((c) => c.ids)).toEqual([['c'], ['b', 'c'], ['b', 'c', 'd'], ['a', 'b', 'c', 'd'], ids]);
+    // As respostas do worker entram na cena em lotes de até 3 níveis (um `ModelScene.update` por lote, não por nível);
+    // o primeiro nível e o último sempre aparecem na hora.
+    expect(cena.chamadas.map((c) => c.ids)).toEqual([['c'], ['a', 'b', 'c', 'd'], ids]);
     expect(m.montados).toBe(5);
     expect(m.usandoWorker).toBe(false);
   });

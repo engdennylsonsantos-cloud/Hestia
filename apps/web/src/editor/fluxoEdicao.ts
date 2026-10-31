@@ -29,6 +29,9 @@ import { ResolucaoProgressiva } from './resolucaoAssincrona.ts';
  *    de uma versão anterior enquanto o recálculo corre (`pendente(nivel)` diz isso). Quem precisa do exato de verdade
  *    (quantitativos, exportação) passa `exigirExato`.
  *
+ * Prewarm: `abrir` agenda em tempo ocioso a resolução dos níveis ainda não prontos (`preaquecerNiveis`), sem as junções,
+ * para a primeira abertura da 3D montar todos de uma vez. `niveisProntos` diz se já dá; `cancelar` encerra o prewarm.
+ *
  * Na tela (ver `ui/quadroPlanta.ts`): o editor liga `exatoAssincrono` e a planta desenha, no quadro da edição, o que
  * `provisorios` guarda (`doNivel` o contorno novo, `apagarDoNivel` o antigo que o último exato ainda mostra,
  * `removidosDoNivel` o que saiu); o exato da planta vem logo depois da pintura. Só a referência do pavimento de baixo
@@ -116,6 +119,8 @@ export class FluxoEdicao {
     this.versaoAtual = versao;
     const ids = this.resolucao.abrir(p, versao);
     this.emitir({ tipo: 'recarga', versao, niveis: 'todos' });
+    // Em segundo plano e em tempo ocioso: deixa todos os níveis prontos para a primeira abertura da 3D.
+    this.resolucao.preaquecerNiveis();
     return ids;
   }
 
@@ -161,9 +166,19 @@ export class FluxoEdicao {
     return this.resolucao.juncoes(id);
   }
 
-  /** Resolução de nível já pronta em segundo plano (senão `null`). Não calcula nada. */
+  /** Resolução de nível já pronta (segundo plano ou cache da abertura; senão `null`). Não calcula nada. */
   nivelPronto(id: Id): ResolvedLevel | null {
     return this.resolucao.nivelPronto(id);
+  }
+
+  /** Todos os níveis do projeto (ou os `alvos`) já estão prontos: a 3D pode montar de uma vez. */
+  niveisProntos(alvos?: readonly Id[]): boolean {
+    return this.resolucao.niveisProntos(alvos);
+  }
+
+  /** Agenda em tempo ocioso a resolução dos níveis ainda não prontos (prewarm da primeira abertura da 3D). */
+  preaquecerNiveis(alvos?: readonly Id[]): void {
+    this.resolucao.preaquecerNiveis(alvos);
   }
 
   /** Contador que cresce a cada nível pronto ou invalidado: a planta e a 3D observam para saber que algo mudou. */

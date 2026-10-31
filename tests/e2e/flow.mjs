@@ -25,8 +25,9 @@ const st = () => page.evaluate(() => {
   return { walls: els.filter((e) => e.kind === 'wall'), openings: els.filter((e) => e.kind !== 'wall'), canUndo: editor.store.canUndo };
 });
 
-await page.getByRole('button', { name: 'Novo' }).click();
-await page.getByText('Em branco').click();
+await page.getByRole('button', { name: 'Menu Arquivo' }).click();
+await page.getByRole('dialog', { name: 'Menu Arquivo' }).getByRole('button', { name: 'Novo', exact: true }).click();
+await page.getByRole('button', { name: /Em branco/ }).click();
 await page.waitForTimeout(300);
 const box = await page.locator('.canvas-wrap').boundingBox();
 const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
@@ -67,13 +68,15 @@ check('seleção por clique', sel === 1);
 await pressTool(page, 'm');
 await click(4, 5.5); await click(4, 6.5);
 s = await st();
-const top = s.walls.find((w) => Math.abs(w.a.y - 6.5) < 1e-6 && Math.abs(w.b.y - 6.5) < 1e-6);
+// Coordenadas de tela arredondam a ~4 mm no zoom do enquadramento: compara com 1 cm.
+const perto = (a, b) => Math.abs(a - b) < 0.01;
+const top = s.walls.find((w) => perto(w.a.y, 6.5) && perto(w.b.y, 6.5));
 const left = s.walls.find((w) => Math.abs(w.a.x - 2) < 1e-6 && Math.abs(w.b.x - 2) < 1e-6);
-check('parede movida 1 m', !!top);
+check('parede movida 1 m', !!top && perto(top.a.y, 6.5) && perto(top.b.y, 6.5), top ? `${top.a.y},${top.b.y}` : '');
 check('vizinha acompanhou e continua ligada (esticou)', !!left && Math.min(left.a.y, left.b.y) < 1.6 && Math.max(left.a.y, left.b.y) > 6.4, left ? `${left.a.y},${left.b.y}` : '');
 await page.keyboard.press('Control+z');
 s = await st();
-check('desfazer volta a posição', s.walls.some((w) => Math.abs(w.a.y - 5.5) < 1e-6 && Math.abs(w.b.y - 5.5) < 1e-6));
+check('desfazer volta a posição', s.walls.some((w) => perto(w.a.y, 5.5) && perto(w.b.y, 5.5)));
 
 // 5. girar digitando 90°
 await pressTool(page, 'v'); await click(5, 5.5);
@@ -98,13 +101,13 @@ check('desfazer edição de tipo', (await page.evaluate(() => window.__hestia.ed
 await page.locator('.rtab:visible', { hasText: 'Gerenciar' }).click();
 await page.getByRole('button', { name: /Materiais/ }).click();
 await page.screenshot({ path: `${OUT}/21-materials.png` });
-await page.keyboard.press('Escape');
+await page.getByRole('dialog').getByRole('button', { name: 'Fechar' }).last().click();
 
 // 8. nível 2 + underlay
-await page.getByRole('tab', { name: /Pavimento 2/ }).click();
+await page.getByRole('treeitem', { name: /Pavimento 2/ }).first().click();
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/22-level2.png` });
-await page.getByRole('tab', { name: /Térreo/ }).click();
+await page.getByRole('treeitem', { name: /rreo/ }).first().click();
 
 // 9. tema escuro + 3D
 await page.locator('.rtab.file').click();
@@ -114,12 +117,12 @@ await page.locator('button[title^="Tema"]').click();
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/23-dark-plan.png` });
-await page.getByRole('tab', { name: /Modelo 3D/ }).click();
+await page.getByRole('treeitem', { name: /Modelo 3D/ }).first().click();
 await page.waitForTimeout(1200);
 await page.screenshot({ path: `${OUT}/24-dark-3d.png` });
 
 // 10. desempenho: 20 movimentos de mouse na planta
-await page.getByRole('tab', { name: /Térreo/ }).click();
+await page.getByRole('treeitem', { name: /rreo/ }).first().click();
 await pressTool(page, 'w');
 await click(0, 0);
 const t0 = Date.now();

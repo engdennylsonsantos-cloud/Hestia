@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeWall, sheetOf, viewportAnchor, viewportIssue } from '@hestia/model';
-import { addSheetAction, changeSheetAction, addViewAction, clampedAt, defaultViewSize, duplicateSheetCommand, fitSizeMm, fitViewportAction, freeSpot, moveViewportAction, moveViewportContentAction, nextSheetNumber, resizeViewportAction, setViewportScaleAction, sheetsPdfOf } from './sheetActions.ts';
+import { ProjectStore, cameraDaVista3D, createEmptyProject, makeView3DPoint, makeWall, projectView3DPoints, sheetOf, viewportAnchor, viewportIssue } from '@hestia/model';
+import { addSheetAction, changeSheetAction, addViewAction, clampedAt, defaultViewSize, duplicateSheetCommand, fitSizeMm, fitViewportAction, freeSpot, moveViewportAction, moveViewportContentAction, nextSheetNumber, resizeViewportAction, setViewportScaleAction, setViewportView3DPointAction, sheetsPdfOf } from './sheetActions.ts';
 
 const LV0 = 'lv_0';
 
@@ -273,5 +273,46 @@ describe('âncora: redimensionar não move o desenho', () => {
     expect(v.at.x).toBeLessThan(200);
     expect(v.anchor!.x - v.at.x).toBeCloseTo(100, 6);
     expect(v.anchor!.y - v.at.y).toBeCloseTo(40, 6);
+  });
+});
+
+describe('ponto de vista 3D da vista na prancha', () => {
+  /** Câmera de teste (metade do `SheetView3DCamera`), completada abaixo. */
+  const CAM3D = { azimuth: 0, elevation: 0.6, distance: 12, target: { x: 0, y: 0, z: 0 }, ortho: true };
+
+  /** Prancha com uma vista 3D e dois pontos salvos no catálogo do projeto. */
+  const comPontos = () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addView3DPoint', point: makeView3DPoint(CAM3D, 'Fachada norte') });
+    s.exec({ type: 'addView3DPoint', point: makeView3DPoint({ ...CAM3D, azimuth: 1.2 }, 'Fachada leste') });
+    const id = addSheetAction(s);
+    s.exec({ type: 'addViewport', sheetId: id, viewport: { id: 'v1', view: { kind: '3d' }, at: { x: 40, y: 60 }, size: { w: 180, h: 130 }, scale: 100 } });
+    return { s, id, ponto: projectView3DPoints(s.project)[0]! };
+  };
+
+  it('grava o ponto escolhido e o desfazer volta ao enquadramento padrão', () => {
+    const { s, id, ponto } = comPontos();
+    expect(setViewportView3DPointAction(s, id, 'v1', ponto.id)).toBeNull();
+    expect(s.undoLabel).toBe('Trocar ponto de vista 3D');
+    const view = sheetOf(s.project, id)!.viewports[0]!.view;
+    expect(view).toEqual({ kind: '3d', pointId: ponto.id });
+    if (view.kind === '3d') expect(cameraDaVista3D(s.project, view)).toEqual(ponto.camera);
+    s.undo();
+    expect(sheetOf(s.project, id)!.viewports[0]!.view).toEqual({ kind: '3d' });
+  });
+
+  it('volta ao enquadramento padrão com null', () => {
+    const { s, id, ponto } = comPontos();
+    setViewportView3DPointAction(s, id, 'v1', ponto.id);
+    expect(setViewportView3DPointAction(s, id, 'v1', null)).toBeNull();
+    expect(sheetOf(s.project, id)!.viewports[0]!.view).toEqual({ kind: '3d' });
+  });
+
+  it('recusa vista que não é 3D e vista inexistente', () => {
+    const s = new ProjectStore(createEmptyProject());
+    const id = addSheetAction(s);
+    s.exec({ type: 'addViewport', sheetId: id, viewport: { id: 'v1', view: { kind: 'plan', levelId: LV0 }, at: { x: 40, y: 60 }, size: { w: 100, h: 80 }, scale: 100 } });
+    expect(setViewportView3DPointAction(s, id, 'v1', null)).toContain('vista 3D');
+    expect(setViewportView3DPointAction(s, id, 'nao_existe', null)).toBe('Vista inexistente');
   });
 });

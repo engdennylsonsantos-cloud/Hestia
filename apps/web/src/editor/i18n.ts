@@ -714,5 +714,18 @@ export function nomeComandoLang(cmd: string, lang: Lang): string {
   if (cmd === 'atalhos') return lang === 'pt' ? 'Atalhos de teclado' : 'Keyboard shortcuts';
   if (cmd === 'unidades') return lang === 'pt' ? 'Unidades do projeto' : 'Project Units';
   if (cmd === 'createSimilar') return lang === 'pt' ? 'Criar semelhante' : 'Create Similar';
+  const vis: Record<string, [string, string]> = {
+    temporaryHide: ['Ocultar temporariamente (elemento)', 'Temporary Hide (Element)'],
+    temporaryCategory: ['Ocultar temporariamente (categoria)', 'Temporary Hide (Category)'],
+    temporaryIsolate: ['Isolar temporariamente (elemento)', 'Temporary Isolate (Element)'],
+    isolateCategory: ['Isolar temporariamente (categoria)', 'Temporary Isolate (Category)'],
+    resetTemporary: ['Restaurar hide/isolate temporário', 'Reset Temporary Hide/Isolate'],
+    hideInView: ['Ocultar na vista (elemento)', 'Hide in View (Element)'],
+    hideCategoryInView: ['Ocultar na vista (categoria)', 'Hide in View (Category)'],
+    revealHidden: ['Revelar elementos ocultos', 'Reveal Hidden Elements'],
+    unhideInView: ['Reexibir na vista (elemento)', 'Unhide in View (Element)'],
+    unhideCategoryInView: ['Reexibir na vista (categoria)', 'Unhide in View (Category)'],
+  };
+  if (vis[cmd]) return lang === 'pt' ? vis[cmd]![0] : vis[cmd]![1];
   return toolLabel(cmd as ToolId, lang);
 }

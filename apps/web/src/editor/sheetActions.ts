@@ -237,6 +237,24 @@ export function setViewportScaleAction(store: ProjectStore, sheetId: Id, vpId: I
   }
 }
 
+/**
+ * Troca o ponto de vista 3D da vista selecionada: `pointId` escolhe um ponto salvo do catálogo; `null` volta ao
+ * enquadramento padrão (decisão 0040). Só vale para vista 3D. Devolve a recusa, ou null quando gravou.
+ */
+export function setViewportView3DPointAction(store: ProjectStore, sheetId: Id, vpId: Id, pointId: Id | null): string | null {
+  const s = sheetOf(store.project, sheetId);
+  const vp = s?.viewports.find((v) => v.id === vpId);
+  if (!s || !vp) return 'Vista inexistente';
+  if (vp.view.kind !== '3d') return 'Só uma vista 3D tem ponto de vista.';
+  const view: SheetViewSource = pointId ? { kind: '3d', pointId } : { kind: '3d' };
+  try {
+    store.exec({ type: 'updateViewport', sheetId, id: vpId, patch: { view } }, 'Trocar ponto de vista 3D');
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Não foi possível trocar o ponto de vista.';
+  }
+}
+
 /** Ajusta a moldura ao conteúdo na escala atual, mantendo o centro (Revit: *Size Crop* > Fit). */
 export function fitViewportAction(store: ProjectStore, sheetId: Id, vpId: Id, padMm = 8): string | null {
   const s = sheetOf(store.project, sheetId);

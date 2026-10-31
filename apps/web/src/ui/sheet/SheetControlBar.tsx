@@ -1,5 +1,5 @@
-import type { ReactElement } from 'react';
-import type { Sheet, SheetViewport } from '@hestia/model';
+import { useEffect, useState, type ReactElement } from 'react';
+import type { Id, Sheet, SheetViewport, View3DPoint } from '@hestia/model';
 import { sheetDimsMm } from '@hestia/model';
 import type { SheetCamera, SheetSize } from './sheetCamera.ts';
 import type { AlignMode } from '../../editor/sheetAlign.ts';
@@ -41,6 +41,10 @@ export interface SheetControlBarProps {
   onDistribute: (axis: 'h' | 'v') => void;
   onAddView: () => void;
   onProps: () => void;
+  /** Pontos de vista 3D salvos no projeto (decisão 0040), para trocar o da vista selecionada. */
+  view3DPoints: readonly View3DPoint[];
+  /** Troca o ponto de vista da vista 3D selecionada; `null` volta ao enquadramento padrão. */
+  onChange3DPoint: (pointId: Id | null) => void;
 }
 
 const ALIGN: { mode: AlignMode; label: string; icon: string; title: string }[] = [
@@ -60,6 +64,11 @@ export function SheetControlBar(p: SheetControlBarProps): ReactElement {
   const { sheet, camera, selected } = p;
   const dims = sheetDimsMm(sheet);
   const one = selected.length === 1 ? selected[0]! : null;
+  // Ponto de vista 3D da vista selecionada ('' = enquadramento padrão); só as vistas 3D têm esse campo.
+  const pontoAtual = one && one.view.kind === '3d' ? (one.view.pointId ?? '') : '';
+  // Rascunho do seletor "Ponto": a troca só vale ao clicar em "Trocar", como as demais propriedades da vista.
+  const [ponto, setPonto] = useState(pontoAtual);
+  useEffect(() => setPonto(pontoAtual), [pontoAtual]);
   const zoomPct = Math.round((camera.zoom / PX_PER_MM) * 100);
   const btn = (key: string, icon: string, label: string, title: string, onClick: () => void, opts: { on?: boolean; disabled?: boolean; danger?: boolean } = {}): ReactElement => (
     <button key={key} className={`vcb-btn${opts.on ? ' on' : ''}${opts.danger ? ' danger' : ''}`} title={title} aria-label={title} aria-pressed={opts.on} disabled={opts.disabled} onClick={onClick}>
@@ -100,6 +109,27 @@ export function SheetControlBar(p: SheetControlBarProps): ReactElement {
               ))}
             </select>
           </label>
+          {one.view.kind === '3d' ? (
+            <>
+              <label className="vcb-field" title="Ponto de vista 3D mostrado na vista" htmlFor="vcb-ponto3d">
+                <Icon name="cube" size={14} />
+                <span>Ponto</span>
+                <select
+                  id="vcb-ponto3d"
+                  className="vcb-select"
+                  aria-label="Ponto de vista 3D"
+                  value={ponto}
+                  onChange={(e) => setPonto(e.target.value)}
+                >
+                  <option value="">Enquadramento padrão</option>
+                  {p.view3DPoints.map((pt) => (
+                    <option key={pt.id} value={pt.id}>{pt.name}</option>
+                  ))}
+                </select>
+              </label>
+              {btn('ponto3d', 'cube', 'Trocar', 'Trocar o ponto de vista 3D da vista', () => p.onChange3DPoint(ponto === '' ? null : ponto), { disabled: ponto === pontoAtual })}
+            </>
+          ) : null}
           {btn('fitframe', 'crop', 'Ajustar moldura', 'Ajusta a moldura ao desenho, na escala atual', p.onFitFrame)}
           {btn('clip', 'crop', 'Recortar', 'Recorta o desenho à moldura (Revit: Crop View)', p.onToggleClip, { on: one.clip !== false })}
           {btn('frame', 'detail', 'Moldura', 'Mostra a moldura da vista na folha', p.onToggleFrame, { on: one.frame !== false })}

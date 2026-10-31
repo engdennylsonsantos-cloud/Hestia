@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { SheetView3DCamera } from '@hestia/model';
 import { clipPlanes, zoomedDistance } from './cameraClip.ts';
 
 /**
@@ -257,4 +258,32 @@ export class OrbitCamera {
     this.distance = f.distance;
     this.apply();
   }
+}
+
+/**
+ * Retrato serializável da câmera orbital (decisão 0040): é o que a prancha guarda para mostrar a vista 3D escolhida.
+ * Copia só números: nenhum objeto do three vai para o projeto.
+ */
+export function cameraDaOrbita(o: OrbitCamera): SheetView3DCamera {
+  return {
+    azimuth: o.azimuth,
+    elevation: o.elevation,
+    distance: o.distance,
+    target: { x: o.target.x, y: o.target.y, z: o.target.z },
+    ortho: o.ortho,
+  };
+}
+
+/**
+ * Aplica na câmera o retrato de `cameraDaOrbita`. Usa a mesma `OrbitCamera` da tela: orientação, alvo, distância e
+ * projeção ficam iguais; só a proporção (aspecto) é a do quadro da prancha, que define o recorte do papel.
+ */
+export function aplicarCameraNaOrbita(o: OrbitCamera, c: SheetView3DCamera): void {
+  o.cancelAnimation();
+  o.azimuth = c.azimuth;
+  o.elevation = c.elevation;
+  o.distance = Math.max(DISTANCE.min, Math.min(DISTANCE.max, c.distance));
+  o.target.set(c.target.x, c.target.y, c.target.z);
+  o.ortho = c.ortho;
+  o.apply();
 }

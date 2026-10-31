@@ -1,5 +1,5 @@
 import { newId } from './ids.ts';
-import { projectSheets, sheetIssue, sheetOf, viewportIssue, type Sheet, type SheetViewport, type SheetViewSource } from './sheet.ts';
+import { projectSheets, sheetIssue, sheetOf, sheetView3DCameraIssue, viewportIssue, type Sheet, type SheetViewport, type SheetViewSource } from './sheet.ts';
 import type { Id, Project } from './types.ts';
 
 /**
@@ -26,6 +26,7 @@ export function viewSourceIssue(p: Pick<Project, 'levels' | 'views'> & Partial<P
   if (view.kind === 'plan' && !p.levels.some((l) => l.id === view.levelId)) return 'Nível inexistente';
   if (view.kind === 'areaPlan' && !(p.areaPlans ?? []).some((a) => a.id === view.planId)) return 'Planta de área inexistente';
   if (view.kind === 'section' && !p.views.some((v) => v.id === view.sectionId)) return 'Vista de corte inexistente';
+  if (view.kind === '3d' && view.camera !== undefined) return sheetView3DCameraIssue(view.camera);
   return null;
 }
 

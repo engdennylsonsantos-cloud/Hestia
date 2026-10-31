@@ -8,6 +8,7 @@ import { selectionAfterClick } from './selectionClick.ts';
 import { activeViewOf, addView, type OpenView, type PlanKind } from './openViews.ts';
 import type { RibbonTabId } from '../ui/ribbon/model.ts';
 import { loadDock, type DockLayout } from './dockLayout.ts';
+import type { TempViewVisibility } from './viewVisibility.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section' | 'sheet';
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -16,7 +17,7 @@ export type ThemePref = 'system' | 'light' | 'dark';
  * Quem quiser seguir o sistema ou usar o escuro escolhe no menu Arquivo; a escolha vale só para a sessão.
  */
 export const DEFAULT_THEME: ThemePref = 'light';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'rampType' | 'rampSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'dxfLayers' | 'sheet' | 'addView' | 'renumberSheets' | 'revision' | 'publish' | 'roomSchedule' | 'roomCategories' | 'cotasAuto' | 'moveLevel' | 'gridType' | 'units' | 'dimensions' | 'hostedLoss' | 'areaMerge' | 'importCad' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'rampType' | 'rampSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'dxfLayers' | 'sheet' | 'addView' | 'renumberSheets' | 'revision' | 'publish' | 'roomSchedule' | 'roomCategories' | 'cotasAuto' | 'moveLevel' | 'gridType' | 'units' | 'dimensions' | 'hostedLoss' | 'areaMerge' | 'importCad' | 'manageCad' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -36,6 +37,8 @@ export interface UiState {
   sheetAlign: boolean;
   /** Ferramenta Mover ativa na prancha (sessão; decisão 0039). */
   sheetMove: boolean;
+  /** Hide/isolate/reveal temporários por vista (sessão; não vai para o projeto). */
+  viewTemp: Record<string, TempViewVisibility>;
   selection: Id[];
   /** Nível selecionado no 3D (a seleção de elementos fica vazia quando há um). */
   selectedLevel: Id | null;
@@ -283,6 +286,7 @@ export const useUi = create<UiState>(() => ({
   tagDrag: null,
   sheetAlign: false,
   sheetMove: false,
+  viewTemp: {},
   sectionId: null,
   sheetId: null,
   selection: [],

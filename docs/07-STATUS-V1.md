@@ -87,10 +87,11 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
   (padrão 2,60 m); tipos em camadas (gesso 12,5 mm, PVC, laje aparente).
 - **Planta de forro** em "Direção da vista → Para cima"; 3D, corte, quantitativos por camada, tabela e CSV; DXF na camada `FORRO`.
 
-**Pranchas e PDF** — 19 feitos, 4 fora de escopo, 0 pendentes (`docs/paridade/pranchas.md`); editor de layout na
-decisão 0039.
+**Pranchas e PDF** — 34 feitos, 2 fora de escopo, 0 pendentes (`docs/paridade/pranchas.md`); editor de layout na
+decisão 0039 e 3D vetorial na 0040.
 - Prancha A0–A4 com margem, carimbo (com disciplina e tabela de revisões) e logo reservado; vistas de planta, corte ou
-  3D com escala; 3D aparece como quadro ("3D não vai no PDF").
+  3D (o 3D não tem escala); **3D vetorial** na prancha, com pontos de vista salvos, linhas ocultas por z-buffer e
+  legenda "Sem escala" (0040).
 - **Editor de layout** (0039): zoom no cursor e pan (roda/botão do meio/Espaço), redimensionar o recorte com 8 alças,
   pan do conteúdo (Alt), recorte e moldura ligáveis, legenda por vista, travar vista, encaixe e guias, alinhar/distribuir,
   setas (1/10 mm), Delete, Z/G/0. Câmera por prancha na sessão.

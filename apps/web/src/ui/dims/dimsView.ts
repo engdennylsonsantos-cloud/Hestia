@@ -46,6 +46,12 @@ export function refLabel(ref: DimRef): string {
 export const providerOf = (dim: TempDim): string => dim.key.split(':')[0] ?? '';
 
 /**
+ * A cota oferece ação ao clique (editar o valor)? Sem `edit` é de leitura — caso dos rascunhos das ferramentas
+ * (parede, grade): não capturam o ponteiro e não deixam fantasma depois de terminar o traço.
+ */
+export const dimAcionavel = (dim: TempDim): boolean => dim.edit !== undefined;
+
+/**
  * Texto mostrado no campo da cota: valor principal e, quando houver, a medida informativa (ex.: "5,00 · 53,1°").
  * Comprimentos vão sem unidade (o campo já pertence à grandeza); ângulos levam o símbolo, que os distingue do número.
  */
@@ -78,7 +84,7 @@ export function viewOfDim(dim: TempDim, toScreen: (p: Vec2) => Vec2, metersPerPi
     ticks: g.ticks.map(seg),
     textAt: toScreen(g.textAt),
     textRotation: g.textRotation,
-    editable: dim.edit !== undefined,
+    editable: dimAcionavel(dim),
     invalid: dim.tone === 'invalid' || invalidKey === dim.key,
     // Ponta com uma só referência não tem o que alternar: sem alça (ela só cobriria as alças de vértice do elemento).
     grips: dim.ends.filter((e) => e.options.length >= 2).map((e) => gripOf(dim, e, toScreen)),

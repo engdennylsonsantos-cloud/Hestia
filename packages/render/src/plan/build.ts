@@ -29,7 +29,7 @@ import { espessuraDeCorte, espessuraDeProjecao, paintOps, surfaceColor, type Pla
 import { Limiares, type VistaComLimiares } from './limiares.ts';
 import { tracoEm } from './marcadores.ts';
 import { resolverZoom } from './zoomOps.ts';
-import { planContext } from './planContext.ts';
+import { anotacoesSemOcultos, planContext, semAnotacoesOcultas, semElementosOcultos } from './planContext.ts';
 import { cadPlanOps } from './cad.ts';
 import { areaPlanProfile, FLOOR_PLAN_PROFILE, type FillOp, type LabelOp, type PlanDrawList, type PlanOps, type PlanProfile, type PlanTheme, type StrokeOp } from './types.ts';
 
@@ -65,6 +65,10 @@ export interface PlanInput {
   areaPlan?: import('@hestia/model').AreaPlan;
   /** Perfil de desenho; sem ele, a vista de área usa `areaPlanProfile` e a planta de piso usa `FLOOR_PLAN_PROFILE`. */
   profile?: PlanProfile;
+  /** Elementos ocultos nesta vista (Hide in View + temporário). */
+  hidden?: ReadonlySet<Id>;
+  /** Elementos que o modo Reveal mostra com borda azul. */
+  revealed?: ReadonlySet<Id>;
   /** Rótulo em arraste (fantasma) da planta de área: segue o cursor em tempo real. */
   tagGhost?: { roomId: Id; at: Vec2 };
   /** Ambiente cujo rótulo está sendo arrastado: a geometria não o desenha (o fantasma desenha). */
@@ -160,14 +164,20 @@ function openingSymbolStrokes(
   zoom: number,
   limiares: Limiares,
   view: PlanView | null,
+  hidden: ReadonlySet<Id> | undefined,
+  hiddenWalls: ReadonlySet<Id> | undefined,
   oculto?: (q: Vec2) => boolean,
 ): StrokeOp[] {
   if (detail === 'coarse') return [];
   const out: StrokeOp[] = [];
   for (const w of paredesDoNivel(p, levelId)) {
+    // A parede oculta pelo Hide in View leva as aberturas junto (a vista foi resolvida sem ela). A oculta pela categoria
+    // não: a categoria da abertura é outra (a janela continua, como antes).
+    if (hiddenWalls?.has(w.id)) continue;
     const f = frameOfWall(p, w.id);
     if (!f) continue;
     for (const o of aberturasDaParede(p, w.id)) {
+      if (hidden?.has(o.id)) continue;
       const g = openingGeometry(p, o, f);
       if (oculto?.(g.center)) continue;
       const type = openingTypeById(p, o.typeId);
@@ -216,7 +226,9 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   const fillT = input.dark ? 0.5 : 0.58;
 
   // Contexto do nível e da vista (o mesmo que a sobreposição usa): estilo, vista, geometria e ocultos.
-  const { style, rp, view, up, geo, hidden, roofOff, roofHidden, stairs, ramps } = planContext(input);
+  const { style, rp, view, up, geo, hidden, hiddenWalls, roofOff, roofHidden, stairs, ramps } = planContext(input);
+  // As anotações e as marcas de corte leem o nível: o projeto sem as ocultas é o que elas desenham (Hide in View).
+  const pNotas = semAnotacoesOcultas(p, input.levelId, hidden);
   const { detail, paint } = style;
   // A escala da vista de área manda no papel das etiquetas e dos contornos claros.
   const scale = areaPlan && areaPlan.scale > 0 ? areaPlan.scale : style.scale;
@@ -397,7 +409,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
 
   // Símbolos das aberturas (fora do grosseiro): cortadas, tracejadas acima do corte, leves abaixo; as ocultas saem.
   // Cada um com o estilo da sua categoria (porta ou janela) e a espessura de corte ou de projeção.
-  if (profile.openings && !rp) strokes.push(...openingSymbolStrokes(p, input.levelId, paint, theme, fillBase, detail, input.viewport.zoom, limiares, view, sobCobertura));
+  if (profile.openings && !rp) strokes.push(...openingSymbolStrokes(p, input.levelId, paint, theme, fillBase, detail, input.viewport.zoom, limiares, view, hidden, hiddenWalls, sobCobertura));
 
   // Telhados (D1): por cima das paredes e dos pisos (semitransparentes); as linhas notáveis saem por último.
   if (profile.roofs !== 'hidden') {
@@ -413,9 +425,14 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
     }, scale);
     addOps(rf, paint.roof, true);
   }
-  // Planta de cobertura: as paredes voltam por cima dos telhados só como contorno fino.
+  // Planta de cobertura: as paredes voltam por cima dos telhados só como contorno fino. Com parede oculta no Hide in
+  // View, os clusters (que agrupam paredes da junção) não servem: o contorno sai parede a parede, só das visíveis.
   if (rp && paint.wall.visible) {
-    for (const c of geo.clusters) for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, ...paint.wall.proj, color: theme.inkSoft, alpha: 0.8 });
+    const temParedeOculta = hidden !== undefined && Object.keys(geo.walls).some((id) => hidden.has(id));
+    for (const [, w] of temParedeOculta ? Object.entries(geo.walls).filter(([id]) => !hidden?.has(id)) : []) {
+      for (const ring of union(...w.layers.map((l) => l.cut)).flat()) strokes.push({ pts: ring, closed: true, ...paint.wall.proj, color: theme.inkSoft, alpha: 0.8 });
+    }
+    if (!temParedeOculta) for (const c of geo.clusters) for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, ...paint.wall.proj, color: theme.inkSoft, alpha: 0.8 });
   }
   // Telhado acima do corte (projeção): o preenchimento quase opaco esconderia as paredes do nível. Os contornos finos,
   // tracejados e esmaecidos, voltam por cima só para o usuário localizar as paredes; a grade continua atrás dos
@@ -442,7 +459,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   // Linhas de corte e elevação: aparecem em todas as plantas, porque o corte atravessa os níveis. Seguem a categoria
   // 'anotação' (visibilidade, cor e peso) e a escala da vista, com geometria em mm de papel.
   if (profile.sectionMarks) {
-    const marks = sectionMarksOf(p, theme, paint.annotation, scale, input.selection);
+    const marks = sectionMarksOf(pNotas, theme, paint.annotation, scale, input.selection);
     fills.push(...marks.fills);
     strokes.push(...marks.strokes);
     labels.push(...marks.labels);
@@ -450,14 +467,14 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
 
   // Cotas e textos do nível (decisão 0019), com o estilo da categoria 'anotação'. Na planta de área valem as
   // anotações da própria vista (ou o fallback do nível, já filtrado por `drawnAnnotations`).
-  const annotations = areaPlan ? drawnAnnotations(p, input.levelId, areaPlan) : undefined;
-  const notes = noteOps(p, input.levelId, paint.annotation, { ink: theme.ink, select: theme.select, paper: theme.bg, selection: input.selection }, scale, v, annotations);
+  const annotations = areaPlan ? anotacoesSemOcultos(drawnAnnotations(p, input.levelId, areaPlan), hidden) : undefined;
+  const notes = noteOps(pNotas, input.levelId, paint.annotation, { ink: theme.ink, select: theme.select, paper: theme.bg, selection: input.selection }, scale, v, annotations);
   fills.push(...notes.fills);
   strokes.push(...notes.strokes);
   labels.push(...notes.labels);
 
   if (profile.elementTags) {
-    const tagged = elementTagOps(p, input.levelId, paint.annotation, scale);
+    const tagged = elementTagOps(pNotas, input.levelId, paint.annotation, scale);
     strokes.push(...tagged.strokes);
     labels.push(...tagged.labels);
   }
@@ -471,11 +488,11 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   // Objetos importados (viga, pilar, mobiliário...): na v1 só o contorno aproximado em planta, tracejado e fino.
   if (profile.generic && paint.generic.visible) {
     for (const e of Object.values(p.elements)) {
-      if (!isGeneric(e) || e.levelId !== input.levelId || !e.outline?.length) continue;
+      if (!isGeneric(e) || e.levelId !== input.levelId || !e.outline?.length || hidden?.has(e.id)) continue;
       strokes.push({ pts: e.outline, closed: true, widthPx: 1, color: theme.inkSoft, alpha: 0.8, dash: [5, 3] });
     }
     // CAD importado (fase 5): os traços e textos do desenho, finos e na cor de cada camada/entidade.
-    const cad = cadPlanOps(p, input.levelId, theme, style.scale);
+    const cad = cadPlanOps(semElementosOcultos(p, hidden), input.levelId, theme, style.scale);
     strokes.push(...cad.strokes);
     labels.push(...cad.labels);
   }
@@ -483,7 +500,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   // Planta de área: separador, etiquetas de ambiente, legenda e quadro por cima de tudo.
   if (areaPlan) {
     if (profile.rooms) {
-      strokes.push(...roomSeparatorStrokes(p, input.levelId, paint.annotation, input.dark ? '#9ca3af' : theme.inkSoft, new Set(input.selection), theme.select));
+      strokes.push(...roomSeparatorStrokes(pNotas, input.levelId, paint.annotation, input.dark ? '#9ca3af' : theme.inkSoft, new Set(input.selection), theme.select));
       const roomTags = areaPlanTagOps(p, areaPlan, scale, hidden, resolveRooms(p, input.levelId), input.hideLabelRoomId, input.dark);
       strokes.push(...roomTags.strokes);
       labels.push(...roomTags.labels);

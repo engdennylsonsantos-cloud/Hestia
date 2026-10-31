@@ -20,7 +20,7 @@ import type { ResolvedLevel } from './types.ts';
  */
 
 /** Chaves do projeto que não entram na resolução de nível (ver o cabeçalho). Todas as outras são globais. */
-const FORA_DA_RESOLUCAO = new Set<string>(['elements', 'nextOrder', 'views', 'sheets', 'view3d']);
+const FORA_DA_RESOLUCAO = new Set<string>(['elements', 'nextOrder', 'views', 'sheets', 'view3d', 'view3dPoints']);
 
 /** Níveis a recalcular entre dois projetos: um conjunto, ou `'todos'` quando algo global mudou ou não se sabe o nível. */
 export type NiveisAfetados = ReadonlySet<Id> | 'todos';

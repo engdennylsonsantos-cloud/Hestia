@@ -1,5 +1,6 @@
 import type { Vec2 } from '@hestia/geom';
 import type { DetailLine, DetailRegion, Dimension, ElementTag, TextNote, Id, Project } from './types.ts';
+import type { ViewHidden } from './graphics.ts';
 
 /** Anotações de uma planta de área (mesmas estruturas da planta de piso, guardadas por vista). */
 export interface AreaPlanAnnotations {
@@ -124,6 +125,8 @@ export interface AreaPlan {
   table?: AreaTable;
   /** Cotas, textos, detalhes e etiquetas desta vista (não vazam para a planta de piso). */
   annotations?: AreaPlanAnnotations;
+  /** Elementos/categorias ocultos nesta planta de área (Hide in View). */
+  hidden?: ViewHidden;
 }
 
 export const DEFAULT_TAG_FIELDS: TagField[] = ['name', 'number', 'area'];

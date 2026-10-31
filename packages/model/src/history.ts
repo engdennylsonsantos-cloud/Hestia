@@ -252,6 +252,8 @@ export function labelOf(c: Command): string {
       return 'Alterar a vista 3D';
     case 'resetView3D':
       return 'Restaurar a vista 3D';
+    case 'setViewHidden':
+      return 'Ocultar na vista';
     case 'setSectionGraphics':
       return 'Alterar gráficos do corte';
     case 'resetSectionGraphics':
@@ -330,6 +332,14 @@ export function labelOf(c: Command): string {
       return 'Excluir vista da prancha';
     case 'setSheetOrder':
       return 'Reordenar pranchas';
+    case 'addView3DPoint':
+      return 'Salvar ponto de vista 3D';
+    case 'updateView3DPoint':
+      return 'Editar ponto de vista 3D';
+    case 'removeView3DPoint':
+      return 'Excluir ponto de vista 3D';
+    case 'setView3DPointOrder':
+      return 'Reordenar pontos de vista 3D';
     case 'addGrid':
       return 'Criar grade';
     case 'updateGrid':
@@ -366,5 +376,9 @@ export function labelOf(c: Command): string {
       return 'Editar esquema de cores';
     case 'removeColorScheme':
       return 'Excluir esquema de cores';
+    default: {
+      const _nunca: never = c;
+      return _nunca;
+    }
   }
 }

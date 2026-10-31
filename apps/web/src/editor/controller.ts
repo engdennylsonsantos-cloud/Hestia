@@ -20,7 +20,7 @@ import {
   type SectionView,
   type TemplateId,
 } from '@hestia/model';
-import { annotationAt, roomTagAt, DEFAULT_SNAP, createTool, execWithHostedLoss, isStairTool, setPasteClip, type HostedApplyResult, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
+import { annotationAt, roomTagAt, DEFAULT_SNAP, createTool, execWithHostedLoss, isStairTool, setPasteClip, type HostedApplyResult, type PointerInfo, type ShortcutCommand, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
 import { transfer } from './transfer.ts';
 import { startCreateSimilar } from './createSimilar.ts';
 import { desfazerOuRefazer } from './historyStatus.ts';
@@ -34,6 +34,7 @@ import { defaultOpenViews, type PlanKind } from './openViews.ts';
 import { casador } from './shortcutConfig.ts'; import { clearSelectionForTool } from './toolSelection.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 import { deleteSelectionIn } from './deleteIds.ts';
+import { hideSelectedCategoryInView, hideSelectionInView, resetAllTemporary, resetTemporaryHidden, temporaryHideSelection, temporaryIsolateSelection, temporarySelectedCategory, toggleRevealHidden, unhideSelectedCategoryInView, unhideSelectionInView } from './viewVisibility.ts';
 import { deleteViewAction, renameViewAction, updateViewAction } from './sectionViewActions.ts';
 import { entregarArquivo } from './entregarArquivo.ts';
 import { safeFilename } from './nomeArquivo.ts';
@@ -94,11 +95,22 @@ function labelHit(p: Project, levelId: Id, scale: number, planId: Id | null, at:
  * Controlador do editor: junta projeto (histórico), ferramenta ativa, seleção e vistas.
  * A interface só lê estado e chama ações; as regras vivem aqui e nos pacotes.
  */
+/** Sequências de visibilidade que funcionam no 3D e no corte mesmo com outro perfil de atalhos. */
+const VIS_SEQUENCES: Record<string, ShortcutCommand> = {
+  HH: 'temporaryHide', HC: 'temporaryCategory', HI: 'temporaryIsolate', IC: 'isolateCategory', HR: 'resetTemporary',
+  EH: 'hideInView', VH: 'hideCategoryInView', RH: 'revealHidden', EU: 'unhideInView', VU: 'unhideCategoryInView',
+  V1: 'temporaryHide', V2: 'temporaryCategory', V3: 'temporaryIsolate', V4: 'isolateCategory', V5: 'resetTemporary',
+  V6: 'hideInView', V7: 'hideCategoryInView', V8: 'revealHidden', V9: 'unhideInView', V0: 'unhideCategoryInView',
+};
+
 export class Editor {
   readonly store = new ProjectStore(createEmptyProject());
   /** Arraste de rótulo de ambiente em andamento (mundo); vale na planta de piso e na de área. */
   private tagDrag: { planId: Id | null; roomId: Id; offset: Vec2; at: Vec2; moved: boolean } | null = null;
   private suppressNextClick = false;
+  /** Buffer próprio dos atalhos de visibilidade no 3D/corte (não depende do perfil configurado). */
+  private visBuf = '';
+  private visTimer: ReturnType<typeof setTimeout> | undefined;
   private tool: Tool;
   private viewports = new Map<Id, Viewport>();
   /** Resolução por nível: uma edição recalcula só o nível editado e os que dependem dele (ver `LevelResolveCache`). */
@@ -116,6 +128,8 @@ export class Editor {
     semear: (id, valor) => this.fluxo.resolucao.semear(id, valor),
   };
   private sectionCache = new Map<Id, { project: Project; value: SectionResult }>();
+  /** Caixa pedida antes de a vista ter viewport (ex.: enquadrar um CAD ao abrir a planta dele): aplicada na criação. */
+  private pendingBox: PlanBox | null = null;
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
   fileName = 'projeto.hestia.json';
 
@@ -220,8 +234,26 @@ export class Editor {
       const box = this.frameBox();
       if (box) Object.assign(v, fitBox(v, box));
     }
+    if (!cur && this.pendingBox) {
+      Object.assign(v, fitBox(v, this.pendingBox));
+      this.pendingBox = null;
+    }
     this.viewports.set(id, v);
     return v;
+  }
+
+  /**
+   * Enquadra a vista atual numa caixa (m). Sem viewport ainda (a vista acabou de ser aberta e o canvas vai montar),
+   * guarda a caixa para `ensureViewport` aplicar na criação.
+   */
+  zoomToBox(box: PlanBox | null): void {
+    if (!box) return;
+    const v = this.viewport();
+    if (!v) {
+      this.pendingBox = box;
+      return;
+    }
+    this.setViewport(fitBox(v, box));
   }
 
   zoomExtents(): void {
@@ -265,7 +297,75 @@ export class Editor {
   /** Aplica comandos pela mesma regra das aberturas hospedadas usada pelas ferramentas (cotas temporárias). */
   applyCommands(label: string, commands: readonly Command[]): HostedApplyResult { return execWithHostedLoss(this.env, label, commands); }
 
+  /** Zera a sequência de visibilidade em andamento (troca de vista/projeto). */
+  private limparVisibilidadeBuffer(): void {
+    this.visBuf = '';
+    if (this.visTimer !== undefined) {
+      clearTimeout(this.visTimer);
+      this.visTimer = undefined;
+    }
+  }
+
+  /**
+   * Atalhos de visibilidade no 3D/corte com buffer próprio. Eles não passam pelo perfil (o perfil simples usa `H`
+   * para reancorar, então `HH` não existiria nele); as sequências do Revit e as do perfil simples são aceitas aqui.
+   * Devolve `null` quando a tecla não pertence a nenhuma sequência.
+   */
+  private atalhoVisibilidadeDaVista(k: string, e: KeyboardEvent): boolean | null {
+    if (e.altKey || useUi.getState().typed || this.tool.freeText) return null;
+    if (!/^[A-Za-z0-9]$/.test(k)) {
+      this.limparVisibilidadeBuffer();
+      return null;
+    }
+    const tentativa = this.visBuf + k.toUpperCase();
+    const exato = VIS_SEQUENCES[tentativa];
+    if (exato) {
+      this.limparVisibilidadeBuffer();
+      return this.executaComandoDeVisibilidade(exato);
+    }
+    if (Object.keys(VIS_SEQUENCES).some((seq) => seq.startsWith(tentativa))) {
+      this.visBuf = tentativa;
+      if (this.visTimer !== undefined) clearTimeout(this.visTimer);
+      this.visTimer = setTimeout(() => {
+        this.visTimer = undefined;
+        this.visBuf = '';
+      }, 1200);
+      return true;
+    }
+    this.limparVisibilidadeBuffer();
+    return null;
+  }
+
+  /** Executa um atalho de visibilidade; falso quando o comando é de ferramenta (o chamador decide). */
+  private executaComandoDeVisibilidade(cmd: ShortcutCommand): boolean {
+    switch (cmd) {
+      case 'temporaryHide': temporaryHideSelection(); return true;
+      case 'temporaryCategory': temporarySelectedCategory(false); return true;
+      case 'temporaryIsolate': temporaryIsolateSelection(); return true;
+      case 'isolateCategory': temporarySelectedCategory(true); return true;
+      case 'resetTemporary': resetTemporaryHidden(); return true;
+      case 'hideInView': hideSelectionInView(); return true;
+      case 'hideCategoryInView': hideSelectedCategoryInView(); return true;
+      case 'revealHidden': toggleRevealHidden(); return true;
+      case 'unhideInView': unhideSelectionInView(); return true;
+      case 'unhideCategoryInView': unhideSelectedCategoryInView(); return true;
+      default: return false;
+    }
+  }
+
+  /**
+   * Zera o arraste de rótulo e o clique suprimido: os dois valem só para o gesto em que começaram. Sem isto, um
+   * `down` no rótulo seguido de `up` com arrasto (que não emite `click`) deixa o clique suprimido armado, e o
+   * `tagDrag` residual passa a mover o rótulo antigo no próximo arrasto, em qualquer vista ou projeto.
+   */
+  private limparArrasteRotulo(): void {
+    this.tagDrag = null;
+    this.suppressNextClick = false;
+    if (useUi.getState().tagDrag) useUi.setState({ tagDrag: null });
+  }
+
   private activate(id: ToolId, tool: Tool = createTool(id, this.env)): void {
+    this.limparArrasteRotulo();
     this.tool = tool;
     useUi.setState({ tool: id, typed: '', prompt: null, hover: null });
     this.tool.start();
@@ -274,6 +374,8 @@ export class Editor {
 
   // Perímetro: Telhado, Piso, Laje e Forro abrem o modo; com o modo aberto, trocar de ferramenta não conclui (a barra pede Concluir ou Cancelar).
   setTool(id: ToolId): void {
+    // Trocar de ferramenta encerra qualquer arraste de rótulo em andamento (inclusive nos retornos antecipados abaixo).
+    this.limparArrasteRotulo();
     const st = useUi.getState();
     // A planta de área é de anotação: ferramentas de modelo não entram nela (nem por atalho, nem ao voltar de um corte).
     if (st.planKind === 'area' && st.view !== '3d' && !areaPlanToolAllowed(id)) {
@@ -419,6 +521,11 @@ export class Editor {
       useUi.setState({ status: !cur ? 'Rastreamento de alinhamento ativado (F11)' : 'Rastreamento de alinhamento desativado (F11)' });
       return true;
     }
+    // 3D e corte não trocam de ferramenta: só os atalhos de visibilidade atravessam o `key3d` (HH/HR/RH/EH...).
+    if (ui.view === '3d' || ui.view === 'section') {
+      const vis = this.atalhoVisibilidadeDaVista(k, e);
+      if (vis !== null) return vis;
+    }
     if (ui.view === 'section') {
       if (k === 'Escape') {
         this.closeSection();
@@ -432,7 +539,7 @@ export class Editor {
     if (k === 'Escape') {
       casador.limpar(); if (ui.typed) useUi.setState({ typed: '' });
       // Ferramenta de texto: Esc com texto digitado também cancela o ponto, senão a próxima tecla vira texto.
-      if (!ui.typed || this.tool.freeText) { if (!this.perimetro.esc()) this.tool.cancel(); }
+      if (!ui.typed || this.tool.freeText) { this.limparArrasteRotulo(); if (!this.perimetro.esc()) this.tool.cancel(); }
       this.bump();
       return true;
     }
@@ -485,7 +592,8 @@ export class Editor {
     if (!r.tratada) return false;
     if (r.comando === 'atalhos' || r.comando === 'unidades') useUi.setState({ dialog: r.comando === 'atalhos' ? 'shortcutsConfig' : 'units', dialogArg: null });
     else if (r.comando === 'createSimilar') startCreateSimilar(this.project, (id) => this.setTool(id));
-    else if (r.comando) this.setTool(r.comando);
+    else if (r.comando && this.executaComandoDeVisibilidade(r.comando)) { /* executado */ }
+    else if (r.comando) this.setTool(r.comando as ToolId);
     return true;
   }
 
@@ -634,6 +742,9 @@ export class Editor {
 
   setView(v: 'plan' | '3d'): void {
     if (this.perimetro.bloqueiaNavegacao()) return;
+    // Mudar de vista encerra o arraste de rótulo: o gesto pertence à planta em que começou.
+    this.limparArrasteRotulo();
+    this.limparVisibilidadeBuffer();
     useUi.setState((s) => ({ view: v, hover: null, typed: '', previewTick: s.previewTick + 1 }));
   }
 
@@ -643,6 +754,10 @@ export class Editor {
   }
 
   load(p: Project, name: string): void {
+    // Projeto novo (ou aberto): o arraste de rótulo e a visibilidade temporária do projeto anterior não sobrevivem.
+    this.limparArrasteRotulo();
+    this.limparVisibilidadeBuffer();
+    resetAllTemporary();
     this.perimetro.encerrar(); this.store.load(p);
     this.fileName = name;
     this.levels.clear(); this.fluxo.abrir(p, this.store.version).forEach((id) => this.resolved(id));

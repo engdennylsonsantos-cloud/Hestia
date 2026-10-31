@@ -38,6 +38,28 @@ export function capturesPointer(rect: ScreenRect, cursor: Vec2 | null, previewin
 }
 
 /**
+ * Cota de leitura (rascunho de ferramenta, sem `edit`) não tem ação no clique: valor e alças saem do caminho do
+ * ponteiro (`pointerEvents: 'none'`) e o clique segue para o canvas. Era o campo de 62×22 px sobre a prévia da
+ * parede/grade engolindo o `pointerdown` e impedindo o traço de terminar.
+ *
+ * Com ação real (editar o valor, alternar a referência da alça ou converter em cotas permanentes), vale a prioridade
+ * de `capturesPointer`: na prévia, só o que cobre a ponta viva (a do cursor) deixa o clique passar ao canvas.
+ *
+ * @param acionavel há ação de verdade no elemento; falso para cota de leitura.
+ */
+export function capturaCota(
+  rect: ScreenRect,
+  cursor: Vec2 | null,
+  previewing: boolean,
+  liveEnds: ReadonlyArray<Vec2>,
+  acionavel: boolean,
+  clearance = CURSOR_CLEARANCE_PX,
+): boolean {
+  if (!acionavel) return false;
+  return capturesPointer(rect, cursor, previewing, liveEnds, clearance);
+}
+
+/**
  * Só o botão principal é engolido pela sobreposição (clicar na alça, no texto ou no "I"). Botão do meio e direito
  * seguem para o canvas: iniciam o pan e o menu mesmo com o cursor sobre uma cota.
  */

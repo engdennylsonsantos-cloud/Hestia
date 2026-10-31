@@ -35,7 +35,7 @@ const levelsButton = (html: string): string => html.match(/<button[^>]*aria-labe
 
 beforeEach(() => useUi.setState({ view: '3d' }));
 afterEach(() => {
-  useUi.setState({ view: 'plan' });
+  useUi.setState({ view: 'plan', viewTemp: {} });
   if (editor.store.project.view3d) editor.store.exec({ type: 'resetView3D' });
 });
 
@@ -59,6 +59,19 @@ describe('botão de níveis na barra de controle da vista 3D', () => {
     expect(btn).toContain('class="vcb-btn on"');
     expect(btn).not.toContain('<span');
     expect(btn).toContain('<svg');
+  });
+
+  it('mostra o botão de Revelar elementos ocultos e o estado ligado/desligado', () => {
+    const findReveal = (html: string): string => html.match(/<button[^>]*aria-label="[^"]*Revelar elementos ocultos[^"]*"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? '';
+    const off = findReveal(render3d());
+    expect(off).toContain('aria-label="Revelar elementos ocultos (RH)"');
+    expect(off).toContain('aria-pressed="false"');
+    expect(off).toContain('<svg');
+    useUi.setState({ viewTemp: { '3d': { reveal: true } } });
+    const on = findReveal(render3d());
+    expect(on).toContain('aria-label="Sair de Revelar elementos ocultos (RH)"');
+    expect(on).toContain('aria-pressed="true"');
+    expect(on).toContain('class="vcb-btn on"');
   });
 
   it('o clique lógica (editView3D) desliga e o aria-pressed acompanha; desfazer restaura', () => {

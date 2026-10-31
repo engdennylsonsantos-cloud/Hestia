@@ -1,21 +1,8 @@
 import { sheetDimsMm, sheetOf, viewportClipped, type Id, type Project, type SheetViewport } from '@hestia/model';
 import { furnitureParts } from './frame.ts';
 import { areaTablePartsOf, areaPlanPartsOf, planPartsOf, sectionPartsOf } from './viewports.ts';
-import { emptyParts, type SheetDrawList, type ViewportParts } from './types.ts';
-
-/** Vista 3D não vai para o papel (sem imagem raster): o quadro traz o aviso. Decisão 0022. */
-const threeDParts = (v: SheetViewport): ViewportParts => {
-  const parts = emptyParts();
-  parts.texts.push({
-    at: { x: v.at.x + v.size.w / 2, y: v.at.y + v.size.h / 2 },
-    text: '3D não vai no PDF',
-    sizeMm: 3,
-    rotation: 0,
-    center: true,
-    color: '#7a828c',
-  });
-  return parts;
-};
+import { vista3dParts } from './vista3d.ts';
+import { type SheetDrawList, type ViewportParts } from './types.ts';
 
 function partsOfViewport(p: Project, v: SheetViewport): ViewportParts {
   switch (v.view.kind) {
@@ -28,7 +15,7 @@ function partsOfViewport(p: Project, v: SheetViewport): ViewportParts {
     case 'section':
       return sectionPartsOf(p, v.view.sectionId, v);
     case '3d':
-      return threeDParts(v);
+      return vista3dParts(p, v);
   }
 }
 

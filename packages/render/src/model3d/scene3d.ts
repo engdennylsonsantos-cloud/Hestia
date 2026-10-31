@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- a cena 3D reúne o port GPU (faixas/sombras) e o alizar/esquadrias do plano; extrair depois. */
 import * as THREE from 'three';
 import { applyPartialStructure, frameOfWall, resolveCeilings, junctionLevel, resolveFloors, resolveRamps, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTop, type ResolvedLevel } from '@hestia/engine';
-import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
+import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Opening, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
 import { DARK, LIGHT } from '../plan/types.ts';
 import { projetoDaJuncao } from '../plan/viewContext.ts';
 import { OrbitCamera, cameraBasis } from './orbit.ts';
@@ -22,11 +22,11 @@ import { buildRampSolids } from './rampSolids.ts';
 import { RealcesDaCena } from './realceDaCena3d.ts';
 import { buildLevelSolidsComCaixas } from './paredesInstanciadas3d.ts';
 import { CaixasDoNivel } from './caixasDoNivel3d.ts';
-import { criarCaixaUnitaria } from './caixas3d.ts';
-import { buildCeilingSolids, buildFloorSolids, buildLevelSolids, buildRoofSolids, buildSlabSolids, type ElementRange, type SolidBatch } from './solids.ts';
+import { arestasDasCaixas, criarCaixaUnitaria } from './caixas3d.ts';
+import { buildCeilingSolids, buildFloorSolids, buildLevelSolids, buildRoofSolids, buildSlabSolids, filtrarParedesDoNivel, type ElementRange, type SolidBatch } from './solids.ts';
 import { Materiais3D } from './materiais3d.ts';
 import { CacheMalhas, bytesDeNivel, disposeNivel, type EntradaNivel, type PickSource } from './cacheMalhas3d.ts';
-import { chavesDeNivel } from './chaveNivel3d.ts';
+import { chavesDeNivel, hashTexto } from './chaveNivel3d.ts';
 import { caixaDaSelecao } from './selecao3d.ts';
 
 /** O mínimo do renderer que o gancho de quadro da cena lê (o three chama `scene.onBeforeRender` com o renderer real). */
@@ -34,6 +34,18 @@ export interface RendererDeQuadro {
   shadowMap: { autoUpdate: boolean; needsUpdate: boolean; enabled?: boolean };
   /** Tamanho da área de desenho em px CSS (o three fornece; sem ele a sombra fica no tamanho configurado). */
   getSize?(alvo: THREE.Vector2): THREE.Vector2;
+}
+
+/** Geometria do modelo em coordenadas de mundo, para a etapa "papel" da prancha (decisão 0040). */
+export interface VetoresDaCena {
+  /** Triângulos de face: 9 números por triângulo (x, y, z de cada vértice). */
+  trianglePositions: Float32Array;
+  /** Índices dos triângulos (3 por triângulo); hoje é a sequência 0,1,2…, mas o BVH usa a forma indexada. */
+  triangleIndices: Uint32Array;
+  /** Arestas: 6 números por segmento (dois pontos). */
+  edges: Float32Array;
+  /** Caixa do modelo (sem datum, chão ou grade). */
+  box: THREE.Box3;
 }
 
 /**
@@ -44,6 +56,10 @@ export interface Scene3DOptions {
   edges: boolean;
   shadows: boolean;
   dark: boolean;
+  /** Elementos ocultos na vista 3D (Hide in View + temporário). */
+  hidden?: ReadonlySet<Id>;
+  /** Elementos que o modo Reveal mostra com borda azul. */
+  revealed?: ReadonlySet<Id>;
 }
 
 /** Ângulo (graus) acima do qual uma aresta da malha é desenhada. */
@@ -57,6 +73,10 @@ const MARGEM_ENQUADRAMENTO_NIVEIS = 6;
 const BACKGROUND = { light: '#dfe7ee', dark: '#14171b' };
 /** Distância da luz em raios do modelo: |(0,7; −0,5; 1,1)|, a posição do sol antes da vista 3D configurável. */
 const SUN_DISTANCE = Math.hypot(0.7, 0.5, 1.1);
+/** Cor das bordas do modo Reveal (elementos ocultos reexibidos como contorno, sem preenchimento). */
+const REVEAL_COLOR = 0x2563eb;
+/** Conjunto de visibilidade vazio (o caso padrão: nada oculto nem revelado). */
+const NADA: ReadonlySet<Id> = new Set();
 
 /** Direção unitária do sol, de alvo para luz: azimute em graus (0 = leste, anti-horário) e elevação acima do horizonte. */
 export function sunDirection(azimuth: number, elevation: number): THREE.Vector3 {
@@ -67,6 +87,25 @@ export function sunDirection(azimuth: number, elevation: number): THREE.Vector3 
 
 /** Estilos de linhas: sempre mostram as arestas, com ou sem faces. */
 const isLineStyle = (s: VisualStyle): boolean => s === 'hiddenLine' || s === 'wireframe';
+
+/**
+ * Projeto com os elementos aceitos. Só os construtores que leem `p.elements` por conta própria (genéricos e CAD) o
+ * precisam: os demais recebem as listas resolvidas já filtradas por id (ver `montarNivel`).
+ */
+function projetoComElementos(p: Project, incluir: (id: Id) => boolean): Project {
+  const elements: Project['elements'] = {};
+  for (const [id, e] of Object.entries(p.elements)) if (incluir(id)) elements[id] = e;
+  return { ...p, elements };
+}
+
+/**
+ * Marca do conjunto de visibilidade para a chave do nível. Ocultar/revelar muda a malha (ou a sobreposição) montada,
+ * então a chave tem de mudar junto: sem isso o cache devolveria o nível do conjunto anterior. O hash mantém a marca curta
+ * mesmo no isolamento (que esconde milhares de ids).
+ */
+function assinaturaDeVisibilidade(ids: ReadonlySet<Id>): string {
+  return ids.size ? hashTexto([...ids].sort().join('\u0001')) : '-';
+}
 
 /** Estado de uma atualização: a vista 3D, o tema e as arestas e sombras efetivas desta vista. */
 interface Frame3D {
@@ -115,6 +154,13 @@ export class ModelScene {
   readonly sombraMaxTriangulos: number;
   /** Projeto da atualização corrente (o gestor resolve os materiais por id). */
   private projeto: Project | null = null;
+  /** Elementos ocultos (Hide in View + temporário) e revelados (Reveal) da atualização corrente. */
+  private ocultos: ReadonlySet<Id> = NADA;
+  private revelados: ReadonlySet<Id> = NADA;
+  /** Projeto sem os elementos ocultos: genéricos e CAD não têm construtor por id (ver `montarNivel`). */
+  private semOcultos: Project | null = null;
+  /** Projeto só com os elementos revelados: os genéricos do Reveal saem daqui (idem). */
+  private soRevelados: Project | null = null;
   /** Materiais por chave (ver `Materiais3D`). */
   private mats = new Materiais3D();
   /** Níveis que a cena mostra agora, e o cache de malhas por nível (ver `update`). */
@@ -271,7 +317,22 @@ export class ModelScene {
     this.sombra.marcar();
     // O realce guarda cópias dos triângulos: com o modelo refeito, refaz-se (a seleção e o cursor são lidos de novo).
     this.realces.soltarTodos();
-    const chaves = chavesDeNivel(p, JSON.stringify([opt.dark, this.frame.edges, this.frame.shadows, view.style]));
+    // Hide in View/Reveal: guardados para `montarNivel` (o filtro por id acontece antes dos builders) e na chave do nível.
+    this.ocultos = opt.hidden ?? NADA;
+    this.revelados = opt.revealed ?? NADA;
+    this.semOcultos = this.ocultos.size ? projetoComElementos(p, (id) => !this.ocultos.has(id)) : p;
+    this.soRevelados = this.revelados.size ? projetoComElementos(p, (id) => this.revelados.has(id) && !this.ocultos.has(id)) : p;
+    const chaves = chavesDeNivel(
+      p,
+      JSON.stringify([
+        opt.dark,
+        this.frame.edges,
+        this.frame.shadows,
+        view.style,
+        assinaturaDeVisibilidade(this.ocultos),
+        assinaturaDeVisibilidade(this.revelados),
+      ]),
+    );
     const antes = this.cenaNiveis;
     const atuais: EntradaNivel[] = [];
     const sobras: EntradaNivel[] = [];
@@ -368,6 +429,90 @@ export class ModelScene {
     }
     // Materiais que esta atualização não usou (outro estilo, outra substituição) saem da memória.
     this.mats.descartarNaoUsados();
+  }
+
+  /** Projeto da última atualização (null antes da primeira). A prancha confere se a cena viva é a do projeto. */
+  projetoDaCena(): Project | null {
+    return this.projeto;
+  }
+
+  /** Quantos níveis a cena tem montados agora (a montagem progressiva começa com menos que o projeto). */
+  niveisNaCena(): number {
+    return this.cenaNiveis.length;
+  }
+
+  /**
+   * Geometria do modelo em coordenadas de mundo, para a etapa "papel" da prancha (decisão 0040). Lê `this.model`, o
+   * mesmo grupo que a GPU desenha: as malhas viram triângulos e as `LineSegments` viram as arestas que a vista 3D mostra.
+   * Ficam de fora o datum dos níveis, o chão, a grade, a camada de picking e os realces, que não são o modelo.
+   * Nada é recalculado: a montagem é a mesma de `update`.
+   */
+  exportarVetores(): VetoresDaCena {
+    this.model.updateMatrixWorld(true);
+    const tri: number[] = [];
+    const arestas: number[] = [];
+    const box = new THREE.Box3();
+    const v = new THREE.Vector3();
+    const ponto = (m: THREE.Matrix4, x: number, y: number, z: number): void => {
+      v.set(x, y, z).applyMatrix4(m);
+      box.expandByPoint(v);
+    };
+    this.model.traverse((o) => {
+      if (!this.visivelNaCena(o)) return;
+      if (o instanceof THREE.LineSegments) {
+        // Arestas: pares de pontos (cada dois formam um segmento), já no mundo pela matriz do objeto.
+        const pos = o.geometry.getAttribute('position');
+        if (!pos) return;
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+          arestas.push(v.x, v.y, v.z);
+          box.expandByPoint(v);
+        }
+        return;
+      }
+      if (!(o instanceof THREE.Mesh)) return;
+      const pos = o.geometry.getAttribute('position');
+      if (!pos || pos.count === 0) return;
+      const indice = o.geometry.index;
+      const matrizes: THREE.Matrix4[] = [];
+      if (o instanceof THREE.InstancedMesh) {
+        // Instanciada: a matriz do objeto compõe com a de cada instância (paredes e esquadrias em caixas).
+        const m = new THREE.Matrix4();
+        for (let i = 0; i < o.count; i++) {
+          o.getMatrixAt(i, m);
+          matrizes.push(new THREE.Matrix4().multiplyMatrices(o.matrixWorld, m));
+        }
+      } else {
+        matrizes.push(o.matrixWorld);
+      }
+      const contar = indice ? indice.count : pos.count;
+      for (const m of matrizes) {
+        for (let i = 0; i + 2 < contar; i += 3) {
+          for (let k = 0; k < 3; k++) {
+            const n = indice ? indice.getX(i + k) : i + k;
+            ponto(m, pos.getX(n), pos.getY(n), pos.getZ(n));
+            v.fromBufferAttribute(pos, n).applyMatrix4(m);
+            tri.push(v.x, v.y, v.z);
+          }
+        }
+      }
+    });
+    const triangleIndices = new Uint32Array(tri.length / 3);
+    for (let i = 0; i < triangleIndices.length; i++) triangleIndices[i] = i;
+    return {
+      trianglePositions: Float32Array.from(tri),
+      triangleIndices,
+      edges: Float32Array.from(arestas),
+      box,
+    };
+  }
+
+  /** O objeto e todos os seus ancestrais até o modelo estão visíveis? (o que a GPU desenharia) */
+  private visivelNaCena(o: THREE.Object3D): boolean {
+    for (let atual: THREE.Object3D | null = o; atual && atual !== this.model; atual = atual.parent) {
+      if (!atual.visible) return false;
+    }
+    return true;
   }
 
   /**
@@ -507,10 +652,18 @@ export class ModelScene {
     this.picks = picks;
     this.mats.noNivel = mats;
     // Exibição parcial (decisão 0015 §2.5): as camadas de parede são filtradas antes dos sólidos e das aberturas.
-    const lv = applyPartialStructure(p, lv0, view.partialStructure);
+    const lvBase = applyPartialStructure(p, lv0, view.partialStructure);
+    // Hide in View: a parede oculta sai antes dos sólidos e das aberturas (a chave do nível já muda com o conjunto). Pisos,
+    // lajes, forros, telhados, escadas, rampas e genéricos são filtrados por id nas listas resolvidas logo abaixo.
+    const lv = filtrarParedesDoNivel(lvBase, (id) => !this.ocultos.has(id));
+    const oculto = (id: Id): boolean => this.ocultos.has(id);
+    // Revelado e oculto ao mesmo tempo: o oculto vence (o resolvedor de visibilidade não produz os dois).
+    const revelado = (id: Id): boolean => this.revelados.has(id) && !this.ocultos.has(id);
+    // Projetos com `elements` filtrado, só para os construtores que varrem o projeto (genéricos e CAD).
+    const pGen = this.semOcultos ?? p;
     // Pisos, lajes e telhados do nível: uma malha por material, com os furos e as inclinações (D2); o beiral (C5) à parte.
     // Categoria oculta: não gera as malhas dela (decisão 0015 §2.4).
-    const roofs = shown('roof') ? resolveRoofs(p, lv.levelId) : [];
+    const roofs = shown('roof') ? resolveRoofs(p, lv.levelId).filter((r) => !oculto(r.roofId)) : [];
     const eave = buildEaveSolids(p, roofs);
     // Junção do nível sobre o projeto reduzido (a mesma redução da planta, `projetoDaJuncao`): o resultado é o do projeto inteiro.
     const juncao = junctionLevel(this.reduzirJuncao ? projetoDaJuncao(p, lv.levelId) : p, lv.levelId);
@@ -523,17 +676,57 @@ export class ModelScene {
     const paredes = !shown('wall') ? { batches: [], caixas: [], arestas: [] } : caixas ? buildLevelSolidsComCaixas(lv, juncao, this.frame.edges) : { batches: buildLevelSolids(lv, juncao).batches, caixas: [], arestas: [] };
     for (const c of paredes.caixas) caixas?.adicionar('wall', c.materialId, c.wallId, c.matriz, false);
     caixas?.adicionarArestas(paredes.arestas);
+    const floors = shown('floor') ? resolveFloors(p, lv.levelId).filter((f) => !oculto(f.floorId)) : [];
+    const ceilings = shown('floor') ? resolveCeilings(p, lv.levelId).filter((c) => !oculto(c.ceilingId)) : [];
+    const slabs = shown('slab') ? resolveSlabs(p, lv.levelId).filter((s) => !oculto(s.slabId)) : [];
+    const escadasNivel = shown('stair') ? escadas.filter((s) => s.levelId === lv.levelId && !oculto(s.id)) : [];
+    const rampasNivel = shown('stair') ? rampas.filter((r) => r.levelId === lv.levelId && !oculto(r.id)) : [];
+    const genericos = shown('generic') ? buildGenericSolids(pGen, lv.levelId) : [];
     const batches: SolidBatch[] = [
       ...paredes.batches,
-      ...(shown('floor') ? buildFloorSolids(resolveFloors(p, lv.levelId), juncao) : []),
-      ...(shown('floor') ? buildCeilingSolids(resolveCeilings(p, lv.levelId)) : []),
-      ...(shown('slab') ? buildSlabSolids(resolveSlabs(p, lv.levelId), juncao) : []),
+      ...buildFloorSolids(floors, juncao),
+      ...buildCeilingSolids(ceilings),
+      ...buildSlabSolids(slabs, juncao),
       ...buildRoofSolids(roofs),
       ...eave.batches,
-      ...(shown('stair') ? buildStairSolids(escadas.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTop(p, s).top) : []),
-      ...(shown('stair') ? buildRampSolids(rampas.filter((r) => r.levelId === lv.levelId)) : []),
-      ...(shown('generic') ? buildGenericSolids(p, lv.levelId) : []),
+      ...buildStairSolids(escadasNivel, (s) => stairArrivalTop(p, s).top),
+      ...buildRampSolids(rampasNivel),
+      ...genericos,
     ];
+    // Reveal: o modelo normal continua desenhado; os elementos revelados ganham só as arestas azuis (sem preenchimento).
+    // As paredes em caixas usam as arestas da união das caixas; o resto usa as arestas dos sólidos, no mesmo ângulo.
+    const bordas: number[] = [];
+    const arestasDe = (lotes: readonly SolidBatch[]): void => {
+      const g = arestasDosLotes(lotes, EDGE_ANGLE);
+      if (!g) return;
+      for (const x of g.getAttribute('position').array) bordas.push(x);
+      g.dispose();
+    };
+    if (this.revelados.size) {
+      // Paredes reveladas: o mesmo construtor das caixas, com as arestas da união (sem as juntas entre peças da camada).
+      const revParedes = Object.values(lv.walls).filter((w) => revelado(w.wallId));
+      if (shown('wall') && revParedes.length) {
+        const pr = buildLevelSolidsComCaixas(filtrarParedesDoNivel(lv, revelado), juncao, true);
+        bordas.push(...pr.arestas);
+        arestasDe(pr.batches);
+      }
+      const revPisos = floors.filter((f) => revelado(f.floorId));
+      if (revPisos.length) arestasDe(buildFloorSolids(revPisos, juncao));
+      const revForros = ceilings.filter((c) => revelado(c.ceilingId));
+      if (revForros.length) arestasDe(buildCeilingSolids(revForros));
+      const revLajes = slabs.filter((s) => revelado(s.slabId));
+      if (revLajes.length) arestasDe(buildSlabSolids(revLajes, juncao));
+      const revTelhados = roofs.filter((r) => revelado(r.roofId));
+      if (revTelhados.length) {
+        arestasDe(buildRoofSolids(revTelhados));
+        arestasDe(buildEaveSolids(p, revTelhados).batches);
+      }
+      const revEscadas = escadasNivel.filter((s) => revelado(s.id));
+      if (revEscadas.length) arestasDe(buildStairSolids(revEscadas, (s) => stairArrivalTop(p, s).top));
+      const revRampas = rampasNivel.filter((r) => revelado(r.id));
+      if (revRampas.length) arestasDe(buildRampSolids(revRampas));
+      if (shown('generic')) arestasDe(buildGenericSolids(this.soRevelados ?? p, lv.levelId));
+    }
     const materialOf = (id: Id): Material | undefined => p.materials[id] ?? eave.materials[id];
     // Caminho de referência (`instanciar: false`): cada nível tem as suas malhas. Caminho padrão: os sólidos vão para os
     // lotes globais por categoria/material (o gestor de GPU os junta e atualiza por faixa).
@@ -550,16 +743,23 @@ export class ModelScene {
     // Esquadrias: cada uma tem o seu grupo (no vão); as peças fixas são juntadas por material dentro dele, e a folha aberta
     // fica no pivô da dobradiça.
     for (const w of wallsOnLevel(p, lv.levelId)) {
+      // Parede oculta: as aberturas dela também não entram (nem no modelo, nem no picking, nem no Reveal).
+      if (oculto(w.id)) continue;
       const f = frameOfWall(p, w.id);
       if (!f) continue;
       for (const o of openingsOfWall(p, w.id)) {
+        if (oculto(o.id)) continue;
         // Base e altura resolvidas (paredes anexadas a pisos mudam de cota); sem resolução, as do modelo.
         const rw = lv.walls[w.id];
+        const baseZ = rw?.baseZ ?? wallBaseElevation(p, w);
+        const altura = rw?.height ?? wallHeight(p, w);
         const linhas = isLineStyle(view.style);
+        // Reveal da esquadria: o mesmo contorno azul, das caixas/prismas da montagem (sem preenchimento).
+        if (revelado(o.id)) this.bordasDaAbertura(p, o, f, baseZ, altura, view, bordas);
         if (caixas) {
           // Esquadria em caixas instanciadas: as peças em caixa viram instâncias; as peças com seção (batente em L)
           // viram prismas nos lotes de geometria. As arestas do alizar saem da silhueta do grupo, sem as juntas internas.
-          const a = caixasEPrismasDaAbertura(p, o, f, rw?.baseZ ?? wallBaseElevation(p, w), rw?.height ?? wallHeight(p, w), view);
+          const a = caixasEPrismasDaAbertura(p, o, f, baseZ, altura, view);
           if (!a) continue;
           const grupos = new Map<string, number[]>();
           for (const c of a.caixas) {
@@ -579,7 +779,7 @@ export class ModelScene {
           for (const matrizes of grupos.values()) caixas.adicionarArestas(arestasDaSilhuetaDeCaixas(matrizes));
           continue;
         }
-        const m = montarAbertura(p, o, f, rw?.baseZ ?? wallBaseElevation(p, w), rw?.height ?? wallHeight(p, w), view, linhas, (parent, geo, mat, cat, edges, ranges) => this.draw(parent, geo, mat, cat, edges, ranges));
+        const m = montarAbertura(p, o, f, baseZ, altura, view, linhas, (parent, geo, mat, cat, edges, ranges) => this.draw(parent, geo, mat, cat, edges, ranges));
         if (!m) continue;
         this.desenharLotes(m.grupo, m.lotes, linhas, materialOf, m.arestasGrupos);
         m.grupo.traverse((c) => {
@@ -592,8 +792,21 @@ export class ModelScene {
     // nível mais o deslocamento do desenho. São linhas: não entram nas sombras nem nas arestas dos sólidos.
     if (shown('generic')) {
       const cota = p.levels.find((l) => l.id === lv0.levelId)?.elevation ?? 0;
-      const cad = buildCadLines(p, lv0.levelId, cota);
+      const cad = buildCadLines(pGen, lv0.levelId, cota);
       if (cad) grupo.add(cad);
+    }
+    // Contorno azul do Reveal: uma linha só por nível, no grupo (o cache e o `dispose` a levam junto). `renderOrder` alto
+    // para as arestas vencerem as faces coplanares na ordenação; sem preenchimento, o modelo normal continua visível.
+    if (bordas.length) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(bordas, 3));
+      const linhasReveladas = new THREE.LineSegments(
+        geo,
+        this.mats.cached(`reveal|${REVEAL_COLOR}`, () => new THREE.LineBasicMaterial({ color: REVEAL_COLOR, depthWrite: false })),
+      );
+      linhasReveladas.renderOrder = 8;
+      linhasReveladas.userData = { reveal: true };
+      grupo.add(linhasReveladas);
     }
     // Malhas de picking (invisíveis) e arestas das caixas: no grupo do nível, para o cache, o picking e o realce as acharem.
     const montadas = caixas?.montar(grupo, this.mats.cached('pick', () => new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })));
@@ -632,6 +845,30 @@ export class ModelScene {
       ...(montadas ? { instancias: montadas.colecoes, arestasCaixas: montadas.arestas } : {}),
       ...(this.instanciar ? { lotes, materiais: eave.materials, ...(arestasSolidas ? { arestasSolidas } : {}), ...(arestas ? { arestas } : {}) } : {}),
     };
+  }
+
+  /**
+   * Arestas azuis de uma esquadria revelada (Reveal): as caixas e os prismas da mesma montagem normal, só o contorno.
+   * A geometria dos prismas é desta chamada (as caixas vão por matriz) e é liberada aqui.
+   */
+  private bordasDaAbertura(
+    p: Project,
+    o: Opening,
+    f: NonNullable<ReturnType<typeof frameOfWall>>,
+    baseZ: number,
+    altura: number,
+    view: View3DSettings,
+    saida: number[],
+  ): void {
+    const a = caixasEPrismasDaAbertura(p, o, f, baseZ, altura, view);
+    if (!a) return;
+    for (const c of a.caixas) arestasDasCaixas(c.matriz, saida);
+    for (const pr of a.prismas) {
+      const g = new THREE.EdgesGeometry(pr.geometry, EDGE_ANGLE);
+      for (const x of g.getAttribute('position').array) saida.push(x);
+      g.dispose();
+      pr.geometry.dispose();
+    }
   }
 
   /**
@@ -688,6 +925,10 @@ export class ModelScene {
     this.liberarNiveis();
     this.niveisAssinatura = null;
     this.faixasDeSombra = [];
+    this.ocultos = NADA;
+    this.revelados = NADA;
+    this.semOcultos = null;
+    this.soRevelados = null;
     this.lotes.dispose();
     this.caixaUnitaria.dispose();
     this.realces.soltarTodos();

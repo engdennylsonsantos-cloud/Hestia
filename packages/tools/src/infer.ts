@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- o motor reúne paredes, faces, grades, capturas extras e CAD numa passada só; dividir perderia o ranking único */
 import {
   arcFromSagitta,
   arcLocal,
@@ -19,6 +20,7 @@ import { frameOfWall, wallFacesCached as facesOf, type WallFaces } from '@hestia
 import { openingTypeById, openingsOfWall, totalThickness, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
 import { closestOnWall, wallMid } from './wallGeom.ts';
 import { addGridSnaps } from './gridSnapPoints.ts';
+import { addCadSnaps, type CadSnapIndex } from './snapCad.ts';
 import { addExtraPoints, addExtraSegments, addExtraTracks } from './snapExtras.ts';
 import { orthoPoint, polarPoint } from './angleSnap.ts';
 import { DEFAULT_SNAP, type Guide, type Inference, type SnapKind, type SnapOptions } from './types.ts';
@@ -58,6 +60,8 @@ export interface InferContext {
   underlayLevelId?: Id | null;
   /** Filtro de visibilidade: paredes ocultas ou fora do recorte da vista não são alvo. Ausente = todas. */
   isVisible?: (w: Wall) => boolean;
+  /** Desenhos CAD importados indexados: vértices, meios, pontos e cruzamentos das linhas servem de referência. */
+  cad?: readonly CadSnapIndex[];
 }
 
 const TOL_PX = 10;
@@ -258,6 +262,8 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   if (!ctx.onWallsOnly) addExtraSegments(ctx, sn, cursor, tol, add);
   // Grades de eixos (do projeto): pontas, cruzamentos com grades e paredes e o ponto sobre a linha.
   if (!ctx.onWallsOnly) addGridSnaps(ctx.project, sn, cursor, tol, walls, ctx.ignore, add);
+  // Linhas e vértices dos desenhos CAD importados (DXF) servem de referência, como as paredes.
+  if (!ctx.onWallsOnly) addCadSnaps(ctx.cad, sn, cursor, tol, ctx.from, add, ctx.ignore);
   // Faces: cantos, pontos médios, arestas e pé da perpendicular nas faces de acabamento e (opcional) do núcleo.
   const addSegs = (segs: Array<[Vec2, Vec2]>, kind: 'face' | 'core', hostId?: Id): void => {
     for (const [a, b] of segs) {

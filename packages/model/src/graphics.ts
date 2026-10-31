@@ -22,6 +22,28 @@ export const GRAPHICS_CATEGORY_LABELS: Record<GraphicsCategory, string> = {
   generic: 'objeto importado',
 };
 
+/**
+ * Ocultação permanente de uma vista (Revit: Hide in View). Guarda elementos e categorias ocultos só naquela vista;
+ * o temporário e o modo Reveal ficam no estado de interface, não no projeto.
+ */
+export interface ViewHidden {
+  elements?: Id[];
+  categories?: GraphicsCategory[];
+}
+
+/** Problemas de um `ViewHidden` (comandos e validação), em pt-BR. */
+export function viewHiddenIssues(h: ViewHidden | undefined): string[] {
+  if (h === undefined) return [];
+  const out: string[] = [];
+  if (h.elements !== undefined && (!Array.isArray(h.elements) || h.elements.some((id) => typeof id !== 'string' || id === ''))) {
+    out.push('Os elementos ocultos devem ser uma lista de ids válidos.');
+  }
+  if (h.categories !== undefined && (!Array.isArray(h.categories) || h.categories.some((c) => !GRAPHICS_CATEGORIES.includes(c)))) {
+    out.push('As categorias ocultas devem ser categorias gráficas válidas.');
+  }
+  return out;
+}
+
 /** Estilo visual (Revit: Visual Styles). Planta aceita wireframe, hiddenLine e shaded; o 3D aceita todos. */
 export type VisualStyle = 'wireframe' | 'hiddenLine' | 'shaded' | 'consistentColors' | 'realistic';
 export const PLAN_VISUAL_STYLES: readonly VisualStyle[] = ['wireframe', 'hiddenLine', 'shaded'];
@@ -101,6 +123,8 @@ export interface View3DSettings {
   openOpenings?: boolean;
   /** Mostra as linhas de nível (nome e cota) no 3D. Ausente = ligado. */
   showLevels?: boolean;
+  /** Elementos e categorias ocultos permanentemente nesta vista 3D (Hide in View). */
+  hidden?: ViewHidden;
 }
 
 /** Tabela do template padrão do Revit (mm de papel, 1:50 | 1:100 | 1:200). Fonte: docs/visualizacao/C-relatorio-pesquisa.md (c) [SECUNDÁRIO]. */
@@ -310,6 +334,7 @@ function view3dIssues(g: View3DSettings): string[] {
   if (g.background !== null && !isHex(g.background)) out.push('A cor de fundo deve estar no formato #rrggbb, ou ser null para o padrão do tema.');
   if (g.openOpenings !== undefined && typeof g.openOpenings !== 'boolean') out.push('Abrir vãos no 3D deve ser sim ou não.');
   if (g.showLevels !== undefined && typeof g.showLevels !== 'boolean') out.push('Mostrar níveis de referência no 3D deve ser sim ou não.');
+  out.push(...viewHiddenIssues(g.hidden));
   return out;
 }
 

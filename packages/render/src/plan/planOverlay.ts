@@ -1,19 +1,20 @@
 import { orientedRect, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { frameOfWall, openingGeometry, wallEndCorners, type ResolvedLevel } from '@hestia/engine';
-import { isOpening, isWall, type Id, type Project } from '@hestia/model';
+import { frameOfWall, openingGeometry, resolveAngularDimension, resolveCeilings, wallEndCorners, type ResolvedLevel } from '@hestia/engine';
+import { angularDimensionGeometry, dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, isCad, isGeneric, isOpening, isWall, levelRoomSeparators, unitsOf, type Id, type Project } from '@hestia/model';
 import { floorSelectionOps } from './floors.ts';
 import { ALCA_PX, quadradoEm } from './marcadores.ts';
 import { slabSelectionOps } from './slabs.ts';
 import { roomSelectionOps } from './rooms.ts';
 import { ceilingSelectionOps } from './ceilings.ts';
-import { roofSelectionOps } from './roofs.ts';
-import { stairSelectionOps } from './stairs.ts';
-import { rampSelectionOps } from './ramps.ts';
+import { roofFootprint, roofSelectionOps } from './roofs.ts';
+import { planFootprint, stairSelectionOps } from './stairs.ts';
+import { rampFootprint, rampSelectionOps } from './ramps.ts';
 import { guideStrokes, previewOverlay, snapMarker, snapTooltipLabel } from './overlay.ts';
 import { hiddenSelectionOps, planViewOf, type PlanView } from './view.ts';
-import { planContext } from './planContext.ts';
+import { planContext, type PlanContext } from './planContext.ts';
+import { ambientesDoNivel, lajesDoNivel, pisosDoNivel, telhadosDoNivel } from './resolucao.ts';
 import { labelGhostOps } from './areaPlan.ts';
-import { annotationHighlightOps, drawnAnnotations } from './notes.ts';
+import { annotationHighlightOps, blocoEm, drawnAnnotations, textBlockModel } from './notes.ts';
 import type { PlanInput } from './build.ts';
 import type { FillOp, PlanOps } from './types.ts';
 
@@ -34,14 +35,111 @@ function elementHighlight(p: Project, geo: ResolvedLevel, ids: Id[], color: stri
   for (const id of ids) {
     if (view?.hidden.has(id)) continue;
     const e = p.elements[id];
-    if (isWall(e)) out.push({ polygons: wallUnion(geo, id, view?.outlineWalls.has(id) === true), color, alpha });
-    else if (isOpening(e)) {
+    if (isWall(e)) {
+      // Parede fora da geometria (oculta ou fora do intervalo): nada a destacar.
+      const m = wallUnion(geo, id, view?.outlineWalls.has(id) === true);
+      if (m.length > 0) out.push({ polygons: m, color, alpha });
+    } else if (isOpening(e)) {
       const f = frameOfWall(p, e.hostId);
       if (!f) continue;
       const g = openingGeometry(p, e, f);
       out.push({ polygons: [[orientedRect(g.center.x, g.center.y, g.u.x, g.u.y, g.width / 2, g.thickness / 2 + 0.02)]], color, alpha });
     }
   }
+  return out;
+}
+
+/** Azul do contorno do modo Reveal: o elemento oculto volta ao desenho normal e ganha esta borda. */
+const REVEAL = '#2563eb';
+/** Folga da caixa do Reveal em volta do texto de uma anotação, em mm de papel. */
+const REVEAL_FOLGA_MM = 0.8;
+
+/**
+ * Contorno azul dos elementos revelados (modo Reveal): o desenho normal continua sendo o da geometria; aqui só entra a
+ * borda de 2 px, por cima. O que o intervalo de vista ou a categoria escondem continua fora (`hidden`), mesmo que o id
+ * esteja em `revealed`: o Reveal é do Hide in View, não do intervalo.
+ */
+function revealedOutlineOps(input: PlanInput, ctx: PlanContext): PlanOps {
+  const revealed = input.revealed;
+  if (!revealed || revealed.size === 0) return vazio();
+  const { project: p, levelId } = input;
+  const { geo, hidden, stairs, ramps, view, style } = ctx;
+  const ids = [...revealed].filter((id) => !hidden?.has(id));
+  if (ids.length === 0) return vazio();
+  const out = vazio();
+  const contorno = (m: MultiPolygon): void => {
+    for (const ring of m.flat()) out.strokes.push({ pts: ring, closed: true, widthPx: 2, color: REVEAL, alpha: 1 });
+  };
+  // Pegadas de piso, laje, forro, telhado, escada, rampa e ambiente: a mesma forma que a seleção e o fantasma usam.
+  const pegadas = new Map<Id, MultiPolygon>();
+  for (const f of pisosDoNivel(p, levelId)) pegadas.set(f.floorId, f.polygon);
+  for (const s of lajesDoNivel(p, levelId)) pegadas.set(s.slabId, s.polygon);
+  for (const c of resolveCeilings(p, levelId)) pegadas.set(c.ceilingId, c.polygon);
+  for (const t of telhadosDoNivel(p, levelId)) pegadas.set(t.roofId, roofFootprint(t));
+  for (const s of stairs) pegadas.set(s.id, planFootprint(s));
+  for (const r of ramps) pegadas.set(r.id, rampFootprint(r));
+  for (const r of ambientesDoNivel(p, levelId)) if (r.polygon) pegadas.set(r.roomId, [r.polygon]);
+  for (const id of ids) {
+    const e = p.elements[id];
+    if (!e) continue;
+    if (isWall(e)) {
+      contorno(wallUnion(geo, id, view?.outlineWalls.has(id) === true));
+      continue;
+    }
+    if (isOpening(e)) {
+      // Abertura de parede oculta não volta sozinha: o vão não tem mais hospedeiro desenhado.
+      if (hidden?.has(e.hostId)) continue;
+      const f = frameOfWall(p, e.hostId);
+      if (!f) continue;
+      const g = openingGeometry(p, e, f);
+      out.strokes.push({ pts: orientedRect(g.center.x, g.center.y, g.u.x, g.u.y, g.width / 2, g.thickness / 2 + 0.02), closed: true, widthPx: 2, color: REVEAL, alpha: 1 });
+      continue;
+    }
+    const m = pegadas.get(id);
+    if (m) {
+      contorno(m);
+      continue;
+    }
+    if (isGeneric(e) && e.outline?.length) {
+      out.strokes.push({ pts: e.outline, closed: true, widthPx: 2, color: REVEAL, alpha: 1 });
+      continue;
+    }
+    if (isCad(e)) {
+      for (const path of e.paths) if (path.pts.length >= 2) out.strokes.push({ pts: path.pts, closed: path.closed, widthPx: 2, color: REVEAL, alpha: 1 });
+    }
+  }
+  // Anotações: caixa em volta do texto (texto, cota) e o próprio traço (linha/região de detalhe e separador de ambiente).
+  const scale = input.areaPlan && input.areaPlan.scale > 0 ? input.areaPlan.scale : style.scale;
+  const mPerMm = scale / 1000;
+  const annotations = drawnAnnotations(p, levelId, input.areaPlan);
+  const sel = new Set(ids);
+  const caixa = (at: Vec2, w: number, h: number, rotation: number): void => {
+    out.strokes.push({ pts: blocoEm(at, w, h, rotation, REVEAL_FOLGA_MM * mPerMm), closed: true, widthPx: 2, color: REVEAL, alpha: 1 });
+  };
+  for (const t of annotations.texts) {
+    if (!sel.has(t.id)) continue;
+    const b = textBlockModel(t, scale);
+    caixa(t.at, b.w, b.h, t.rotation);
+  }
+  for (const d of annotations.dimensions) {
+    if (!sel.has(d.id)) continue;
+    const textMm = d.textHeight ?? DIM_TEXT_MM;
+    if (d.angular) {
+      const rd = resolveAngularDimension(p, levelId, d);
+      const g = angularDimensionGeometry(rd);
+      if (!g) continue;
+      const b = textBlockModel({ text: dimensionText(p, rd, unitsOf(p)), height: textMm }, scale);
+      caixa(g.textAt, b.w, b.h, g.textRotation);
+      continue;
+    }
+    const { a, b } = dimensionPoints(p, d);
+    const g = dimensionGeometry(a, b, d.offset, mPerMm, textMm, d.textAt);
+    const bloco = textBlockModel({ text: dimensionText(p, d, unitsOf(p)), height: textMm }, scale);
+    caixa(g.textAt, bloco.w, bloco.h, g.textRotation);
+  }
+  for (const l of annotations.detailLines) if (sel.has(l.id)) out.strokes.push({ pts: [l.a, l.b], closed: false, widthPx: 2, color: REVEAL, alpha: 1 });
+  for (const r of annotations.detailRegions) if (sel.has(r.id)) out.strokes.push({ pts: r.boundary, closed: true, widthPx: 2, color: REVEAL, alpha: 1 });
+  for (const s of levelRoomSeparators(p, levelId)) if (sel.has(s.id)) out.strokes.push({ pts: [s.a, s.b], closed: false, widthPx: 2, color: REVEAL, alpha: 1 });
   return out;
 }
 
@@ -69,7 +167,8 @@ function comAnotacoes(out: PlanOps, input: PlanInput, escala: number, target: { 
  */
 export function buildPlanSelectionOverlay(input: PlanInput): PlanOps {
   const { project: p, theme } = input;
-  const { geo, hidden, up, roofHidden, stairs, view, style } = planContext(input);
+  const ctx = planContext(input);
+  const { geo, hidden, up, roofHidden, stairs, view, style } = ctx;
   const selection = input.selection;
   const out = vazio();
   const add = (o: PlanOps): void => {
@@ -107,6 +206,8 @@ export function buildPlanSelectionOverlay(input: PlanInput): PlanOps {
   }
   // Anotações (textos e cotas): caixa de seleção, alça do texto e realce leve do hover em camada própria.
   comAnotacoes(out, input, style.scale, { selection, hover: null });
+  // Modo Reveal: os ocultos voltam ao desenho (geometria) e ganham esta borda azul, uma vez só, na camada de seleção.
+  add(revealedOutlineOps(input, ctx));
   return out;
 }
 
@@ -168,7 +269,8 @@ export function buildPlanLiveOverlay(input: PlanInput): PlanOps {
  */
 export function buildPlanOverlay(input: PlanInput): PlanOps {
   const { project: p, theme, viewport: v } = input;
-  const { geo, hidden, up, roofHidden, stairs, ramps, view, style } = planContext(input);
+  const ctx = planContext(input);
+  const { geo, hidden, up, roofHidden, stairs, ramps, view, style } = ctx;
   const { selection, hover } = input;
   const out = vazio();
   const alcasDeModelo = input.areaPlan === undefined;
@@ -207,6 +309,9 @@ export function buildPlanOverlay(input: PlanInput): PlanOps {
 
   // Anotações (textos e cotas): caixa de seleção, alça do texto e realce leve do hover.
   comAnotacoes(out, input, style.scale, { selection, hover });
+
+  // Modo Reveal: os ocultos voltam ao desenho (geometria) e ganham esta borda azul, uma vez só, na sobreposição.
+  add(revealedOutlineOps(input, ctx));
 
   // Pré-visualização, guias e marcador de captura.
   add(previewOverlay(input.preview, theme, (ids) => elementHighlight(p, geo, ids, theme.accent, 0.2, view)));

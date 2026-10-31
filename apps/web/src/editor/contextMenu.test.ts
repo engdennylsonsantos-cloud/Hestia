@@ -13,6 +13,9 @@ const base: ContextMenuCtx = {
   propsOpen: true,
   browserOpen: false,
   lang: 'pt',
+  reveal: false,
+  singleCategory: null,
+  hasHidden: false,
 };
 
 /** Ids de primeiro nível, sem os separadores, para comparar a ordem. */
@@ -82,13 +85,22 @@ describe('planta com elemento selecionado', () => {
 
   it('ordem do Revit com seleção', () => {
     const m = buildContextMenu(sel);
-    expect(ids(m)).toEqual(['repeat', 'recentes', 'hide', 'override', 'createSimilar', 'selectAll', 'delete', 'locate', 'zoomRegion', 'zoomOut2x', 'zoomFit', 'panPrev', 'panNext', 'browser', 'properties']);
+    expect(ids(m)).toEqual(['repeat', 'recentes', 'hide', 'isolate', 'override', 'createSimilar', 'selectAll', 'delete', 'locate', 'zoomRegion', 'zoomOut2x', 'zoomFit', 'panPrev', 'panNext', 'browser', 'properties']);
   });
 
-  it('Ocultar na vista é submenu com Elementos, Categoria e Por filtro ainda não disponíveis', () => {
+  it('Ocultar na vista é submenu com Elementos, Categoria e Por filtro (só o filtro é futuro)', () => {
     const e = find(buildContextMenu(sel), 'hide');
     expect(e.children?.map((c) => c.label)).toEqual(['Elementos', 'Categoria', 'Por filtro']);
-    expect(e.children?.every((c) => c.soon && c.disabled)).toBe(true);
+    expect(e.children?.find((c) => c.id === 'hideElements')?.shortcut).toBe('EH');
+    expect(e.children?.find((c) => c.id === 'hideFilter')?.soon).toBe(true);
+  });
+
+  it('em Reveal, Ocultar vira Reexibir e aparece Reexibir tudo quando há ocultos', () => {
+    const m = buildContextMenu({ ...sel, reveal: true, hasHidden: true });
+    expect(m.find((x) => x.id === 'hide')).toBeUndefined();
+    const e = find(m, 'unhide');
+    expect(e.children?.map((c) => c.label)).toEqual(['Elementos', 'Categoria']);
+    expect(find(m, 'unhideAll').label).toBe('Reexibir tudo nesta vista');
   });
 
   it('Criar semelhante habilitado com um só tipo de elemento de ferramenta', () => {

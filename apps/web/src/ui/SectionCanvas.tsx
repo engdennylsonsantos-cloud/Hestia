@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import type { Id } from '@hestia/model';
 import { DARK, LIGHT, sectionFrame, type PlanDrawList, type Viewport } from '@hestia/render';
 import { editor, useProject } from '../editor/controller.ts';
 import { thinLinesOn } from '../editor/graphicsActions.ts';
@@ -16,7 +17,7 @@ import { Icon } from './Icon.tsx';
  * tamanho da vista não geram geometria nova. Com GPU, a lista volta como está (o shader aplica `papel`/`zoomMin` com o
  * zoom corrente); sem GPU, ela sai resolvida para o zoom do Canvas2D.
  */
-export function buildSectionFrame(v: Viewport, dark: boolean): PlanDrawList | null {
+export function buildSectionFrame(v: Viewport, dark: boolean, hidden?: ReadonlySet<Id>, revealed?: ReadonlySet<Id>): PlanDrawList | null {
   const st = useUi.getState();
   const section = editor.sectionOf(st.sectionId);
   if (!section || !st.sectionId) return null;
@@ -30,6 +31,8 @@ export function buildSectionFrame(v: Viewport, dark: boolean): PlanDrawList | nu
       theme: dark ? DARK : LIGHT,
       dark,
       showGrid: st.showGrid,
+      hidden,
+      revealed,
       highlight: { selection: st.selection, hover: st.hover },
       thinLines: thinLinesOn(editor.project, 'section'),
     },

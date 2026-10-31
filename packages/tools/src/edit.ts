@@ -1,7 +1,8 @@
 import { applyTransform, dist, dot, type Transform, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { isFloor, isOpening, isRamp, isRoof, isRoom, isSlab, isStair, isWall, newId, sectionLabelOf, sectionPoints, viewIdsIn, viewTransformCommands, type Command, type Id, type Project } from '@hestia/model';
+import { isCad, isFloor, isOpening, isRamp, isRoof, isRoom, isSlab, isStair, isWall, newId, sectionLabelOf, sectionPoints, viewIdsIn, viewTransformCommands, type Command, type Id, type Project } from '@hestia/model';
 import { followerCommands, planWallFollowers } from './wallFollow.ts';
+import { cadSnapIndexes } from './snapCad.ts';
 import { execWithHostedLoss } from './hostedGuard.ts';
 import { selectedStairs } from './stairPick.ts';
 import { ghostStairItems } from './stairPreview.ts';
@@ -16,8 +17,10 @@ import type { PreviewItem, ToolEnv } from './types.ts';
 /** Paredes dentro da seleção (aberturas selecionadas acompanham o anfitrião). */
 export const selectedWalls = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isWall(p.elements[id]));
 export const selectedOpenings = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isOpening(p.elements[id]));
-/** Paredes, pisos, lajes e telhados: o que o comando 'transform' move, gira, espelha e copia (aberturas seguem o anfitrião). */
-export const selectedMovables = (p: Project, ids: Id[]): Id[] => [...selectedWalls(p, ids), ...selectedFloors(p, ids), ...selectedSlabs(p, ids), ...selectedRoofs(p, ids), ...selectedStairs(p, ids), ...selectedRamps(p, ids), ...selectedRooms(p, ids)];
+/** Desenhos CAD importados dentro da seleção (movem como um objeto só). */
+export const selectedCads = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isCad(p.elements[id]));
+/** Paredes, pisos, lajes, telhados e CAD: o que o comando 'transform' move, gira, espelha e copia (aberturas seguem o anfitrião). */
+export const selectedMovables = (p: Project, ids: Id[]): Id[] => [...selectedWalls(p, ids), ...selectedFloors(p, ids), ...selectedSlabs(p, ids), ...selectedRoofs(p, ids), ...selectedStairs(p, ids), ...selectedRamps(p, ids), ...selectedRooms(p, ids), ...selectedCads(p, ids)];
 
 /** Vistas de corte/elevação dentro da seleção. Elas transformam junto com os elementos. */
 export const selectedViews = (p: Project, ids: Id[]): Id[] => viewIdsIn(p, ids);
@@ -57,6 +60,7 @@ export function makeIdMap(p: Project, ids: Id[]): Record<Id, Id> {
     else if (isStair(e)) map[id] = newId('st');
     else if (isRamp(e)) map[id] = newId('rp');
     else if (isRoom(e)) map[id] = newId('rm');
+    else if (isCad(e)) map[id] = newId('cad');
   }
   for (const e of Object.values(p.elements)) {
     if (isOpening(e) && ids.includes(e.hostId)) map[e.id] = newId(e.kind === 'door' ? 'd' : 'j');
@@ -78,7 +82,23 @@ export function ghostBands(p: Project, wallIds: Id[], t: Transform): PreviewItem
       continue;
     }
     const fl = p.elements[id];
-    // Ambiente: o contorno é derivado do circuito, então o fantasma é o ponto interior movido.
+    // Desenho CAD: o fantasma é a caixa do desenho (mover milhares de traços por quadro pesaria no cursor).
+    if (isCad(fl)) {
+      const ix = cadSnapIndexes(p, [fl.levelId]).find((x) => x.id === fl.id);
+      if (ix) {
+        out.push({
+          kind: 'polygon',
+          ring: [
+            applyTransform(t, { x: ix.minX, y: ix.minY }),
+            applyTransform(t, { x: ix.maxX, y: ix.minY }),
+            applyTransform(t, { x: ix.maxX, y: ix.maxY }),
+            applyTransform(t, { x: ix.minX, y: ix.maxY }),
+          ],
+          dashed: true,
+        });
+      }
+      continue;
+    }
     if (isRoom(fl)) {
       out.push({ kind: 'point', at: applyTransform(t, fl.point) });
       continue;

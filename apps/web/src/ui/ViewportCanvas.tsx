@@ -1,12 +1,14 @@
 /* eslint-disable max-lines -- a vista reúne planta, 3D, corte e o editor da cota; extrair depois. */
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import { DARK, LIGHT, ModelScene, PickGpu3d, PlanFrame, PlanScene, criarControladorGpu, drawPlanOnCanvas, pickDimension, pickElement, pickModelPoint, planFrameUpdateOf, reiniciarEstadoGpu, sameView, screenToWorld, type ControladorGpu, type GpuContext, type LabelOp, type PlanDrawList, type PreferenciaGpu, type Viewport } from '@hestia/render';
+import { DARK, LIGHT, ModelScene, PickGpu3d, PlanFrame, PlanScene, aplicarCameraNaOrbita, criarControladorGpu, definirProvedorVetores3D, drawPlanOnCanvas, pickDimension, pickElement, pickModelPoint, planFrameUpdateOf, reiniciarEstadoGpu, sameView, screenToWorld, type ControladorGpu, type GpuContext, type LabelOp, type PlanDrawList, type PreferenciaGpu, type Viewport } from '@hestia/render';
 import { view3dOf } from '@hestia/model';
 import { useShallow } from 'zustand/react/shallow';
 import { editor } from '../editor/controller.ts';
+import { visibilityOf } from '../editor/viewVisibility.ts';
 import { usePerimeter } from '../editor/perimeter.ts';
 import { hoverSectionAt, sectionPickAt } from '../editor/sectionPick.ts';
 import { clickSelect3d, useUi } from '../editor/state.ts';
+import { consumirCameraPendente, registrarOrbita3D } from '../editor/vista3dAoVivo.ts';
 import { thinLinesOn } from '../editor/graphicsActions.ts';
 import { buildSectionFrame } from './SectionCanvas.tsx';
 import { selecionarNivelNoClique } from './nivelPick3d.ts';
@@ -18,11 +20,28 @@ import { useDark } from './useDark.ts';
 import { criarMontagemVista3d, type Montagem3dProgressiva } from './montagem3dProgressiva.ts';
 import { QuadroPlanta } from './quadroPlanta.ts';
 import { medirQuadro, useContarCommitPerf, usePerfDaUrl } from '../debug/perf/index.ts';
-import { gestosComShift } from './planGestos.ts';
+import { eventosDeSolta, gestosComShift, passouDoLimiar } from './planGestos.ts';
+import { cliqueAdiadoInicial, decidirCliqueAdiado, type EstadoCliqueAdiado } from './cliqueAdiado.ts';
 
 interface Pt {
   x: number;
   y: number;
+}
+
+/** Modificadores capturados no evento: o `down` adiado (D1) sai depois, quando o evento original já não existe. */
+interface Mods {
+  shift: boolean;
+  ctrl: boolean;
+  alt: boolean;
+}
+
+/** Down guardado enquanto a vista não existe (ver `adiarDown`): ponto, modificadores e a solta que porventura chegue antes. */
+interface DownAdiado {
+  estado: EstadoCliqueAdiado;
+  ponto: Pt;
+  mods: Mods;
+  frame: number;
+  soltura: { ponto: Pt; mods: Mods } | null;
 }
 
 /** Rótulos vazios com referência fixa: a planta compara por identidade para não atualizar o estado à toa. */
@@ -42,6 +61,27 @@ export function ViewportCanvas(): ReactElement {
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) Object.assign(window, { __hestia3d: model.current.orbit, __hestia3dModel: model.current });
   const modelKey = useRef('');
   const montagem = useRef<Montagem3dProgressiva | null>(null);
+  // A prancha lê a câmera e a geometria da MESMA cena da aba 3D (decisão 0040): nada é remontado à parte quando a
+  // cena viva já está completa. Sem ela, a prancha monta uma instância própria (mesmo caminho, mesma geometria).
+  useEffect(() => {
+    const m = model.current;
+    registrarOrbita3D(m.orbit);
+    definirProvedorVetores3D((proj) => {
+      if (m.projetoDaCena() !== proj || m.niveisNaCena() !== proj.levels.length) return null;
+      // Hide/isolate/reveal temporários não vão para o projeto: a prancha mostraria outra coisa. Nesse caso, monta a
+      // cena própria (que só conhece a ocultação permanente da vista 3D).
+      if (visibilityOf(proj, useUi.getState()).temporary) return null;
+      const v3 = view3dOf(proj);
+      // No aramado a cena não tem malhas; sem arestas (estilo sombreado) não há o que desenhar em linha.
+      if (v3.style === 'wireframe') return null;
+      if (!v3.edges && v3.style !== 'hiddenLine') return null;
+      return m.exportarVetores();
+    });
+    return () => {
+      registrarOrbita3D(null);
+      definirProvedorVetores3D(null);
+    };
+  }, []);
   const [size, setSize] = useState({ w: 0, h: 0 });
   // Rótulos da planta e a vista deles: o estado só troca quando o conteúdo ou a vista muda (`publish`).
   const [labels, setLabels] = useState<LabelOp[]>(NO_LABELS);
@@ -144,6 +184,7 @@ export function ViewportCanvas(): ReactElement {
     dprRef.current = dpr;
     const g = gpuRef.current;
     const p = editor.project;
+    const vis = visibilityOf(p, st);
     const theme = dark ? DARK : LIGHT;
     if (st.view === '3d') {
       secDl.current = null;
@@ -174,7 +215,7 @@ export function ViewportCanvas(): ReactElement {
         montagem.current ??= criarMontagemVista3d(m, (id) => editor.resolved(id), (id) => editor.resolucaoPronta(id));
         // Gancho de depuração (`?debug=1`): o e2e de perf espera `montados` chegar ao total de níveis.
         if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) Object.assign(window, { __hestia3dMontagem: montagem.current });
-        montagem.current.atualizar(p, { edges: v3.edges, shadows: v3.shadows, dark }, st.levelId);
+        montagem.current.atualizar(p, { edges: v3.edges, shadows: v3.shadows, dark, hidden: vis.hidden, revealed: vis.revealed }, st.levelId);
         picker?.invalidar();
       }
       // O nível selecionado no datum (clique no 3D) é aplicado à cena a cada quadro; sem mudança, não refaz nada.
@@ -185,6 +226,9 @@ export function ViewportCanvas(): ReactElement {
       g.gpu.setSize(w, h, dpr);
       // Animação da câmera (ViewCube, Início): avança a cada quadro e pede o próximo enquanto anima.
       if (m.orbit.step(performance.now())) useUi.setState((x) => ({ previewTick: x.previewTick + 1 }));
+      // "Ir para o ponto de vista": aplica a câmera pedida no primeiro quadro depois de abrir a aba 3D.
+      const pendente = consumirCameraPendente();
+      if (pendente) aplicarCameraNaOrbita(m.orbit, pendente);
       m.orbit.setAspect(w, h);
       m.sombra.aplicar(g.gpu.renderer);
       safeRender(g, m.scene, m.orbit.camera);
@@ -199,7 +243,7 @@ export function ViewportCanvas(): ReactElement {
     // Vista de corte: a cena é refeita por inteiro (ver `PlanFrame`).
     if (st.view === 'section') {
       pf.reset(); quadroRef.current?.invalidar();
-      const dl: PlanDrawList = buildSectionFrame(v, dark) ?? { background: theme.bg, fills: [], strokes: [], labels: [] };
+      const dl: PlanDrawList = buildSectionFrame(v, dark, vis.hidden, vis.revealed) ?? { background: theme.bg, fills: [], strokes: [], labels: [] };
       // R4: a lista do corte é cacheada por projeto/vista/tema/seleção — pan e zoom não geram geometria nova. Só reenvia
       // quando a referência muda (o `SectionFrame` devolve a mesma lista nos quadros seguintes).
       if (g) { g.gpu.setSize(w, h, dpr); plan.current.setViewport(v); if (dl !== secDl.current) { plan.current.setDrawList(dl, v); secDl.current = dl; } safeRender(g, plan.current.scene, plan.current.camera); }
@@ -214,7 +258,8 @@ export function ViewportCanvas(): ReactElement {
     // Grade visível quando o botão de grade está ligado ou quando a captura por grade está ativa (o que se captura, se vê).
     const gridOn = st.showGrid || (st.options.snap?.enabled !== false && !!st.options.snap?.grid);
     const areaPlan = st.planKind === 'area' && st.areaPlanId ? (p.areaPlans ?? []).find((x) => x.id === st.areaPlanId) : undefined;
-    const extra = quadro.desenhar({ quadro: pf, cena: g ? plan.current : null, v, tema: theme, nivel: st.levelId, versao: editor.store.version, contexto: [dark, !!g, v.zoom, st.showUnderlay, st.underlayLevel, st.showRoofProjection, gridOn, st.gridStep, st.planKind, areaPlan ? JSON.stringify(areaPlan) : '', st.tagDrag ? st.tagDrag.roomId : ''].join('|'), atualizar: () => planFrameUpdateOf({ project: p, version: editor.store.version, levelId: st.levelId, v, theme, dark, gpu: !!g, showGrid: gridOn, showUnderlay: st.showUnderlay, underlayLevel: st.underlayLevel, showRoofProjection: st.showRoofProjection, roofPlanMode: st.planKind === 'roof', areaPlan, tagGhost: st.tagDrag ? { roomId: st.tagDrag.roomId, at: st.tagDrag.at } : undefined, thinLines: thinLinesOn(p, { levelId: st.levelId }), selection: st.selection, hover: st.hover, preview: editor.activeTool.preview(), inference: editor.activeTool.inference(), resolve: quadro.resolver, sketch }) });
+    const visKey = `${[...vis.hidden].sort().join(',')}|${[...vis.revealed].sort().join(',')}`;
+    const extra = quadro.desenhar({ quadro: pf, cena: g ? plan.current : null, v, tema: theme, nivel: st.levelId, versao: editor.store.version, contexto: [dark, !!g, v.zoom, st.showUnderlay, st.underlayLevel, st.showRoofProjection, gridOn, st.gridStep, st.planKind, areaPlan ? JSON.stringify(areaPlan) : '', st.tagDrag ? st.tagDrag.roomId : '', visKey].join('|'), atualizar: () => planFrameUpdateOf({ project: p, version: editor.store.version, levelId: st.levelId, v, theme, dark, gpu: !!g, showGrid: gridOn, showUnderlay: st.showUnderlay, underlayLevel: st.underlayLevel, showRoofProjection: st.showRoofProjection, roofPlanMode: st.planKind === 'roof', areaPlan, tagGhost: st.tagDrag ? { roomId: st.tagDrag.roomId, at: st.tagDrag.at } : undefined, thinLines: thinLinesOn(p, { levelId: st.levelId }), selection: st.selection, hover: st.hover, preview: editor.activeTool.preview(), inference: editor.activeTool.inference(), resolve: quadro.resolver, sketch, hidden: vis.hidden, revealed: vis.revealed }) });
     if (g) {
       g.gpu.setSize(w, h, dpr);
       plan.current.setViewport(v);
@@ -247,6 +292,8 @@ export function ViewportCanvas(): ReactElement {
   const spaceDown = useRef(false);
   /** Botão direito pressionado: solto sem arrasto (mais de 4 px) abre o menu de contexto. */
   const rightPress = useRef<{ start: Pt; moved: boolean } | null>(null);
+  /** Down adiado até a vista existir (D1): `load`/`newProject` limpam o mapa de viewports até o quadro seguinte. */
+  const downAdiado = useRef<DownAdiado | null>(null);
 
   useEffect(() => {
     const down = (e: KeyboardEvent): void => {
@@ -255,12 +302,46 @@ export function ViewportCanvas(): ReactElement {
     const up = (e: KeyboardEvent): void => {
       if (e.code === 'Space') spaceDown.current = false;
     };
+    // Alt-tab com Espaço pressionado perde o keyup: sem o reset, todo clique esquerdo viraria pan para sempre (D3).
+    const soltar = (): void => { spaceDown.current = false; };
+    const visibilidade = (): void => { if (document.hidden) spaceDown.current = false; };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
+    window.addEventListener('blur', soltar);
+    document.addEventListener('visibilitychange', visibilidade);
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', soltar);
+      document.removeEventListener('visibilitychange', visibilidade);
     };
+  }, []);
+
+  // Desmontou com um `down` adiado (D1): cancela o quadro pendente para não entregar ponteiro a um canvas que sumiu.
+  useEffect(() => () => {
+    const a = downAdiado.current;
+    if (a) cancelAnimationFrame(a.frame);
+    downAdiado.current = null;
+  }, []);
+
+  // Atalhos de visibilidade no 3D/corte também passam por aqui, em captura: o App ignora teclas quando o foco está
+  // num <select> ou quando a caixa de texto está aberta, e isso deixava HH/HR/EH sem efeito justamente depois de usar
+  // a barra de controle da vista. Só as primeiras teclas das sequências são interceptadas; o restante segue normal.
+  useEffect(() => {
+    const atalhoDeVisibilidade = (e: KeyboardEvent): void => {
+      const st = useUi.getState();
+      if (st.view !== '3d' && st.view !== 'section') return;
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const alvo = e.target as HTMLElement | null;
+      if (alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA')) return;
+      if (!/^[herv0-9]$/i.test(e.key)) return;
+      if (editor.key(e)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    };
+    window.addEventListener('keydown', atalhoDeVisibilidade, true);
+    return () => window.removeEventListener('keydown', atalhoDeVisibilidade, true);
   }, []);
 
   const local = (e: { clientX: number; clientY: number }): Pt => {
@@ -293,15 +374,57 @@ export function ViewportCanvas(): ReactElement {
       if (useUi.getState().hover !== id) useUi.setState({ hover: id });
     });
   };
-  const info = (e: RPointerEvent, s: Pt): { raw: Pt; shift: boolean; ctrl: boolean; alt: boolean } => {
-    const v = editor.viewport() as Viewport;
-    return { raw: screenToWorld(v, s), shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey };
+  const modsDe = (e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean; altKey: boolean }): Mods => ({
+    shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey,
+  });
+  /** `info` a partir de ponto e modificadores já capturados (o `down` adiado sai depois do evento original). */
+  const infoDe = (s: Pt, m: Mods) => ({ raw: screenToWorld(editor.viewport() as Viewport, s), ...m });
+  const info = (e: RPointerEvent, s: Pt) => infoDe(s, modsDe(e));
+
+  const cancelarDownAdiado = (): void => {
+    const a = downAdiado.current;
+    if (!a) return;
+    cancelAnimationFrame(a.frame);
+    downAdiado.current = null;
+  };
+
+  /**
+   * Entrega o `down` adiado assim que a vista existe (D1). A sequência sai na ordem da ferramenta — down → (drag) →
+   * up → click — e só uma vez: quem decide é a máquina pura em `cliqueAdiado.ts`.
+   */
+  const tentarEntregarDownAdiado = (): void => {
+    const a = downAdiado.current;
+    if (!a) return;
+    const r = decidirCliqueAdiado(a.estado, { tipo: 'quadro', vistaPronta: editor.viewport() !== null });
+    a.estado = r.estado;
+    if (r.acao === 'abandonar') {
+      downAdiado.current = null;
+      drag.current = { mode: 'none', start: a.ponto, last: a.ponto, moved: false, pick: false };
+      return;
+    }
+    if (r.acao === 'nenhuma') { a.frame = requestAnimationFrame(tentarEntregarDownAdiado); return; }
+    downAdiado.current = null;
+    editor.pointer('down', infoDe(a.ponto, a.mods));
+    if (r.acao !== 'entregar-solto' || !a.soltura) return;
+    // O `up` chegou durante a espera: fecha o gesto agora, sem segundo `down` e sem click quando houve arrasto.
+    const fim = infoDe(a.soltura.ponto, a.soltura.mods);
+    if (drag.current.moved) editor.pointer('drag', fim);
+    for (const ev of eventosDeSolta(drag.current.moved)) editor.pointer(ev, fim);
+    drag.current = { mode: 'none', start: a.soltura.ponto, last: a.soltura.ponto, moved: false, pick: false };
+  };
+
+  /** Arma o `down` adiado: guarda o ponto/modificadores e tenta de novo a cada quadro (ver `MAX_TENTATIVAS_VISTA`). */
+  const adiarDown = (e: RPointerEvent, s: Pt): void => {
+    cancelarDownAdiado();
+    downAdiado.current = { estado: cliqueAdiadoInicial(), ponto: s, mods: modsDe(e), frame: requestAnimationFrame(tentarEntregarDownAdiado), soltura: null };
   };
 
   const onDown = (e: RPointerEvent): void => {
     host.current?.setPointerCapture(e.pointerId);
     const s = local(e);
     pointers.current.set(e.pointerId, s);
+    // Um novo `down` encerra qualquer adiamento anterior (ex.: segundo dedo): o gesto pendente não entrega mais nada.
+    cancelarDownAdiado();
     const view = useUi.getState().view;
     // Com a cota aberta, um clique fora do input aplica e fecha (o input não propaga o pointerdown).
     if (cotaRef.current?.fecharSeAberto()) return;
@@ -350,10 +473,12 @@ export function ViewportCanvas(): ReactElement {
       if (view === 'section' && useUi.getState().hover) useUi.setState({ hover: null });
       return;
     }
-    if (!editor.viewport()) return;
     drag.current = { mode: 'tool', start: s, last: s, moved: false, pick: false, shiftPending: shiftDraw };
     // Com Shift pendente, o 'down' só vai ao soltar (ver onUp), para não começar um gesto da ferramenta antes de saber se é pan.
-    if (!shiftDraw) editor.pointer('down', info(e, s));
+    if (shiftDraw) return;
+    // Sem vista (logo após load/newProject), adiar em vez de descartar: o render a recria no quadro seguinte (D1).
+    if (!editor.viewport()) { adiarDown(e, s); return; }
+    editor.pointer('down', info(e, s));
   };
 
   const onMove = (e: RPointerEvent): void => {
@@ -381,25 +506,34 @@ export function ViewportCanvas(): ReactElement {
       if (d.mode === 'orbit') model.current.orbit.orbit(s.x - d.last.x, s.y - d.last.y);
       else if (d.mode === 'pan') model.current.orbit.pan(s.x - d.last.x, s.y - d.last.y);
       if (d.mode !== 'none') {
-        if (!d.moved && Math.hypot(s.x - d.start.x, s.y - d.start.y) > 3) d.moved = true;
+        if (!d.moved && passouDoLimiar(Math.hypot(s.x - d.start.x, s.y - d.start.y))) d.moved = true;
         d.last = s;
         useUi.setState((st) => ({ previewTick: st.previewTick + 1 }));
       } else pickHover3d(s);
       return;
     }
     if (d.mode === 'pan') {
-      if (!d.moved && Math.hypot(s.x - d.start.x, s.y - d.start.y) > 3) d.moved = true;
+      if (!d.moved && passouDoLimiar(Math.hypot(s.x - d.start.x, s.y - d.start.y))) d.moved = true;
       editor.pan(s.x - d.last.x, s.y - d.last.y);
       d.last = s;
       return;
     }
     // Sem botão pressionado, o corte realça o elemento sob o cursor (decisão 0016).
     if (view === 'section') { if (d.mode === 'none') hoverSectionAt(s); return; }
-    // Shift pendente que passou de ~3 px é arrasto da vista (pan), como antes; a ferramenta não recebe o gesto.
-    if (d.shiftPending && Math.hypot(s.x - d.start.x, s.y - d.start.y) > 3) {
+    // Shift pendente que passou do limiar é arrasto da vista (pan), como antes; a ferramenta não recebe o gesto.
+    if (d.shiftPending && passouDoLimiar(Math.hypot(s.x - d.start.x, s.y - d.start.y))) {
       d.shiftPending = false; d.mode = 'pan'; d.moved = true;
       editor.pan(s.x - d.start.x, s.y - d.start.y);
       d.last = s;
+      return;
+    }
+    // Down adiado (D1): a ferramenta ainda não recebeu 'down', então nada de move/drag antes dele. O deslocamento
+    // local continua sendo medido para o click/arrasto ser decidido no quadro em que a vista aparecer.
+    if (downAdiado.current) {
+      if (d.mode === 'tool') {
+        if (!d.moved && passouDoLimiar(Math.hypot(s.x - d.start.x, s.y - d.start.y))) d.moved = true;
+        d.last = s;
+      }
       return;
     }
     const v = editor.viewport();
@@ -407,7 +541,7 @@ export function ViewportCanvas(): ReactElement {
     const inf = info(e, s);
     useUi.setState({ cursor: inf.raw, snapKind: editor.activeTool.inference()?.kind ?? '' });
     if (d.mode === 'tool') {
-      if (!d.moved && Math.hypot(s.x - d.start.x, s.y - d.start.y) > 3) d.moved = true;
+      if (!d.moved && passouDoLimiar(Math.hypot(s.x - d.start.x, s.y - d.start.y))) d.moved = true;
       editor.pointer(d.moved ? 'drag' : 'move', inf);
       d.last = s;
     } else {
@@ -429,13 +563,19 @@ export function ViewportCanvas(): ReactElement {
       if (pointers.current.size < 2) gesture.current = null;
       return;
     }
+    if (downAdiado.current) {
+      // O `up` chegou antes de a vista existir: registra e deixa o rAF fechar down → up → click; nada de click solto.
+      const a = downAdiado.current;
+      a.estado = decidirCliqueAdiado(a.estado, { tipo: 'soltar' }).estado;
+      a.soltura = { ponto: s, mods: modsDe(e) };
+      return;
+    }
     const d = drag.current;
     if (d.mode === 'tool') {
       // Shift pendente sem arrasto: é um toque com shift (trava ortogonal) e a ferramenta recebe down, up e click.
       const inf = d.shiftPending ? { ...info(e, s), shift: true } : info(e, s);
       if (d.shiftPending) editor.pointer('down', inf);
-      editor.pointer('up', inf);
-      if (!d.moved) editor.pointer('click', inf);
+      for (const ev of eventosDeSolta(d.moved)) editor.pointer(ev, inf);
     }
     // Clique sem arrasto na vista 3D. Com ferramenta que aceita pick3d: vai o ponto da superfície sob o cursor (no plano).
     // Sem essa ferramenta (seleção): seleciona o elemento sob o cursor; Shift/Ctrl acrescenta ou alterna (decisão 0016 §3).
@@ -463,6 +603,22 @@ export function ViewportCanvas(): ReactElement {
     // Arrasto que começou sobre o seletor de escala deixa o foco no <select>, e aí Delete e os atalhos são ignorados: solta o foco.
     if (d.moved && document.activeElement?.tagName === 'SELECT') (document.activeElement as HTMLElement).blur();
     drag.current = { mode: 'none', start: s, last: s, moved: false, pick: false };
+  };
+
+  /**
+   * Cancelamento do navegador (toque interrompido, perda de captura): não é clique e não pode gerar geometria.
+   * Zera o gesto sem enviar `up`/`click` à ferramenta (D4). Só cancela a ferramenta quando o gesto era dela e o
+   * `down` já havia saído — com down adiado (D1) ou Shift pendente a ferramenta nem começou, não há estado a desfazer.
+   */
+  const onCancel = (e: RPointerEvent): void => {
+    const fim = pointers.current.get(e.pointerId) ?? drag.current.last;
+    pointers.current.delete(e.pointerId);
+    gesture.current = null;
+    rightPress.current = null;
+    const d = drag.current;
+    if (d.mode === 'tool' && !downAdiado.current && !d.shiftPending) editor.activeTool.cancel?.();
+    cancelarDownAdiado();
+    drag.current = { mode: 'none', start: fim, last: fim, moved: false, pick: false };
   };
 
   const onWheel = (e: WheelEvent): void => {
@@ -517,7 +673,7 @@ export function ViewportCanvas(): ReactElement {
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}
-      onPointerCancel={onUp}
+      onPointerCancel={onCancel}
       onPointerLeave={onLeave}
       onContextMenu={(e) => e.preventDefault()}
     >

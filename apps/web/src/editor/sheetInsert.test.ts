@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, emptyTitleBlock, makeWall, sheetInnerBox, sheetOf, viewportIssue, type Sheet, type SheetViewport } from '@hestia/model';
+import { ProjectStore, createEmptyProject, emptyTitleBlock, makeView3DPoint, makeWall, sheetInnerBox, sheetOf, viewportIssue, type Sheet, type SheetViewport } from '@hestia/model';
 import { addSheetAction } from './sheetActions.ts';
 import { addViewportAtAction, addViewsAction, autoScaleForView, contentSizeMm, dragPlacement, naturalScaleOf, sheetsPerLevelAction } from './sheetInsert.ts';
 
@@ -30,6 +30,11 @@ describe('inserção de vistas: tamanho do conteúdo', () => {
     expect(contentSizeMm(s.project, { kind: 'areaTable' }, 100)).toEqual({ w: 120, h: 120 });
     expect(contentSizeMm(s.project, { kind: 'areaTable' }, 20)).toEqual({ w: 120, h: 120 });
     expect(contentSizeMm(s.project, { kind: '3d' }, 50)).toEqual({ w: 180, h: 130 });
+  });
+
+  it('vista 3D com ponto de vista salvo continua com tamanho fixo', () => {
+    const s = new ProjectStore(createEmptyProject());
+    expect(contentSizeMm(s.project, { kind: '3d', pointId: 'v3d_1' }, 100)).toEqual({ w: 180, h: 130 });
   });
 });
 
@@ -68,6 +73,19 @@ describe('inserção de vistas: lote', () => {
     s.undo();
     expect(sheetOf(s.project, sheetId)!.viewports).toHaveLength(0);
     expect(s.project.sheets).toHaveLength(1);
+  });
+
+  it('insere a vista 3D já apontando para o ponto de vista escolhido', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addView3DPoint', point: makeView3DPoint({ azimuth: 0, elevation: 0.6, distance: 12, target: { x: 0, y: 0, z: 0 }, ortho: true }, 'Fachada norte') });
+    const ponto = (s.project.view3dPoints ?? [])[0]!;
+    const sheetId = addSheetAction(s);
+    const ids = addViewsAction(s, sheetId, [{ view: { kind: '3d', pointId: ponto.id } }]);
+    expect(ids).toHaveLength(1);
+    const vp = sheetOf(s.project, sheetId)!.viewports[0]!;
+    expect(vp.view).toEqual({ kind: '3d', pointId: ponto.id });
+    expect(vp.size).toEqual({ w: 180, h: 130 });
+    expect(viewportIssue(sheetOf(s.project, sheetId)!, vp)).toBeNull();
   });
 
   it('recusa o lote inteiro, sem gravar nada, quando uma vista não cabe', () => {

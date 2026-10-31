@@ -28,6 +28,12 @@ export interface ContextMenuCtx {
   propsOpen: boolean;
   browserOpen: boolean;
   lang: MenuLang;
+  /** Modo Reveal ativo: o menu troca Ocultar por Reexibir. */
+  reveal: boolean;
+  /** Categoria única dos elementos selecionados (para Ocultar/Reexibir categoria). */
+  singleCategory: string | null;
+  /** A vista tem algo oculto (permanente ou temporário). */
+  hasHidden: boolean;
 }
 
 /** Entrada do menu. `soon`: recurso do Revit que o Hestia ainda não tem (esmaecido, com dica). */
@@ -62,6 +68,11 @@ const TEXTOS = {
   hideElements: ['Elementos', 'Elements'],
   hideCategory: ['Categoria', 'Category'],
   hideFilter: ['Por filtro', 'By Filter'],
+  unhide: ['Reexibir na vista', 'Unhide in View'],
+  unhideElements: ['Elementos', 'Elements'],
+  unhideCategory: ['Categoria', 'Category'],
+  unhideAll: ['Reexibir tudo nesta vista', 'Unhide All in View'],
+  isolate: ['Isolar temporariamente', 'Temporary Isolate'],
   override: ['Substituir gráficos na vista', 'Override Graphics in View'],
   createSimilar: ['Criar semelhante', 'Create Similar'],
   editFamily: ['Editar família', 'Edit Family'],
@@ -135,8 +146,31 @@ export function buildContextMenu(ctx: ContextMenuCtx): MenuEntry[] {
       ],
     };
     grupos.push([repeat, recentItem]);
+    const categoriaOk = ctx.singleCategory !== null;
+    const visibilidade: MenuEntry = ctx.reveal
+      ? {
+          id: 'unhide',
+          label: T('unhide'),
+          children: [
+            { id: 'unhideElements', label: T('unhideElements'), shortcut: 'EU' },
+            { id: 'unhideCategory', label: T('unhideCategory'), shortcut: 'VU', disabled: !categoriaOk, hint: categoriaOk ? undefined : T('oneType') },
+          ],
+        }
+      : {
+          id: 'hide',
+          label: T('hide'),
+          children: [
+            { id: 'hideElements', label: T('hideElements'), shortcut: 'EH' },
+            { id: 'hideCategory', label: T('hideCategory'), shortcut: 'VH', disabled: !categoriaOk, hint: categoriaOk ? undefined : T('oneType') },
+            soon('hideFilter', T('hideFilter')),
+          ],
+        };
     grupos.push([
-      { id: 'hide', label: T('hide'), children: [soon('hideElements', T('hideElements')), soon('hideCategory', T('hideCategory')), soon('hideFilter', T('hideFilter'))] },
+      visibilidade,
+      { id: 'isolate', label: T('isolate'), children: [
+        { id: 'isolateElements', label: T('hideElements'), shortcut: 'HI' },
+        { id: 'isolateCategory', label: T('hideCategory'), shortcut: 'IC', disabled: !categoriaOk, hint: categoriaOk ? undefined : T('oneType') },
+      ] },
       soon('override', T('override')),
       criar,
       ...(kind === 'door' || kind === 'window' ? [soon('editFamily', T('editFamily'))] : []),
@@ -152,6 +186,7 @@ export function buildContextMenu(ctx: ContextMenuCtx): MenuEntry[] {
     ]);
     grupos.push([...steer, ...zoom]);
   }
+  if (ctx.hasHidden) grupos.push([{ id: 'unhideAll', label: T('unhideAll') }]);
   grupos.push(tail);
 
   // Cada grupo não vazio começa com linha divisória (exceto o primeiro).

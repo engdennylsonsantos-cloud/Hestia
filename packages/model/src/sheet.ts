@@ -34,8 +34,39 @@ export interface TitleBlock {
   scaleNote?: string;
 }
 
-/** O que a vista mostra: planta de um nível, planta de área, corte/elevação de uma seção do projeto ou o 3D (só quadro no PDF). */
-export type SheetViewSource = { kind: 'plan'; levelId: Id } | { kind: 'areaPlan'; planId: Id } | { kind: 'areaTable' } | { kind: 'section'; sectionId: Id } | { kind: '3d' };
+/**
+ * Câmera da vista 3D na prancha: retrato do `OrbitCamera` da tela (decisão 0040). É o que permite a prancha mostrar
+ * exatamente o enquadramento escolhido na aba 3D, sem depender do estado vivo da tela. Ausente = enquadramento padrão
+ * (axonométrica que cobre o modelo).
+ */
+export interface SheetView3DCamera {
+  /** Ângulo da órbita em radianos (0 = leste, anti-horário). */
+  azimuth: number;
+  /** Elevação da câmera em radianos (acima do horizonte). */
+  elevation: number;
+  /** Distância da câmera ao alvo, em metros. */
+  distance: number;
+  /** Ponto para onde a câmera olha, em metros. */
+  target: { x: number; y: number; z: number };
+  /** Projeção ortogonal (true) ou em perspectiva (false). */
+  ortho: boolean;
+}
+
+/** O que a vista mostra: planta de um nível, planta de área, corte/elevação de uma seção do projeto ou o 3D vetorial. */
+export type SheetViewSource =
+  | { kind: 'plan'; levelId: Id }
+  | { kind: 'areaPlan'; planId: Id }
+  | { kind: 'areaTable' }
+  | { kind: 'section'; sectionId: Id }
+  | { kind: '3d'; pointId?: Id; camera?: SheetView3DCamera };
+
+/** Motivo de recusa de uma câmera 3D, ou null. */
+export function sheetView3DCameraIssue(c: SheetView3DCamera): string | null {
+  const finitos = [c.azimuth, c.elevation, c.distance, c.target.x, c.target.y, c.target.z].every((n) => Number.isFinite(n));
+  if (!finitos) return 'Câmera da vista 3D inválida';
+  if (!(c.distance > 0)) return 'A distância da câmera 3D deve ser maior que zero.';
+  return null;
+}
 
 /**
  * Legenda da vista na prancha (Revit: *View Title*, ArchiCAD: *Drawing Title*). Ausente = legenda padrão abaixo da

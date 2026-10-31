@@ -18,6 +18,11 @@ import { ViewCubeRing } from './ViewCubeRing.tsx';
 /** Distância (px) a partir da qual um toque no cubo vira arrasto (órbita) e não clique. */
 const DRAG_PX = 4;
 
+/** Só o botão esquerdo pertence aos controles; meio (pan) e direito (menu) seguem para o canvas. */
+const conterSeEsquerdo = (e: RPointerEvent<HTMLElement>): void => {
+  if (e.button === 0) e.stopPropagation();
+};
+
 interface ViewCubeProps {
   model: ModelScene;
 }
@@ -61,7 +66,10 @@ export function ViewCube({ model }: ViewCubeProps): ReactElement {
   };
 
   const onStagePointerDown = (e: RPointerEvent<HTMLDivElement>): void => {
+    // Meio e direito não são do palco: deixam o evento subir para o canvas (pan e menu de contexto).
     if (e.button !== 0) return;
+    // O arrasto da vista nasce no palco; o canvas não pode iniciar outro por baixo.
+    e.stopPropagation();
     const stage = e.currentTarget;
     const start = { x: e.clientX, y: e.clientY };
     let last = start;
@@ -123,8 +131,9 @@ export function ViewCube({ model }: ViewCubeProps): ReactElement {
       : 'Clique numa zona ou letra para ir à vista; arraste para girar a vista';
 
   return (
-    // O ponteiro não chega ao canvas por baixo: sem isso o canvas captura o ponteiro e o clique nos botões some.
-    <div className="viewcube" role="group" aria-label="Controle da vista 3D" onPointerDown={(e) => e.stopPropagation()}>
+    // O contêiner não recebe o ponteiro (CSS): só o palco e os botões são interativos. O vão transparente em volta do
+    // cubo/anel deixa o clique chegar ao canvas (órbita, seleção e pan), em vez de sumir no contêiner.
+    <div className="viewcube" role="group" aria-label="Controle da vista 3D">
       <div
         className="vc-stage"
         title={stageTitle}
@@ -159,7 +168,7 @@ export function ViewCube({ model }: ViewCubeProps): ReactElement {
         </div>
         <ViewCubeRing azimuth={orbit.azimuth} elevation={orbit.elevation} hover={ringHover?.key ?? null} layer="front" />
       </div>
-      <div className="vc-tools">
+      <div className="vc-tools" onPointerDown={conterSeEsquerdo}>
         <button type="button" className="vc-btn" aria-label="Girar a vista 90° para a esquerda" title="Girar 90° para a esquerda" onClick={turn(1)}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>

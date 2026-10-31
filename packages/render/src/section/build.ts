@@ -17,6 +17,10 @@ export interface SectionInput {
   theme: PlanTheme;
   dark: boolean;
   showGrid: boolean;
+  /** Elementos ocultos nesta vista (Hide in View + temporário). */
+  hidden?: ReadonlySet<Id>;
+  /** Elementos que o modo Reveal mostra com borda azul. */
+  revealed?: ReadonlySet<Id>;
   /** Seleção e cursor (decisão 0016): realçados por cima do desenho. Sem ele, o desenho é o de sempre. */
   highlight?: { selection: Id[]; hover: Id | null };
   /** Linhas finas só na tela (decisão 0015): todo traço do modelo sai com 1 px. Padrão desligado; a prancha não passa. */
@@ -26,6 +30,10 @@ export interface SectionInput {
 /** Caixilho de vidro (opaco na linha oculta, como o dono decidiu) e folha de porta: cores fixas do desenho. */
 const GLASS_FILL = '#bfe3f5';
 const DOOR_FILL = '#e6d2ae';
+
+/** Borda do modo Reveal (Hide in View/Reveal): azul de 2 px sobre o desenho normal. */
+const REVEAL_COLOR = '#2563eb';
+const REVEAL_WIDTH = 2;
 
 /**
  * Zoom mínimo da hachura do corte/elevação (px/m). Abaixo dele o padrão some, como sempre: antes a decisão era tomada ao
@@ -81,6 +89,19 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
   const halftone = (color: string, pt: PlanPaint): string => (pt.halftone ? mix(color, paper, 0.5) : color);
   // Para o contorno externo de uma vista com categoria oculta: a silhueta do motor une tudo, então ela é refeita dos itens visíveis.
   const silhouetteParts: MultiPolygon[] = [];
+  // Hide in View/Reveal: o input já traz os conjuntos efetivos da vista. `hidden` não é desenhado; `revealed` só ganha
+  // contorno azul por cima do desenho normal (a vista tira os revelados de `hidden`, mas os dois são independentes aqui).
+  const hidden = input.hidden;
+  const revealed = input.revealed;
+  const hasHidden = (hidden?.size ?? 0) > 0;
+  const isHidden = (id: Id | undefined): boolean => id !== undefined && (hidden?.has(id) ?? false);
+  const isRevealed = (id: Id | undefined): boolean => id !== undefined && (revealed?.has(id) ?? false);
+  /** Origem oculta: o dono (parede, piso, laje, telhado, escada, rampa) ou o próprio vão. */
+  const originHidden = (o: SectionOrigin): boolean => isHidden(ownerOf(o)?.id) || isHidden(o.openingId);
+  const revealStrokes: StrokeOp[] = [];
+  const revealOutline = (polygons: MultiPolygon): void => {
+    for (const ring of ringsOf(polygons)) revealStrokes.push({ pts: ring, closed: true, widthPx: REVEAL_WIDTH, color: REVEAL_COLOR, alpha: 1 });
+  };
 
   // Solo e níveis: linhas finas tracejadas ao longo de todo o comprimento.
   for (const l of s.levels) {
@@ -93,6 +114,8 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
   }
 
   const drawBeyond = (b: SectionBeyond): void => {
+    const owner = ownerOf(b);
+    if (owner && isHidden(owner.id)) return;
     const cat = categoryOf(b);
     const pt = paint[cat];
     if (!pt.visible) return;
@@ -106,6 +129,7 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
     }
     const line = mix(theme.ink, paper, 0.35 + 0.4 * (b.depth / maxDepth));
     for (const ring of ringsOf(b.polygons)) strokes.push({ pts: ring, closed: true, ...strokeWidth(projWidth(cat)), color: halftone(line, pt), alpha: 1 });
+    if (owner && isRevealed(owner.id)) revealOutline(b.polygons);
   };
 
   /**
@@ -116,9 +140,11 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
    * último. Sem `model` (lista sintética), cai no retângulo de antes.
    */
   const drawOpening = (o: SectionOpening): void => {
+    if (isHidden(o.openingId)) return;
     const { polygons, kind, cut, t0, t1, z0, z1, model } = o;
     const pt = paint[kind];
     if (!pt.visible) return;
+    if (isRevealed(o.openingId)) revealOutline(polygons);
     const edge = openingEdge(kind, cut);
     const outline = (): void => {
       for (const ring of ringsOf(polygons)) strokes.push({ pts: ring, closed: true, ...strokeWidth(edge), color: halftone(theme.ink, pt), alpha: 1 });
@@ -220,7 +246,25 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
   // Pintura do mais longe ao mais perto: além e vãos pela profundidade; o corte (profundidade 0) por último.
   type Paint = { depth: number; cut: boolean; draw: () => void };
   const cutPaint = s.cut.flatMap((r): Paint[] => {
-    const cats = [...new Set(r.sources.map(categoryOf))];
+    // Corte unido por material: `parts` guarda o polígono visível de cada origem. Com Hide in View, some só a peça oculta;
+    // sem `parts` (lista sintética), a região inteira só some quando todas as origens estiverem ocultas.
+    let polygons = r.polygons;
+    let sources = r.sources;
+    let parts = r.parts;
+    if (hasHidden) {
+      if (r.parts) {
+        const kept = r.parts.filter((part) => !originHidden(part.origin));
+        if (kept.length === 0) return [];
+        if (kept.length !== r.parts.length) polygons = union(...kept.map((part) => part.polygons));
+        parts = kept;
+        sources = kept.map((part) => part.origin);
+      } else {
+        const kept = r.sources.filter((o) => !originHidden(o));
+        if (r.sources.length > 0 && kept.length === 0) return [];
+        sources = kept.length > 0 ? kept : r.sources;
+      }
+    }
+    const cats = [...new Set(sources.map(categoryOf))];
     if (!cats.some((c) => paint[c].visible)) return [];
     const cat = cats.find((c) => paint[c].visible) ?? 'wall';
     const pt = paint[cat];
@@ -228,17 +272,21 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
       depth: 0,
       cut: true,
       draw: () => {
-        silhouetteParts.push(r.polygons);
+        silhouetteParts.push(polygons);
         const m = p.materials[r.materialId];
         if (!noFill) {
           const base = pt.color ?? m?.color ?? '#999999';
           const color = pt.visual === 'shaded' ? base : mix(base, paper, input.dark ? 0.5 : 0.58);
           const hatchKind = r.hatch ?? m?.hatch;
           const hatch = hatchFor(hatchKind, halftone(mix(pt.color ?? m?.color ?? '#999999', input.dark ? '#ffffff' : '#000000', 0.45), pt));
-          fills.push({ polygons: r.polygons, color: halftone(color, pt), alpha: pt.alpha, hatch });
+          fills.push({ polygons, color: halftone(color, pt), alpha: pt.alpha, hatch });
         }
         const line = halftone(mix(theme.ink, paper, 0.35), pt);
-        for (const ring of ringsOf(r.polygons)) strokes.push({ pts: ring, closed: true, ...strokeWidth(cutWidth(cat)), color: line, alpha: 1 });
+        for (const ring of ringsOf(polygons)) strokes.push({ pts: ring, closed: true, ...strokeWidth(cutWidth(cat)), color: line, alpha: 1 });
+        // Reveal do corte unido: contorna só as peças reveladas (sem `parts`, a região inteira, se alguma origem foi revelada).
+        const revealParts = parts?.filter((part) => isRevealed(ownerOf(part.origin)?.id));
+        if (revealParts && revealParts.length > 0) for (const part of revealParts) revealOutline(part.polygons);
+        else if (!parts && sources.some((o) => isRevealed(ownerOf(o)?.id))) revealOutline(polygons);
       },
     }];
   });
@@ -251,18 +299,23 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
   for (const item of paintList) item.draw();
   // Membranas de piso e laje: linha tracejada na cota da face (decisão 0023 §5), na espessura do corte do dono.
   for (const m of s.membranes) {
+    const owner = ownerOf(m);
+    if (owner && isHidden(owner.id)) continue;
     const cat = categoryOf(m);
     if (!paint[cat].visible) continue;
     strokes.push({ pts: [...m.pts], closed: false, ...strokeWidth(cutWidth(cat)), color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
+    if (owner && isRevealed(owner.id)) revealStrokes.push({ pts: [...m.pts], closed: false, widthPx: REVEAL_WIDTH, color: REVEAL_COLOR, alpha: 1 });
   }
 
-  // Contorno externo: a união das regiões visíveis (o que está atrás de um sólido não entra). Com categoria oculta,
-  // a silhueta do motor (que une tudo) é refeita só com os itens que ficaram.
+  // Contorno externo: a união das regiões visíveis (o que está atrás de um sólido não entra). Com categoria oculta (ou
+  // elemento oculto nesta vista), a silhueta do motor (que une tudo) é refeita só com os itens que ficaram.
   const hiddenAny = GRAPHICS_CATEGORIES.some((c) => !paint[c].visible);
-  const silhouette = hiddenAny ? (silhouetteParts.length > 0 ? union(...silhouetteParts) : []) : s.silhouette;
+  const silhouette = hiddenAny || hasHidden ? (silhouetteParts.length > 0 ? union(...silhouetteParts) : []) : s.silhouette;
   for (const ring of ringsOf(silhouette)) strokes.push({ pts: ring, closed: true, widthPx: 2.2, color: theme.ink, alpha: 1 });
 
   if (input.thinLines) thinStrokes(strokes);
+  // Borda azul do Reveal por cima do desenho normal e com a largura própria (não passa pelo `thinStrokes`).
+  if (revealStrokes.length > 0) strokes.push(...revealStrokes);
   if (input.highlight) highlightOps(s, input.highlight, theme, fills, strokes);
 
   return { background: theme.bg, fills, strokes, labels };

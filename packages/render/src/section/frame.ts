@@ -25,6 +25,8 @@ export interface SectionFrameInput {
   theme: PlanTheme;
   dark: boolean;
   showGrid: boolean;
+  hidden?: ReadonlySet<Id>;
+  revealed?: ReadonlySet<Id>;
   highlight?: { selection: Id[]; hover: Id | null };
   thinLines?: boolean;
 }
@@ -75,7 +77,9 @@ export class SectionFrame {
   static keyOf(i: SectionFrameInput): string {
     const hl = i.highlight;
     const sel = hl && hl.selection.length > 0 ? hl.selection.join(',') : '';
-    return [i.version, i.sectionId, i.theme.bg, i.theme.ink, i.dark ? 'd' : 'l', i.showGrid ? 'g' : '-', i.thinLines ? 't' : '-', sel, hl?.hover ?? ''].join('|');
+    const hid = i.hidden?.size ? `h:${[...i.hidden].sort().join(',')}` : '';
+    const rev = i.revealed?.size ? `r:${[...i.revealed].sort().join(',')}` : '';
+    return [i.version, i.sectionId, i.theme.bg, i.theme.ink, i.dark ? 'd' : 'l', i.showGrid ? 'g' : '-', i.thinLines ? 't' : '-', hid, rev, sel, hl?.hover ?? ''].join('|');
   }
 
   /**
@@ -96,6 +100,8 @@ export class SectionFrame {
         theme: input.theme,
         dark: input.dark,
         showGrid: input.showGrid,
+        hidden: input.hidden,
+        revealed: input.revealed,
         highlight: input.highlight,
         thinLines: input.thinLines,
       });

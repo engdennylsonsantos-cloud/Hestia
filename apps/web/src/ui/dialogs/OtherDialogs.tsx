@@ -1,7 +1,7 @@
-import { useMemo, useState, type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { COMANDOS_COM_ATALHO, TOOL_GROUPS, type ShortcutCommand } from '@hestia/tools';
 import { nomeComandoLang, useI18n } from '../../editor/i18n.ts';
-import { TEMPLATES, buildTemplate, isWall, makeLevel, newId, type TemplateId, type Wall } from '@hestia/model';
+import { makeLevel, newId } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { hasAutosave } from '../../editor/storage.ts';
 import { useUi } from '../../editor/state.ts';
@@ -50,80 +50,67 @@ export function LevelsDialog(): ReactElement {
   );
 }
 
-/** Enquadramento da miniatura: caixa das paredes com margem proporcional, para o desenho nunca sair do SVG. */
-function thumbViewBox(walls: Wall[]): string {
-  let x0 = Infinity;
-  let y0 = Infinity;
-  let x1 = -Infinity;
-  let y1 = -Infinity;
-  for (const w of walls) {
-    for (const v of [w.a, w.b]) {
-      x0 = Math.min(x0, v.x);
-      x1 = Math.max(x1, v.x);
-      y0 = Math.min(y0, v.y);
-      y1 = Math.max(y1, v.y);
-    }
-  }
-  if (!Number.isFinite(x0)) return '0 0 10 7';
-  const pad = Math.max(0.4, Math.max(x1 - x0, y1 - y0) * 0.06);
-  return `${x0 - pad} ${y0 - pad} ${x1 - x0 + pad * 2} ${y1 - y0 + pad * 2}`;
-}
-
-/** Miniatura da planta do exemplo: as paredes do nível térreo, enquadradas na própria caixa. */
-function Thumb({ walls }: { walls: Wall[] }): ReactElement {
-  if (walls.length === 0) {
-    return (
-      <svg viewBox="0 0 10 7" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-        <rect x="0.5" y="0.5" width="9" height="6" fill="none" stroke="var(--line-strong)" strokeDasharray="0.4 0.3" strokeWidth="0.08" />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox={thumbViewBox(walls)} preserveAspectRatio="xMidYMid meet" aria-hidden="true" style={{ transform: 'scaleY(-1)' }}>
-      {walls.map((w) => <line key={w.id} x1={w.a.x} y1={w.a.y} x2={w.b.x} y2={w.b.y} stroke="var(--fg)" strokeWidth="0.2" strokeLinecap="square" />)}
-    </svg>
-  );
-}
-
+/**
+ * Novo projeto: só o projeto em branco e o que já está salvo — o último projeto deste navegador (autosave) e um
+ * arquivo `.hestia.json` do disco. Os exemplos de `TEMPLATES` (casa, prédio, esquadrias…) são material de teste e
+ * não aparecem mais aqui: abrir o app nunca deve começar por um projeto de exemplo.
+ */
 export function StartDialog(): ReactElement {
   const [has] = useState(() => hasAutosave());
-  // Cada exemplo é montado uma vez: a miniatura usa as mesmas paredes que a contagem mostra.
-  const cards = useMemo(
-    () =>
-      TEMPLATES.map((t) => {
-        const p = buildTemplate(t.id);
-        const els = Object.values(p.elements);
-        return { ...t, walls: els.filter(isWall), levels: p.levels.length, horizontal: els.filter((e) => e.kind === 'floor' || e.kind === 'slab').length };
-      }),
-    [],
-  );
-  const pick = (id: TemplateId): void => {
-    editor.newProject(id);
+  const emBranco = (): void => {
+    editor.newProject('blank');
     close();
-    if (id === 'blank') useUi.setState({ tutorial: true });
+    useUi.setState({ tutorial: true });
   };
+  const abrirArquivo = (): void => {
+    close();
+    document.getElementById('file-open')?.click();
+  };
+  const voltarAoSalvo = (): void => {
+    editor.restoreAutosave();
+    close();
+  };
+  const icone = (d: string): ReactElement => (
+    <span className="tpl-thumb">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="var(--line-strong)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d={d} />
+      </svg>
+    </span>
+  );
   return (
-    <Dialog title="Novo projeto" sub="Escolha um ponto de partida" onClose={close} footer={
+    <Dialog title="Novo projeto" sub="Crie um projeto em branco ou abra um projeto salvo" onClose={close} footer={
       <>
-        {has && <button className="btn" onClick={() => { editor.restoreAutosave(); close(); }}>Voltar ao último projeto salvo neste navegador</button>}
         <span style={{ flex: 1 }} />
         <button className="btn" onClick={close}>Cancelar</button>
       </>
     }>
       <div className="tplgrid">
-        {cards.map((t) => (
-          <button key={t.id} className="tpl" onClick={() => pick(t.id)}>
-            <span className="tpl-thumb"><Thumb walls={t.walls} /></span>
+        <button className="tpl" onClick={emBranco}>
+          {icone('M5 3h9l5 5v13H5z M14 3v5h5')}
+          <span className="tpl-body">
+            <span className="tpl-name">Em branco</span>
+            <span className="tpl-desc">Dois níveis e os tipos de parede padrão.</span>
+            <span className="tpl-meta">Começa sem geometria<span className="area">novo</span></span>
+          </span>
+        </button>
+        <button className="tpl" onClick={abrirArquivo}>
+          {icone('M3 7h6l2 2h10v10H3z')}
+          <span className="tpl-body">
+            <span className="tpl-name">Abrir projeto…</span>
+            <span className="tpl-desc">Um arquivo .hestia.json salvo no computador.</span>
+            <span className="tpl-meta">Abrir do disco<span className="area">arquivo</span></span>
+          </span>
+        </button>
+        {has ? (
+          <button className="tpl" onClick={voltarAoSalvo}>
+            {icone('M12 3a9 9 0 1 1-9 9h3a6 6 0 1 0 6-6v3L7 5l5-4z')}
             <span className="tpl-body">
-              <span className="tpl-name">{t.name}</span>
-              <span className="tpl-desc">{t.description}</span>
-              <span className="tpl-meta">
-                {t.levels} {t.levels === 1 ? 'nível' : 'níveis'} · {t.walls.length} paredes{t.horizontal > 0 ? ` · ${t.horizontal} pisos` : ''}
-                <span className="area">{t.area}</span>
-              </span>
+              <span className="tpl-name">Último projeto salvo neste navegador</span>
+              <span className="tpl-desc">Retoma o projeto em que você estava trabalhando.</span>
+              <span className="tpl-meta">Salvo automaticamente<span className="area">retomar</span></span>
             </span>
           </button>
-        ))}
+        ) : null}
       </div>
     </Dialog>
   );

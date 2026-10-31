@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
-import { sheetDimsMm, sheetInnerBox, sheetOf, viewportBox, type SheetViewport } from '@hestia/model';
+import { projectView3DPoints, sheetDimsMm, sheetInnerBox, sheetOf, viewportBox, type SheetViewport } from '@hestia/model';
 import { buildSheetDrawList } from '@hestia/render';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { alignViewportsAction, distributeViewportsAction, type AlignMode } from '../../editor/sheetAlign.ts';
-import { fitViewportAction, moveViewportContentAction, resizeViewportAction, setViewportScaleAction, toggleViewportLockAction } from '../../editor/sheetActions.ts';
+import { fitViewportAction, moveViewportContentAction, resizeViewportAction, setViewportScaleAction, setViewportView3DPointAction, toggleViewportLockAction } from '../../editor/sheetActions.ts';
 import { SheetCanvas } from './SheetCanvas.tsx';
 import { SheetControlBar } from './SheetControlBar.tsx';
 import { panBy } from './sheetCamera.ts';
@@ -438,6 +438,12 @@ export function SheetStage({ sheetId }: { sheetId: string }): ReactElement {
         onDistribute={onDistribute}
         onAddView={() => useUi.setState({ dialog: 'addView', dialogArg: sheetId })}
         onProps={() => useUi.setState({ dialog: 'sheet', dialogArg: sheetId })}
+        view3DPoints={projectView3DPoints(p)}
+        onChange3DPoint={(id) => {
+          if (!single) return;
+          const erro = setViewportView3DPointAction(editor.store, sheetId, single.id, id);
+          if (erro) say(erro);
+        }}
       />
     </div>
   );

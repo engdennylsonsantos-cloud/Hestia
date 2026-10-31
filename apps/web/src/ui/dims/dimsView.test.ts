@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultUnits, formatQuantity } from '@hestia/model';
 import type { DimEnd, TempDim } from '@hestia/tools';
-import { dimText, gripOf, nextRef, providerOf, refLabel, viewOfDim } from './dimsView.ts';
+import { dimAcionavel, dimText, gripOf, nextRef, providerOf, refLabel, viewOfDim } from './dimsView.ts';
 
 const end = (slot: string, current: DimEnd['current'], options: DimEnd['options'], x = 0): DimEnd => ({ at: { x, y: 0 }, slot, kind: 'wall', current, options });
 const dim = (over: Partial<TempDim> = {}): TempDim => ({
@@ -71,6 +71,11 @@ describe('dimsView', () => {
     expect(dimText(comAngulo, fmt)).toBe('2 · 30°');
     // Uma cota de ângulo (principal) leva o símbolo para não se confundir com comprimento.
     expect(dimText(dim({ quantity: 'angle', value: Math.PI / 2 }), fmt)).toBe('90°');
+  });
+
+  it('rascunho de ferramenta (sem `edit`) não é acionável; a cota editável é', () => {
+    expect(dimAcionavel(dim())).toBe(false);
+    expect(dimAcionavel(dim({ edit: () => ({ commands: [] }) }))).toBe(true);
   });
 
   it('ponta com uma só referência não ganha alça (C03: cobria as alças de vértice do contorno)', () => {

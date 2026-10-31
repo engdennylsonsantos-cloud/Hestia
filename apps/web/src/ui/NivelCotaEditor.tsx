@@ -1,6 +1,31 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactElement } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactElement } from 'react';
 import type { DimensionHit } from '@hestia/render';
-import { editor } from '../editor/controller.ts';
+import type { Project } from '@hestia/model';
+import { editor, useProjectVersion } from '../editor/controller.ts';
+import { useUi, type ViewKind } from '../editor/state.ts';
+
+/** Contexto em que a cota foi aberta: a vista, o nível ativo e o documento. */
+export interface ContextoCota {
+  view: ViewKind;
+  levelId: string;
+  /** Identidade do projeto: a referência do documento aberto (os ids de nível se repetem entre projetos). */
+  projeto: Project;
+}
+
+/** Lê o contexto atual do editor (para comparar com o da abertura). */
+export function contextoAtualCota(): ContextoCota {
+  const ui = useUi.getState();
+  return { view: ui.view, levelId: ui.levelId, projeto: editor.project };
+}
+
+/**
+ * Decisão ao fechar a edição: só aplica quando ela ainda pertence ao contexto em que abriu. Se a vista, o nível
+ * ativo ou o projeto mudaram, a cota é descartada sem `upsertLevel` (o projeto novo pode ter o mesmo `lv_0`).
+ */
+export function decidirFechamentoCota(aberto: ContextoCota, atual: ContextoCota): 'aplicar' | 'cancelar' {
+  const mesmoContexto = aberto.view === atual.view && aberto.levelId === atual.levelId && aberto.projeto === atual.projeto;
+  return mesmoContexto ? 'aplicar' : 'cancelar';
+}
 
 /** Cota aberta para edição no 3D: posição no canvas (px) e o intervalo. */
 interface Edicao {
@@ -12,12 +37,14 @@ interface Edicao {
   side: 'below' | 'above';
   /** Contador da abertura: o efeito de foco roda a cada abertura, mesmo repetindo a mesma cota. */
   abertura: number;
+  /** Contexto da abertura: se ele mudar, a edição é cancelada sem aplicar. */
+  contexto: ContextoCota;
 }
 
 /** O que a vista chama para abrir/fechar o editor da cota. */
 export interface NivelCotaEditorHandle {
   abrir: (hit: DimensionHit, rect: { width: number; height: number }) => void;
-  /** Fecha aplicando, se estiver aberto; devolve true se havia um editor aberto (o clique é consumido). */
+  /** Fecha aplicando, se estiver aberto; devolve true se havia um editor aberto no contexto atual (o clique é consumido). */
   fecharSeAberto: () => boolean;
 }
 
@@ -25,7 +52,7 @@ export interface NivelCotaEditorHandle {
  * Editor da cota entre os eixos das bolhas: um input **no lugar** da etiqueta no 3D. Enquanto o input está aberto a
  * etiqueta 3D (sprite) fica escondida, para não aparecerem dois elementos sobrepostos. Editar a cota move o nível
  * **selecionado** (o vizinho fica fixo). Enter aplica, Esc cancela; clicar fora também aplica (a vista chama
- * `fecharSeAberto` no `pointerdown`).
+ * `fecharSeAberto` no `pointerdown`). Trocar de vista, de nível ou de projeto cancela a edição sem aplicar.
  */
 export const NivelCotaEditor = forwardRef<NivelCotaEditorHandle>(function NivelCotaEditor(_props, ref): ReactElement | null {
   const [edicao, setEdicao] = useState<Edicao | null>(null);
@@ -35,15 +62,20 @@ export const NivelCotaEditor = forwardRef<NivelCotaEditorHandle>(function NivelC
   const etiquetaRef = useRef<DimensionHit['label'] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const aberturas = useRef(0);
+  // Contexto reativo: vista, nível ativo e versão do projeto (a referência do documento muda ao abrir/editar).
+  const view = useUi((s) => s.view);
+  const levelId = useUi((s) => s.levelId);
+  useProjectVersion();
+  const projeto = editor.project;
 
   /** Devolve a etiqueta 3D à cena (se ela ainda existir) e esquece a referência. */
-  const mostrarEtiqueta = (): void => {
+  const mostrarEtiqueta = useCallback((): void => {
     const label = etiquetaRef.current;
     etiquetaRef.current = null;
     if (label) label.visible = true;
-  };
+  }, []);
 
-  const fechar = (aplicar: boolean): void => {
+  const fechar = useCallback((aplicar: boolean): void => {
     const d = edicaoRef.current;
     if (!d) return;
     if (aplicar) {
@@ -59,7 +91,7 @@ export const NivelCotaEditor = forwardRef<NivelCotaEditorHandle>(function NivelC
     setEdicao(null);
     // A etiqueta volta ao 3D: o input sai de cena no mesmo quadro.
     mostrarEtiqueta();
-  };
+  }, [mostrarEtiqueta]);
 
   useImperativeHandle(ref, () => ({
     abrir: (hit, rect) => {
@@ -78,12 +110,16 @@ export const NivelCotaEditor = forwardRef<NivelCotaEditorHandle>(function NivelC
         neighborId: hit.neighborId,
         side: hit.side,
         abertura: aberturas.current,
+        contexto: contextoAtualCota(),
       });
     },
     fecharSeAberto: () => {
-      if (!edicaoRef.current) return false;
-      fechar(true);
-      return true;
+      const d = edicaoRef.current;
+      if (!d) return false;
+      // Fora do contexto da abertura, fecha sem aplicar e não consome o clique: ele segue para a vista de agora.
+      const aplicar = decidirFechamentoCota(d.contexto, contextoAtualCota()) === 'aplicar';
+      fechar(aplicar);
+      return aplicar;
     },
   }));
 
@@ -98,6 +134,14 @@ export const NivelCotaEditor = forwardRef<NivelCotaEditorHandle>(function NivelC
     }, 0);
     return () => clearTimeout(t);
   }, [abertura]);
+
+  // Trocar de vista (prancha inclusive), de nível ou de projeto cancela a edição sem aplicar. Sem isto, o primeiro
+  // clique depois da troca seria consumido por `fecharSeAberto` e poderia gravar a elevação no projeto novo.
+  useEffect(() => {
+    const d = edicaoRef.current;
+    if (!d) return;
+    if (decidirFechamentoCota(d.contexto, { view, levelId, projeto }) === 'cancelar') fechar(false);
+  }, [view, levelId, projeto, fechar]);
 
   // Se o componente sair da tela com a cota aberta, a etiqueta não pode ficar escondida para sempre.
   useEffect(() => () => {

@@ -3,8 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { LevelResolveCache, type ResolvedLevel } from '@hestia/engine';
 import { ClienteResolucao, type WorkerLike } from '@hestia/engine/src/worker/cliente.ts';
 import { projetoComPavimentos } from '@hestia/engine/src/worker/fixturePavimentos.ts';
+import type { TipoResolucao } from '@hestia/engine/src/worker/protocolo.ts';
+import { criarWorkerSimulado } from '@hestia/engine/src/worker/workerSimulado.ts';
 import { makeLevel, ProjectStore, type Id, type Project } from '@hestia/model';
 import { ModelScene, type Scene3DOptions } from '@hestia/render';
+import { FluxoEdicao } from '../editor/fluxoEdicao.ts';
+import { ResolucaoProgressiva } from '../editor/resolucaoAssincrona.ts';
 import { criarFonteNiveisWorker } from './montagem3dNiveis.ts';
 import { Montagem3dProgressiva, ordemDeMontagem, proximoLote, type CenaMontagem, type FonteNiveis, type FonteWorker } from './montagem3dProgressiva.ts';
 
@@ -44,6 +48,29 @@ function fonteContada(pronto?: (id: Id) => ResolvedLevel | null): FonteNiveis & 
       return nivelFalso(id);
     },
   };
+}
+
+/** Cliente de resolução com worker simulado que anota cada pedido (tipo, nível e projeto). */
+class ClienteContado extends ClienteResolucao {
+  readonly pedidos: Array<{ tipo: TipoResolucao; nivel: Id; projeto: Project }> = [];
+
+  constructor() {
+    super({ usarWorker: true, criarWorker: () => criarWorkerSimulado() });
+  }
+
+  override resolver(tipo: TipoResolucao, nivel: Id, p: Project, versao: number, base: number | null = null): Promise<unknown> {
+    this.pedidos.push({ tipo, nivel, projeto: p });
+    return super.resolver(tipo, nivel, p, versao, base);
+  }
+}
+
+/** Espera uma condição ficar verdadeira (a resolução em segundo plano chega por macrotarefas). */
+async function esperarAte(condicao: () => boolean, limiteMs = 60_000): Promise<void> {
+  const inicio = Date.now();
+  while (!condicao()) {
+    if (Date.now() - inicio > limiteMs) throw new Error('tempo esgotado esperando a resolução');
+    await new Promise((r) => setTimeout(r, 5));
+  }
 }
 
 describe('ordemDeMontagem', () => {
@@ -175,6 +202,45 @@ describe('Montagem3dProgressiva: fonte e cancelamento', () => {
     fila.rodar();
     expect(cena.chamadas).toHaveLength(1);
     expect(concluidas).toBe(0);
+  });
+});
+
+describe('Montagem3dProgressiva: prewarm completo', () => {
+  it('todos os níveis prontos: um único update com todos, sem worker nem cálculo na hora', () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    const prontos = new Map(ids.map((id) => [id, nivelFalso(id)] as const));
+    const cena = new CenaAnotada();
+    const fila = filaManual();
+    const fonte = fonteContada((id) => prontos.get(id) ?? null);
+    const worker = new WorkerFalso();
+    let concluidas = 0;
+    const m = new Montagem3dProgressiva({ cena, fonte, worker, aoAtualizar: () => undefined, aoConcluir: () => concluidas++, agendar: fila.agendar });
+
+    m.iniciar(projetoDeIds(ids), OPT, 'c');
+
+    // Um `update` com todos, na ordem do projeto: o primeiro quadro já vem completo.
+    expect(cena.chamadas).toHaveLength(1);
+    expect(cena.chamadas[0]!.ids).toEqual(ids);
+    expect(fonte.calculados).toEqual([]);
+    expect(worker.pedidos).toEqual([]);
+    expect(worker.iniciados).toEqual([]);
+    expect(concluidas).toBe(1);
+    expect(m.montados).toBe(ids.length);
+  });
+
+  it('apenas alguns prontos: mantém o progressivo (primeira fatia só o visível e worker para o resto)', () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    const cena = new CenaAnotada();
+    const fonte = fonteContada((id) => (id === 'c' ? nivelFalso('c') : null));
+    const worker = new WorkerFalso();
+    const m = new Montagem3dProgressiva({ cena, fonte, worker, aoAtualizar: () => undefined, aoConcluir: () => undefined });
+
+    m.iniciar(projetoDeIds(ids), OPT, 'c');
+
+    expect(cena.chamadas.map((c) => c.ids)).toEqual([['c']]);
+    expect(fonte.calculados).toEqual([]); // o visível veio pronto; os outros vão ao worker
+    expect(worker.pedidos).toEqual(['b', 'd']);
+    expect(m.usandoWorker).toBe(true);
   });
 });
 
@@ -541,6 +607,65 @@ describe('Montagem3dProgressiva: níveis no worker', () => {
     expect(m.montados).toBe(ids.length);
     expect(assinatura(parcial)).toEqual(assinatura(cheia));
   }, 120_000);
+});
+
+describe('ResolucaoProgressiva: prewarm dos níveis', () => {
+  it('resolve só os níveis que faltam, em tempo ocioso, e não repete um nível já pronto', async () => {
+    const p = projetoComPavimentos(3);
+    const cache = new LevelResolveCache();
+    const cliente = new ClienteContado();
+    const fila = filaManual();
+    const r = new ResolucaoProgressiva({ cliente, agendarOcioso: fila.agendar });
+    r.abrir(p);
+    // Como o cache da abertura faria: dois níveis já prontos, um em falta.
+    expect(r.semear('pav_0', cache.get(p, 'pav_0'))).toBe(true);
+    expect(r.semear('pav_1', cache.get(p, 'pav_1'))).toBe(true);
+    expect(r.niveisProntos()).toBe(false);
+
+    r.preaquecerNiveis();
+    fila.rodar();
+    await esperarAte(() => r.nivelPronto('pav_2') !== null);
+
+    // Só o nível em falta foi resolvido; os prontos não voltam para o worker.
+    expect(cliente.pedidos.filter((x) => x.tipo === 'patchNivel').map((x) => x.nivel)).toEqual(['pav_2']);
+    expect(r.niveisProntos()).toBe(true);
+  });
+
+  it('cancelar invalida a tarefa ociosa do prewarm: nenhum pedido sai', async () => {
+    const p = projetoComPavimentos(3);
+    const cliente = new ClienteContado();
+    const fila = filaManual();
+    const r = new ResolucaoProgressiva({ cliente, agendarOcioso: fila.agendar });
+    r.abrir(p);
+    r.preaquecerNiveis();
+    r.cancelar();
+    fila.rodar();
+    await new Promise((res) => setTimeout(res, 10));
+    expect(cliente.pedidos).toEqual([]);
+  });
+
+  it('abrir outro projeto invalida o prewarm do anterior', async () => {
+    const antigo = projetoComPavimentos(2);
+    const novo = projetoComPavimentos(1);
+    const cliente = new ClienteContado();
+    const fila = filaManual();
+    const r = new ResolucaoProgressiva({ cliente, agendarOcioso: fila.agendar });
+    r.abrir(antigo);
+    r.preaquecerNiveis();
+    r.abrir(novo);
+    fila.rodar();
+    await esperarAte(() => r.nivelPronto('pav_0') !== null);
+    expect(cliente.pedidos.filter((x) => x.projeto === antigo)).toEqual([]);
+  });
+
+  it('FluxoEdicao.abrir agenda o prewarm sozinho: todos os níveis ficam prontos', async () => {
+    const p = projetoComPavimentos(3);
+    const fluxo = new FluxoEdicao({ cliente: new ClienteContado() });
+    fluxo.abrir(p, 1);
+    await esperarAte(() => fluxo.niveisProntos());
+    expect(fluxo.niveisProntos()).toBe(true);
+    fluxo.cancelar();
+  });
 });
 
 /** Worker simulado do protocolo: responde cada pedido de nível com o nível falso e anota o que atravessou. */

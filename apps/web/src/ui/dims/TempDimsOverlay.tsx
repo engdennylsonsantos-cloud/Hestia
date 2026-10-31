@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import { worldToScreen } from '@hestia/render';
-import { toPermanent, type TempDim } from '@hestia/tools';
+import { toPermanent, type TempDim, type Tool, type ToolId } from '@hestia/tools';
+import type { Id, Project } from '@hestia/model';
 import { editor } from '../../editor/controller.ts';
-import { setDimOverride, suspendSelectionDims, useUi } from '../../editor/state.ts';
+import { setDimOverride, suspendSelectionDims, useUi, type ViewKind } from '../../editor/state.ts';
 import { currentUnits, useFormat } from '../useUnits.ts';
 import { INVALID_FLASH_MS, resolveDimEdit, suspensionAfterConversion } from './dimsActions.ts';
 import { larguraDoCampo } from './dimsBox.ts';
-import { capturesPointer, holdsLastPreview, rectAround, swallowsPointerButton, type ScreenRect } from './dimsHit.ts';
+import { capturaCota, holdsLastPreview, rectAround, swallowsPointerButton, type ScreenRect } from './dimsHit.ts';
 import { placeConvertButton, valueRect } from './dimsLayout.ts';
-import { dimText, viewOfDim } from './dimsView.ts';
+import { dimAcionavel, dimText, viewOfDim } from './dimsView.ts';
 import { toolDims, useDimContext, useSelectionDims } from './useSelectionDims.ts';
 
 const DANGER = 'var(--danger, #d33)';
@@ -58,6 +59,22 @@ const hover = (e: { buttons: number; stopPropagation(): void }): void => {
 };
 
 /**
+ * Última prévia guardada (C05): segura as cotas enquanto o cursor vai da prévia até o valor ou o "I". A chave inclui a
+ * instância da ferramenta (`editor.activeTool` é recriada a cada `activate()`) e o escopo (nível, vista, projeto):
+ * reativar a mesma ferramenta ou trocar de escopo zera o fantasma em vez de deixar caixas antigas sobre o desenho.
+ */
+interface PreviewCache {
+  tool: Tool | null;
+  toolId: ToolId;
+  levelId: Id;
+  view: ViewKind;
+  project: Project | null;
+  dims: TempDim[];
+}
+
+const semPrevia = (): PreviewCache => ({ tool: null, toolId: 'select', levelId: '', view: 'plan', project: null, dims: [] });
+
+/**
  * Cotas dinâmicas (temporárias) de qualquer ferramenta ou seleção: um componente só. Desenha as linhas, o texto azul
  * editável, as alças das pontas (trocam a referência) e o ícone "I" (converte em cotas permanentes). Não conhece
  * nenhum elemento: tudo vem dos provedores (`TempDim`).
@@ -67,12 +84,13 @@ export function TempDimsOverlay(): ReactElement | null {
   const selDims = useSelectionDims();
   const tick = useUi((s) => s.previewTick);
   const tool = useUi((s) => s.tool);
+  const view = useUi((s) => s.view);
   const cursor = useUi((s) => s.cursor);
   const format = useFormat();
   const [editing, setEditing] = useState<{ key: string; text: string } | null>(null);
   const [invalidKey, setInvalidKey] = useState<string | null>(null);
-  // Última prévia da ferramenta: segura as cotas enquanto o cursor vai da prévia até o valor ou o "I" (C05).
-  const lastPreview = useRef<{ tool: string; dims: TempDim[] }>({ tool: '', dims: [] });
+  // Fantasma da última prévia: segura as cotas enquanto o cursor vai da prévia até o valor ou o "I" (C05).
+  const lastPreview = useRef<PreviewCache>(semPrevia());
   // `tick` entra só para recalcular quando a ferramenta ou a vista se mexem.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const viewport = useMemo(() => editor.viewport(), [tick, tool, ctx.project]);
@@ -90,11 +108,23 @@ export function TempDimsOverlay(): ReactElement | null {
 
   const toScreen = (p: { x: number; y: number }): { x: number; y: number } => worldToScreen(viewport, p);
   const cursorPx = cursor ? toScreen(cursor) : null;
+  // A prévia guardada só vale para a MESMA instância da ferramenta (`editor.activeTool` é recriada a cada `activate()`)
+  // e no MESMO escopo: reativar a ferramenta, trocar de nível, de vista ou de projeto zera o fantasma.
+  const sameScope =
+    lastPreview.current.tool === editor.activeTool &&
+    lastPreview.current.toolId === tool &&
+    lastPreview.current.levelId === ctx.levelId &&
+    lastPreview.current.view === view &&
+    lastPreview.current.project === ctx.project;
   let dims = fresh;
-  if (!previewing) lastPreview.current = { tool: '', dims: [] };
-  else if (fresh.length > 0) lastPreview.current = { tool, dims: fresh };
-  else if (lastPreview.current.tool === tool && holdsLastPreview(0, lastPreview.current.dims.map((d) => valueRect(viewOfDim(d, toScreen, 1 / viewport.zoom, null).textAt)), cursorPx)) dims = lastPreview.current.dims;
-  else lastPreview.current = { tool: '', dims: [] };
+  if (!previewing) lastPreview.current = semPrevia();
+  // Só cota acionável (editável) sobrevive à prévia: o rascunho de parede/grade é de leitura e não pode deixar caixas
+  // antigas sobre o desenho depois de terminar, cancelar ou reiniciar a ferramenta.
+  else if (fresh.length > 0) {
+    lastPreview.current = fresh.some(dimAcionavel) ? { tool: editor.activeTool, toolId: tool, levelId: ctx.levelId, view, project: ctx.project, dims: fresh } : semPrevia();
+  } else if (sameScope && holdsLastPreview(0, lastPreview.current.dims.map((d) => valueRect(viewOfDim(d, toScreen, 1 / viewport.zoom, null).textAt)), cursorPx)) {
+    dims = lastPreview.current.dims;
+  } else lastPreview.current = semPrevia();
   if (dims.length === 0) return null;
   const views = dims.map((d) => ({ dim: d, view: viewOfDim(d, toScreen, 1 / viewport.zoom, invalidKey) }));
 
@@ -133,8 +163,10 @@ export function TempDimsOverlay(): ReactElement | null {
 
   // Pontas vivas (em tela): só nelas o clique da prévia é do canvas; valor e "I" nunca deixam o clique criar geometria.
   const liveEnds = dims.flatMap((d) => d.ends.map((e) => toScreen(e.at)));
-  // Alça: folga para o imã (o cursor fica ao lado do ponto). Valor e "I": só passam ao canvas se cobrem o cursor (trecho curto).
-  const captures = (rect: ScreenRect, clearance?: number): 'auto' | 'none' => auto(capturesPointer(rect, cursorPx, previewing, liveEnds, clearance));
+  // Alça: folga para o imã (o cursor fica ao lado do ponto). Valor e "I": só passam ao canvas se cobrem o cursor (trecho
+  // curto). Cota de leitura não tem ação: `pointerEvents: none` e o clique atravessa até a ferramenta.
+  const captures = (rect: ScreenRect, acionavel: boolean, clearance?: number): 'auto' | 'none' =>
+    auto(capturaCota(rect, cursorPx, previewing, liveEnds, acionavel, clearance));
   const widthOf = (d: TempDim): number => larguraDoCampo(editing?.key === d.key ? editing.text : dimText(d, format));
   const valueRects = views.map(({ dim, view }) => valueRect(view.textAt, widthOf(dim)));
   const gripRects = views.flatMap(({ view }) => view.grips.map((g) => rectAround(g.at, 10)));
@@ -165,7 +197,7 @@ export function TempDimsOverlay(): ReactElement | null {
               aria-label={`Cota: ${dim.key.split(':').pop()}`}
               title={view.editable ? 'Digite a medida e pressione Enter' : 'Cota de leitura'}
               readOnly={!view.editable}
-              style={{ ...BOX, width, left: view.textAt.x, top: view.textAt.y, transform: `translate(-50%, -50%) rotate(${-(view.textRotation ?? 0)}deg)`, appearance: 'none', lineHeight: '22px', textShadow: '0 0 2px var(--panel), 0 0 3px var(--panel)', pointerEvents: captures(valueRect(view.textAt, width), 0), ...(view.invalid ? { color: DANGER } : {}) }}
+              style={{ ...BOX, width, left: view.textAt.x, top: view.textAt.y, transform: `translate(-50%, -50%) rotate(${-(view.textRotation ?? 0)}deg)`, appearance: 'none', lineHeight: '22px', textShadow: '0 0 2px var(--panel), 0 0 3px var(--panel)', pointerEvents: captures(valueRect(view.textAt, width), view.editable, 0), ...(view.invalid ? { color: DANGER } : {}) }}
               value={texto}
               onPointerDown={stop}
               onPointerUp={stop}
@@ -196,7 +228,7 @@ export function TempDimsOverlay(): ReactElement | null {
                 type="button"
                 aria-label={g.title}
                 title={g.title}
-                style={{ ...GRIP, left: g.at.x, top: g.at.y, pointerEvents: captures(rectAround(g.at, 10)) }}
+                style={{ ...GRIP, left: g.at.x, top: g.at.y, pointerEvents: captures(rectAround(g.at, 10), view.editable) }}
                 onPointerDown={stop}
                 onPointerUp={stop}
                 onPointerMove={hover}
@@ -214,7 +246,7 @@ export function TempDimsOverlay(): ReactElement | null {
         className="btn"
         aria-label="Converter em cotas permanentes"
         title="Converter em cotas permanentes"
-        style={{ position: 'absolute', left: convert.x, top: convert.y, width: convert.w, height: convert.h, padding: 0, pointerEvents: captures(convert, 0), zIndex: 13 }}
+        style={{ position: 'absolute', left: convert.x, top: convert.y, width: convert.w, height: convert.h, padding: 0, pointerEvents: captures(convert, true, 0), zIndex: 13 }}
         onPointerDown={stop}
         onPointerUp={stop}
         onPointerMove={hover}

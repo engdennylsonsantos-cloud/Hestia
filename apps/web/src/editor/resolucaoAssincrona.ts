@@ -8,6 +8,8 @@ import { criarClienteResolucao } from './resolveWorker.ts';
 
 /** Atraso (ms) do aviso à interface: resoluções que chegam juntas geram um único redesenho. */
 const ATRASO_AVISO_MS = 16;
+/** Prazo (ms) do idle para o prewarm começar quando o navegador não avisa que está ocioso a tempo. */
+const IDLE_TIMEOUT_MS = 500;
 
 /** O que já está pronto para um nível: a resolução de nível e as junções (só o que foi pedido). */
 interface Pronto {
@@ -31,10 +33,22 @@ export interface OpcoesResolucaoProgressiva {
   aoMudar?: () => void;
   /** Eventos do fluxo de edição vindos daqui: `exato`, `juncoes`, `descartado` e `concluido` (ver `fluxoEdicao.ts`). */
   aoEvento?: (evento: EventoFluxo) => void;
+  /**
+   * Agenda a fila e o prewarm (padrão: `requestIdleCallback` para começar, senão `setTimeout`). O segundo plano só
+   * começa quando a thread está ociosa, para não competir com a planta.
+   */
+  agendarOcioso?: (tarefa: () => void) => void;
 }
 
 /** Ordem dos níveis em relação ao visível: o mais perto primeiro, desempate pelo índice. */
 const distanciaAoVisivel = (ids: Id[], visivel: Id | null, i: number): number => Math.abs(i - Math.max(0, visivel ? ids.indexOf(visivel) : 0));
+
+/** Agenda por tempo ocioso quando o navegador tem; senão por macrotarefa (o mesmo efeito de ceder a thread). */
+function agendarOciosoPadrao(tarefa: () => void): void {
+  const ric = (globalThis as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+  if (typeof ric === 'function') ric(tarefa, { timeout: IDLE_TIMEOUT_MS });
+  else setTimeout(tarefa, 0);
+}
 
 /**
  * Resolução progressiva dos níveis do projeto. O nível visível e o seu vizinho imediato são resolvidos na hora (ver
@@ -51,6 +65,7 @@ export class ResolucaoProgressiva {
   private readonly cliente: ClienteResolucao;
   private readonly aoMudar: () => void;
   private readonly aoEvento: (evento: EventoFluxo) => void;
+  private readonly agendarOcioso: (tarefa: () => void) => void;
   private projeto: Project | null = null;
   private versaoProjeto = 0;
   /** Último resultado exato aplicado de cada nível, com a versão do projeto de que saiu: base dos patches de diferença. */
@@ -71,6 +86,13 @@ export class ResolucaoProgressiva {
   private voo: Voo | null = null;
   /** Verdadeiro depois de `cancelar()`: a fila não dispara mais pedidos até um `abrir`. */
   private parado = false;
+  /**
+   * Níveis do prewarm em curso (a 3D vai precisar deles). Enquanto não estiver `null`, a fila resolve só o `nivel`
+   * desses alvos — as junções ficam para depois, quando o prewarm terminar. `null`: fila normal.
+   */
+  private preaquecendo: Set<Id> | null = null;
+  /** Geração do prewarm: `abrir`/`cancelar` invalidam a tarefa ociosa já agendada. */
+  private prewarmGeracao = 0;
   private tokens = 0;
   private avisoAgendado = false;
   private versaoResolucao = 0;
@@ -79,6 +101,7 @@ export class ResolucaoProgressiva {
     this.cliente = opcoes.cliente ?? criarClienteResolucao({ usarWorker: true });
     this.aoMudar = opcoes.aoMudar ?? (() => undefined);
     this.aoEvento = opcoes.aoEvento ?? (() => undefined);
+    this.agendarOcioso = opcoes.agendarOcioso ?? agendarOciosoPadrao;
   }
 
   /** Contador de versão da resolução: a planta observa para saber que algo ficou pronto ou mudou. */
@@ -92,6 +115,7 @@ export class ResolucaoProgressiva {
    */
   abrir(p: Project, versao?: number): Id[] {
     this.parado = false;
+    this.cancelarPrewarm();
     this.cliente.cancelarTodos();
     this.voo = null;
     this.prontos.clear();
@@ -105,7 +129,8 @@ export class ResolucaoProgressiva {
     this.ocioso = false;
     this.visivel = p.levels[0]?.id ?? null;
     this.versaoResolucao++;
-    setTimeout(() => this.avancar(), 0);
+    // A fila começa em tempo ocioso: a planta tem a prioridade do primeiro quadro.
+    this.agendarOcioso(() => this.avancar());
     return p.levels.slice(0, 2).map((l) => l.id);
   }
 
@@ -122,6 +147,8 @@ export class ResolucaoProgressiva {
     if (p === antes) return;
     const afetados = niveis ?? niveisAfetados(antes, p);
     this.projeto = p;
+    // Um nível novo (ou removido) muda os alvos do prewarm em curso; liberado continua fora da fila.
+    if (this.preaquecendo) this.preaquecendo = new Set(p.levels.map((l) => l.id).filter((id) => !this.liberados.has(id)));
     this.versaoProjeto = versao ?? this.versaoProjeto + 1;
     this.ocioso = false;
     if (afetados === 'todos') {
@@ -163,9 +190,43 @@ export class ResolucaoProgressiva {
     return !this.prontos.get(id)?.nivel && !this.sincronos.has(id);
   }
 
-  /** Resolução de nível já pronta em segundo plano (senão `null`). Não calcula nada. */
+  /**
+   * Resolução de nível já pronta (senão `null`). Não calcula nada. Inclui o nível calculado na thread da interface na
+   * abertura (`resolvido`): ele também está pronto e a 3D pode usá-lo sem refazer o cálculo.
+   */
   nivelPronto(id: Id): ResolvedLevel | null {
-    return this.prontos.get(id)?.nivel ?? null;
+    const pronto = this.prontos.get(id)?.nivel;
+    if (pronto) return pronto;
+    if (this.sincronos.has(id)) return this.anteriores.get(id)?.valor ?? null;
+    return null;
+  }
+
+  /** Todos os níveis do projeto (ou os `alvos`) já têm resolução pronta: a 3D pode montar de uma vez. */
+  niveisProntos(alvos?: readonly Id[]): boolean {
+    if (!this.projeto) return false;
+    const ids = alvos ?? this.projeto.levels.map((l) => l.id);
+    return ids.every((id) => this.nivelPronto(id) !== null);
+  }
+
+  /**
+   * Prewarm dos níveis para a primeira abertura da 3D: agenda em tempo ocioso a resolução dos níveis ainda não prontos
+   * (todos, por padrão), um pedido de cada vez e sem as junções — a 3D só precisa do `nivel`. Usa a mesma fila e o mesmo
+   * cache da planta (`receber`/`nivelPronto`), então não há cálculo duplicado: nível já pronto não é pedido de novo.
+   *
+   * É idempotente e não bloqueia a planta: cada passo cede a thread e o pedido segue no cliente de resolução. `abrir` e
+   * `cancelar` invalidam a tarefa ociosa pendente e encerram o prewarm.
+   */
+  preaquecerNiveis(alvos?: readonly Id[]): void {
+    const p = this.projeto;
+    if (!p || this.parado) return;
+    const ids = (alvos ?? p.levels.map((l) => l.id)).filter((id) => !this.liberados.has(id));
+    if (ids.length === 0 || this.niveisProntos(ids)) return; // nada a fazer: não acorda a fila à toa
+    this.preaquecendo = new Set(ids);
+    const geracao = this.prewarmGeracao;
+    this.agendarOcioso(() => {
+      if (geracao !== this.prewarmGeracao || this.parado) return; // cancelado por `abrir`/`cancelar`
+      this.avancar();
+    });
   }
 
   /**
@@ -193,14 +254,26 @@ export class ResolucaoProgressiva {
     this.prontos.delete(id);
     this.sincronos.delete(id);
     this.liberados.add(id);
+    // Nível liberado sai também do prewarm, senão ele esperaria para sempre por um resultado que não virá.
+    if (this.preaquecendo) {
+      this.preaquecendo.delete(id);
+      if (this.preaquecendo.size === 0) this.preaquecendo = null;
+    }
     if (this.voo?.nivel === id) this.cancelarVoo();
   }
 
   /** Desliga o segundo plano (desmontagem). Os pedidos pendentes são cancelados. */
   cancelar(): void {
     this.parado = true;
+    this.cancelarPrewarm();
     this.cliente.cancelarTodos();
     this.voo = null;
+  }
+
+  /** Encerra o prewarm e invalida a tarefa ociosa já agendada. */
+  private cancelarPrewarm(): void {
+    this.preaquecendo = null;
+    this.prewarmGeracao++;
   }
 
   /** Torna `id` o nível visível para a fila, sem cancelar o pedido em curso (ele termina e o próximo já é o visível). */
@@ -242,6 +315,7 @@ export class ResolucaoProgressiva {
     const ids = p.levels.map((l) => l.id);
     let melhor: { nivel: Id; tipo: TipoResolucao; distancia: number } | null = null;
     ids.forEach((id, i) => {
+      if (this.preaquecendo && !this.preaquecendo.has(id)) return; // prewarm: só os alvos
       const tipo = this.tipoPendente(id);
       if (!tipo) return;
       const distancia = distanciaAoVisivel(ids, this.visivel, i);
@@ -254,6 +328,8 @@ export class ResolucaoProgressiva {
     if (this.liberados.has(id)) return null;
     const e = this.prontos.get(id);
     if (!e?.nivel && !this.sincronos.has(id)) return 'nivel';
+    // No prewarm só o nível importa (é o que a 3D usa); as junções voltam quando ele terminar.
+    if (this.preaquecendo) return null;
     if (!e?.juncoes) return 'juncoes';
     return null;
   }
@@ -261,6 +337,8 @@ export class ResolucaoProgressiva {
   /** Dispara o próximo pedido se nenhum está em curso. Um pedido por vez. */
   private avancar(): void {
     if (this.parado || this.voo || !this.projeto) return;
+    // Prewarm concluído (ou alvos todos prontos): a fila volta ao normal, com as junções.
+    if (this.preaquecendo && this.niveisProntos([...this.preaquecendo])) this.preaquecendo = null;
     const alvo = this.proximo();
     if (!alvo) {
       if (!this.ocioso) {

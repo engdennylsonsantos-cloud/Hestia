@@ -7,6 +7,7 @@ import { buildContextMenu, type ContextMenuCtx, type MenuEntry, type MenuView } 
 import { useI18n, toolLabel } from '../editor/i18n.ts';
 import { repeatLast, selectPrevious, useRecent } from '../editor/recentCommands.ts';
 import { clickSelect3d, useUi } from '../editor/state.ts';
+import { hideSelectedCategoryInView, hideSelectionInView, revealActive, selectedCategories, temporaryIsolateSelection, temporarySelectedCategory, toggleRevealHidden, unhideAllInView, unhideSelectedCategoryInView, unhideSelectionInView, visibilityOf } from '../editor/viewVisibility.ts';
 import { startCreateSimilar } from '../editor/createSimilar.ts';
 import { comEditarPerimetro, EDITAR_PERIMETRO_ID, idPerimetroEditavel } from './perimeter/perimeterEditavel.ts';
 
@@ -34,6 +35,8 @@ function contextoAtual(view: MenuView): ContextMenuCtx {
   const kinds = ui.selection.map((id) => p.elements[id]?.kind ?? '').filter((k) => k !== '');
   const mesmoTipoDeCoisa = kinds.length > 0 && kinds.every((k) => k === kinds[0]);
   const tipo = ui.selection.length ? selectedTypeId(p, ui.selection) : null;
+  const cats = selectedCategories(p, ui.selection);
+  const vis = visibilityOf(p, ui);
   return {
     view,
     tool: ui.tool,
@@ -46,6 +49,9 @@ function contextoAtual(view: MenuView): ContextMenuCtx {
     propsOpen: ui.propsOpen,
     browserOpen: ui.browserOpen,
     lang,
+    reveal: revealActive(),
+    singleCategory: cats.length === 1 ? cats[0]! : null,
+    hasHidden: vis.hidden.size + vis.revealed.size > 0,
   };
 }
 
@@ -102,6 +108,14 @@ export function executaComandoDoMenu(id: string, view: MenuView, camera: Camera3
     case 'delete': editor.deleteSelection(); return;
     case 'selectAllView': editor.selectAllOfSelectedType(); return;
     case 'createSimilar': startCreateSimilar(editor.project, (id) => editor.setTool(id)); return;
+    case 'hideElements': hideSelectionInView(); return;
+    case 'hideCategory': hideSelectedCategoryInView(); return;
+    case 'unhideElements': unhideSelectionInView(); return;
+    case 'unhideCategory': unhideSelectedCategoryInView(); return;
+    case 'unhideAll': unhideAllInView(); return;
+    case 'isolateElements': temporaryIsolateSelection(); return;
+    case 'isolateCategory': temporarySelectedCategory(true); return;
+    case 'revealHidden': toggleRevealHidden(); return;
     case EDITAR_PERIMETRO_ID: editarPerimetroSelecionado(); return;
     default:
   }

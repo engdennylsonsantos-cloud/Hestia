@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capturesPointer, holdsLastPreview, rectAround, swallowsPointerButton } from './dimsHit.ts';
+import { capturesPointer, capturaCota, holdsLastPreview, rectAround, swallowsPointerButton } from './dimsHit.ts';
 
 const grip = rectAround({ x: 100, y: 100 }, 10);
 
@@ -34,6 +34,41 @@ describe('capturesPointer', () => {
   it('valor que cobre a ponta viva (trecho curto): o clique na ponta é do canvas', () => {
     const valor = rectAround({ x: 110, y: 100 }, 60);
     expect(capturesPointer(valor, { x: 102, y: 101 }, true, live)).toBe(false);
+  });
+});
+
+describe('capturaCota', () => {
+  // Campo do valor (62×22) longe das pontas vivas: o caso do rascunho sobre o meio do traçado.
+  const valor = rectAround({ x: 400, y: 300 }, 62);
+
+  it('cota de leitura (rascunho de parede/grade) não captura o ponteiro sobre o centro', () => {
+    expect(capturaCota(valor, { x: 400, y: 300 }, true, live, false)).toBe(false);
+    expect(capturaCota(valor, { x: 400, y: 300 }, false, live, false)).toBe(false);
+  });
+
+  it('cota de leitura sem cursor também não captura', () => {
+    expect(capturaCota(valor, null, true, live, false)).toBe(false);
+    expect(capturaCota(valor, null, false, live, false)).toBe(false);
+  });
+
+  it('cota editável com o cursor sobre o centro captura (C05)', () => {
+    expect(capturaCota(valor, { x: 400, y: 300 }, true, live, true)).toBe(true);
+    expect(capturaCota(valor, { x: 400, y: 300 }, false, live, true)).toBe(true);
+  });
+
+  it('cota editável sem cursor conhecido captura', () => {
+    expect(capturaCota(valor, null, true, live, true)).toBe(true);
+  });
+
+  it('cota editável que cobre a ponta viva deixa o clique ir ao canvas', () => {
+    const naPonta = rectAround({ x: 110, y: 100 }, 62);
+    expect(capturaCota(naPonta, { x: 102, y: 101 }, true, live, true)).toBe(false);
+  });
+
+  it('a folga da alça continua valendo para cota editável', () => {
+    expect(capturaCota(grip, { x: 112, y: 100 }, true, live, true)).toBe(false);
+    expect(capturaCota(grip, { x: 118, y: 100 }, true, live, true)).toBe(true);
+    expect(capturaCota(grip, { x: 100, y: 100 }, true, live, false)).toBe(false);
   });
 });
 

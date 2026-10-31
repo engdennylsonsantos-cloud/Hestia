@@ -104,12 +104,25 @@ describe('composição da prancha', () => {
     expect(list.groups[list.groups.length - 1]!.texts.map((t) => t.text)).toContain('Corte AA · 1:50');
   });
 
-  it('3D não vai no PDF: o quadro traz o aviso e nada de desenho', () => {
+  it('3D sai vetorial na prancha: arestas visíveis, sem o aviso antigo', () => {
     const p = projectWithWall();
     p.sheets = [sheet([{ id: 'v3', view: { kind: '3d' }, at: { x: 20, y: 20 }, size: { w: 200, h: 100 }, scale: 100 }])];
     const list = buildSheetDrawList(p, 'sh1')!;
+    expect(list.groups[0]!.texts).toEqual([]);
     expect(list.groups[0]!.fills).toHaveLength(0);
-    expect(list.groups[0]!.texts.map((t) => t.text)).toEqual(['3D não vai no PDF']);
+    const paths = list.groups[0]!.paths;
+    expect(paths.length).toBeGreaterThan(0);
+    for (const s of paths) {
+      expect(s.widthMm).toBeGreaterThan(0);
+      for (const q of s.pts) {
+        expect(q.x).toBeGreaterThanOrEqual(20 - 0.01);
+        expect(q.x).toBeLessThanOrEqual(220 + 0.01);
+        expect(q.y).toBeGreaterThanOrEqual(20 - 0.01);
+        expect(q.y).toBeLessThanOrEqual(120 + 0.01);
+      }
+    }
+    // A legenda não mostra escala de desenho no 3D.
+    expect(list.groups[1]!.texts.map((t) => t.text)).toContain('3D · Sem escala');
   });
 
   it('nível inexistente não quebra: a vista fica vazia com a legenda "Vista inexistente"', () => {

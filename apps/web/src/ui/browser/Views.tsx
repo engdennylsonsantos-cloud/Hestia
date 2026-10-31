@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactElement } from 'react';
-import { areaPlansOf, formatQuantity, projectSheets, type Element, type SectionView, type SheetViewSource } from '@hestia/model';
+import { areaPlansOf, formatQuantity, projectSheets, projectView3DPoints, view3DPointOf, view3DPointsUsage, type Element, type SectionView, type SheetViewSource, type View3DPoint } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { duplicateSheetCommand, addSheetAction } from '../../editor/sheetActions.ts';
 import { moveSheetCommand } from '../../editor/sheetNumbering.ts';
@@ -7,6 +7,7 @@ import { beginSheetDrag, endSheetDrag, SHEET_VIEW_MIME } from '../../editor/shee
 import { createAreaPlansForLevels, openAreaPlan } from '../../editor/areaPlanActions.ts';
 import { useUi, type DialogKind } from '../../editor/state.ts';
 import { activateView } from '../../editor/viewTabActions.ts';
+import { atualizarPonto3DAction, excluirPonto3DAction, irParaPonto3DAction, renomearPonto3DAction, salvarPonto3DAction } from '../../editor/view3dPointActions.ts';
 import { Node, type DragData, type MenuItem } from './Tree.tsx';
 import { useUnits } from '../useUnits.ts';
 
@@ -66,6 +67,75 @@ function SectionNode({ view }: { view: SectionView }): ReactElement {
   return <Node id={`view:${view.id}`} label={label} icon={view.kind === 'section' ? 'section' : 'elevation'} bold={active} title="Duplo clique abre a vista; arraste para a prancha; botão direito: renomear, excluir." onOpen={open} menu={menu} drag={dragView({ kind: 'section', sectionId: view.id }, `${view.kind === 'elevation' ? 'Elevação' : 'Corte'} · ${view.name}`)} />;
 }
 
+/** Mostra na barra de status o resultado (ou a recusa) de uma ação de ponto de vista 3D. */
+function ponto3DAction(run: () => string | null, ok: string): void {
+  const erro = run();
+  say(erro ?? ok);
+}
+
+/**
+ * Ponto de vista 3D salvo (catálogo de câmeras): duplo clique leva o 3D à câmera do ponto; arraste para a prancha;
+ * botão direito atualiza com a câmera atual, renomeia (no lugar, como os cortes) ou exclui.
+ * Exportado para o teste de marcação (não usa o projeto global: recebe o ponto por propriedade).
+ */
+export function View3DPointNode({ point, pranchas }: { point: View3DPoint; pranchas: number }): ReactElement {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(point.name);
+  // Enter, Esc e a perda de foco podem disparar em sequência; só o primeiro encerra a edição.
+  const editingRef = useRef(false);
+  const irPara = (): void => ponto3DAction(() => irParaPonto3DAction(point.id), `Vista 3D: ${point.name}.`);
+  const start = (): void => {
+    editingRef.current = true;
+    setDraft(point.name);
+    setEditing(true);
+  };
+  const finish = (save: boolean): void => {
+    if (!editingRef.current) return;
+    editingRef.current = false;
+    setEditing(false);
+    if (save && draft.trim() !== point.name) ponto3DAction(() => renomearPonto3DAction(editor.store, point.id, draft), `Ponto de vista renomeado para "${draft.trim()}".`);
+  };
+  const label = editing ? (
+    <input
+      className="input view-rename"
+      aria-label={`Novo nome de ${point.name}`}
+      autoFocus
+      value={draft}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => setDraft(e.target.value)}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') finish(true);
+        else if (e.key === 'Escape') finish(false);
+      }}
+      onBlur={() => finish(true)}
+    />
+  ) : point.name;
+  const menu: MenuItem[] = [
+    { label: 'Ir para o 3D', run: irPara, hint: 'Abre o Modelo 3D com a câmera salva neste ponto.' },
+    { label: 'Atualizar com a câmera atual', run: () => ponto3DAction(() => atualizarPonto3DAction(editor.store, point.id), `Ponto "${point.name}" atualizado com a câmera atual.`), hint: 'Grava a órbita da vista 3D no ponto; as pranchas que o usam acompanham.' },
+    { label: 'Renomear…', run: start },
+    {
+      label: 'Excluir',
+      run: () => ponto3DAction(() => excluirPonto3DAction(editor.store, point.id), 'Ponto de vista 3D excluído; as pranchas que o usavam mantêm a câmera.'),
+      danger: true,
+      sep: true,
+      hint: pranchas ? `Usado em ${pranchas} vista${pranchas === 1 ? '' : 's'} de prancha; elas mantêm a câmera.` : 'Nenhuma prancha usa este ponto.',
+    },
+  ];
+  return (
+    <Node
+      id={`v3d:${point.id}`}
+      label={label}
+      icon="cube"
+      title="Duplo clique leva o 3D a este ponto; arraste para a prancha; botão direito: atualizar, renomear, excluir."
+      onOpen={irPara}
+      menu={menu}
+      drag={dragView({ kind: '3d', pointId: point.id }, `3D · ${point.name}`)}
+    />
+  );
+}
+
 export function ViewsTree(): ReactElement {
   const p = useProject();
   const units = useUnits();
@@ -76,7 +146,14 @@ export function ViewsTree(): ReactElement {
   const areaPlans = areaPlansOf(p);
   const sections = p.views.filter((v) => v.kind === 'section');
   const elevations = p.views.filter((v) => v.kind === 'elevation');
+  const pontos3D = projectView3DPoints(p);
   const genMenu: MenuItem[] = [{ label: 'Gerar elevações (Norte, Sul, Leste, Oeste)', run: () => editor.generateElevations(), hint: 'Cria as quatro em volta das paredes do nível ativo; substitui as de mesmo nome.' }];
+  /** Salva a câmera da vista 3D viva como ponto novo; o nome padrão (Vista 3D, Vista 3D 2…) renomeia-se no menu do ponto. */
+  const salvarVista3D = (): void => {
+    const r = salvarPonto3DAction(editor.store);
+    if ('erro' in r) return say(r.erro);
+    say(`Ponto de vista 3D "${view3DPointOf(editor.project, r.id)?.name ?? 'Vista 3D'}" salvo. Botão direito no ponto: renomear.`);
+  };
   return (
     <Node id="g:views" label="Vistas (todas)" icon="levels" group open>
       <Node id="g:plans" label="Plantas de piso (Planta de piso)" group open menu={[{ label: 'Níveis…', run: () => useUi.setState({ dialog: 'levels' }) }]}>
@@ -138,8 +215,9 @@ export function ViewsTree(): ReactElement {
           />
         ))}
       </Node>
-      <Node id="g:3d" label="Vistas 3D (3D View)" group open>
-        <Node id="v:3d" label="Modelo 3D" icon="cube" bold={view === '3d'} onOpen={() => activateView({ kind: '3d' })} menu={[{ label: 'Abrir', run: () => activateView({ kind: '3d' }) }]} drag={dragView({ kind: '3d' }, 'Modelo 3D')} />
+      <Node id="g:3d" label="Vistas 3D (3D View)" group open menu={[{ label: 'Salvar vista atual…', run: salvarVista3D, hint: 'Guarda a câmera da vista 3D aberta como um ponto do catálogo.' }]}>
+        <Node id="v:3d" label="Modelo 3D" icon="cube" bold={view === '3d'} onOpen={() => activateView({ kind: '3d' })} menu={[{ label: 'Abrir', run: () => activateView({ kind: '3d' }) }, { label: 'Salvar vista atual…', run: salvarVista3D, sep: true, hint: 'Guarda a câmera da vista 3D aberta como um ponto do catálogo.' }]} drag={dragView({ kind: '3d' }, 'Modelo 3D')} />
+        {pontos3D.map((pt) => <View3DPointNode key={pt.id} point={pt} pranchas={view3DPointsUsage(p, pt.id).length} />)}
       </Node>
       <Node id="g:elev" label="Elevações (Elevação de edifício)" group menu={genMenu} empty="Nenhuma elevação. Botão direito: Gerar elevações.">
         {elevations.length ? elevations.map((v) => <SectionNode key={v.id} view={v} />) : undefined}

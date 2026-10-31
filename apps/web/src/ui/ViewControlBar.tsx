@@ -4,6 +4,7 @@ import { editor, useProject } from '../editor/controller.ts';
 import { editLevelGraphics, editSectionGraphics, editView3D, showLevelsOn, type GraphicsEdit } from '../editor/graphicsActions.ts';
 import { useI18n } from '../editor/i18n.ts';
 import { useUi } from '../editor/state.ts';
+import { resetTemporaryHidden, temporaryHideActive, temporaryHideSelection, toggleRevealHidden, visibilityOf } from '../editor/viewVisibility.ts';
 import { DETAIL_LABEL, PLAN_SCALES, VISUAL_STYLE_LABEL } from './graphicsLabels.ts';
 import { Icon } from './Icon.tsx';
 import { FitRow, type FitItem } from './ribbon/FitRow.tsx';
@@ -15,15 +16,17 @@ import { FitRow, type FitItem } from './ribbon/FitRow.tsx';
  * o que não cabe recolhe pelo fim para o botão "»" (ver `FitRow`); escala e nível de detalhe são os últimos a sair.
  */
 
-const SOON = ['Caminho do sol', 'Cortar vista', 'Mostrar região de corte', 'Ocultar/isolar temporário', 'Revelar elementos ocultos', 'Propriedades temporárias da vista'] as const;
-const SOON_EN = ['Sun Path', 'Crop View', 'Show Crop Region', 'Temporary Hide/Isolate', 'Reveal Hidden Elements', 'Temporary View Properties'] as const;
-const SOON_ICON = ['sun', 'crop', 'crop', 'isolate', 'eye', 'soon'] as const;
+const SOON = ['Caminho do sol', 'Cortar vista', 'Mostrar região de corte', 'Propriedades temporárias da vista'] as const;
+const SOON_EN = ['Sun Path', 'Crop View', 'Show Crop Region', 'Temporary View Properties'] as const;
+const SOON_ICON = ['sun', 'crop', 'crop', 'soon'] as const;
 
 export function ViewControlBar(): ReactElement | null {
   const p = useProject();
   const view = useUi((s) => s.view);
   const levelId = useUi((s) => s.levelId);
   const lang = useI18n((s) => s.lang);
+  const selection = useUi((s) => s.selection);
+  const viewTemp = useUi((s) => s.viewTemp);
   const pt = lang === 'pt';
   if (view === 'sheet') return null;
 
@@ -43,6 +46,11 @@ export function ViewControlBar(): ReactElement | null {
     <button className={`vcb-btn${on ? ' on' : ''}`} aria-pressed={on} title={tip} onClick={onClick}>
       <Icon name={icon} size={14} />
       <span>{label}</span>
+    </button>
+  );
+  const iconToggle = (icon: string, on: boolean, onClick: () => void, tip: string): ReactElement => (
+    <button className={`vcb-btn${on ? ' on' : ''}`} aria-pressed={on} aria-label={tip} title={tip} onClick={onClick}>
+      <Icon name={icon} size={14} />
     </button>
   );
 
@@ -103,19 +111,21 @@ export function ViewControlBar(): ReactElement | null {
     // Níveis de referência (datum) no 3D: só ícone, como os demais alternadores da barra. Ausente no projeto = ligados.
     const levelsOn = showLevelsOn(v3);
     const levelsTip = pt ? 'Mostrar/ocultar níveis de referência' : 'Show/hide reference levels';
-    const levelsBtn = (
-      <button
-        className={`vcb-btn${levelsOn ? ' on' : ''}`}
-        aria-pressed={levelsOn}
-        aria-label={levelsTip}
-        title={levelsTip}
-        onClick={() => edit3d({ showLevels: !levelsOn })}
-      >
-        <Icon name="levels" size={14} />
-      </button>
-    );
-    items.push(grouped('niveis', 1, levelsBtn, false));
+    items.push(grouped('niveis', 1, iconToggle('levels', levelsOn, () => edit3d({ showLevels: !levelsOn }), levelsTip), false));
   }
+  // Visibilidade temporária e Reveal valem em todas as vistas (planta, área, corte e 3D).
+  void viewTemp;
+  const vis = visibilityOf(p, useUi.getState());
+  const tempOn = temporaryHideActive();
+  const tempTip = pt ? 'Ocultar/restaurar temporário (HH/HR)' : 'Temporary hide/reset (HH/HR)';
+  const tempBtn = toggle(pt ? (tempOn ? 'Restaurar' : 'Ocultar') : tempOn ? 'Reset' : 'Hide', 'isolate', tempOn, () => {
+    if (tempOn) resetTemporaryHidden();
+    else if (selection.length > 0) temporaryHideSelection();
+    else useUi.setState({ status: pt ? 'Selecione elementos para ocultar temporariamente.' : 'Select elements to hide temporarily.' });
+  }, tempTip);
+  items.push(grouped('temporario', 1, tempBtn, true));
+  const revealTip = pt ? (vis.reveal ? 'Sair de Revelar elementos ocultos (RH)' : 'Revelar elementos ocultos (RH)') : vis.reveal ? 'Exit Reveal Hidden Elements (RH)' : 'Reveal Hidden Elements (RH)';
+  items.push(grouped('revelar', 1, iconToggle('eye', vis.reveal, toggleRevealHidden, revealTip), false));
   SOON.forEach((label, i) => {
     const en = SOON_EN[i] ?? label;
     const icon = SOON_ICON[i] ?? 'soon';

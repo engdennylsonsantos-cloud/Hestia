@@ -5,7 +5,7 @@ import { angularDimensionGeometry, areaPlanOf, formatQuantity, isCeiling, isFloo
 import { resolveAngularDimension } from '@hestia/engine';
 import { ToolBase } from './base.ts';
 import { ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews } from './edit.ts';
-import { genericAt, idsInBox, pickAt } from './pick.ts';
+import { genericAt, idsInBox, pickAt, cadAt, cadIdsInBox } from './pick.ts';
 import { floorIdsInBox, pickFloorAt, ringRemoveVertex } from './floorPick.ts';
 import { pickRoomAt, roomIdsInBox } from './roomPick.ts';
 import { pickRoomSeparatorAt } from './roomSeparatorPick.ts';
@@ -200,6 +200,9 @@ export class SelectTool extends ToolBase {
     // Grade (do projeto, fora de project.elements): acima de escada, piso e demais áreas; abaixo de parede e abertura.
     const gr = ly && !ly.grids ? null : pickGridAt(pr, at, mpp);
     if (gr) return { id: gr, kind: 'grid' };
+    // Desenho CAD importado: clicar na linha do DXF seleciona o desenho (Propriedades, ocultar, mover e excluir).
+    const cd = cadAt(pr, lv, at, mpp);
+    if (cd) return { id: cd, kind: 'generic' };
     const st = pickStairAt(vp, lv, at, mpp);
     if (st) return { id: st, kind: 'stair' };
     const rp = pickRampAt(pr, lv, at, mpp);
@@ -515,6 +518,7 @@ export class SelectTool extends ToolBase {
           ...stairIdsInBox(vp, this.env.levelId(), this.downPt, p.raw),
           ...rampIdsInBox(vp, this.env.levelId(), this.downPt, p.raw),
           ...roomIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
+          ...cadIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...(ly && !ly.grids ? [] : gridIdsInBox(pr, this.downPt, p.raw)),
           ...(ly && !ly.sectionMarks ? [] : sectionMarkIdsInBox(pr, this.env.levelId(), this.downPt, p.raw)),
           ...roomTagIdsInBox(pr, this.downPt, p.raw, this.planId()),

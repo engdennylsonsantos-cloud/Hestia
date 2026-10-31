@@ -1,5 +1,5 @@
 import type { ResolvedLevel, ResolvedRamp, ResolvedStair } from '@hestia/engine';
-import type { Id, Project } from '@hestia/model';
+import { isOpening, isWall, type AreaPlanAnnotations, type Id, type Project } from '@hestia/model';
 import { ambientesDoNivel, escadasDoNivel, lajesDoNivel, pisosDoNivel, rampasDoNivel, telhadosDoNivel } from './resolucao.ts';
 import { planStyleOf, type PlanStyle } from './style.ts';
 import { planViewOf, type PlanView } from './view.ts';
@@ -26,6 +26,88 @@ export function planBelowOf(p: Project, levelId: Id, resolve: (id: Id) => Resolv
   return { below: resolve(id), belowFloors: pisosDoNivel(p, id), belowSlabs: lajesDoNivel(p, id), belowRoofs: telhadosDoNivel(p, id), belowRooms: ambientesDoNivel(p, id) };
 }
 
+/** Filtra as anotações de uma vista de área pelos ids ocultos (o mesmo `hidden` do modelo). */
+export function anotacoesSemOcultos(a: AreaPlanAnnotations, hidden: ReadonlySet<Id> | undefined): AreaPlanAnnotations {
+  if (!hidden?.size) return a;
+  const keep = <T extends { id: Id }>(xs: T[]): T[] => xs.filter((x) => !hidden.has(x.id));
+  return { dimensions: keep(a.dimensions), texts: keep(a.texts), detailLines: keep(a.detailLines), detailRegions: keep(a.detailRegions), tags: keep(a.tags) };
+}
+
+/**
+ * Projeto do nível sem as anotações ocultas (cotas, textos, linhas/regiões de detalhe, separadores e etiquetas) e sem as
+ * marcas de corte ocultas: `noteOps` e as etiquetas leem o nível, não recebem um conjunto de ocultos, então o filtro
+ * entra antes do desenho. Sem ocultos, o mesmo projeto (o caminho comum não cria objeto novo).
+ */
+export function semAnotacoesOcultas(p: Project, levelId: Id, hidden: ReadonlySet<Id> | undefined): Project {
+  if (!hidden?.size) return p;
+  const keep = <T extends { id: Id }>(xs: T[] | undefined): T[] | undefined => xs?.filter((x) => !hidden.has(x.id));
+  const levels = p.levels.map((l) => {
+    if (l.id !== levelId) return l;
+    const next = { ...l };
+    if (l.dimensions) next.dimensions = keep(l.dimensions);
+    if (l.texts) next.texts = keep(l.texts);
+    if (l.detailLines) next.detailLines = keep(l.detailLines);
+    if (l.detailRegions) next.detailRegions = keep(l.detailRegions);
+    if (l.roomSeparators) next.roomSeparators = keep(l.roomSeparators);
+    if (l.tags) next.tags = keep(l.tags);
+    return next;
+  });
+  return { ...p, levels, views: p.views.filter((v) => !hidden.has(v.id)) };
+}
+
+/** Projeto sem os elementos ocultos (o CAD importado é desenhado pelo projeto inteiro, sem receber `hidden`). */
+export function semElementosOcultos(p: Project, hidden: ReadonlySet<Id> | undefined): Project {
+  if (!hidden?.size) return p;
+  const elements = { ...p.elements };
+  let mudou = false;
+  for (const id of hidden) {
+    if (!elements[id]) continue;
+    delete elements[id];
+    mudou = true;
+  }
+  return mudou ? { ...p, elements } : p;
+}
+
+/**
+ * Junta dois conjuntos de ocultos sem repetição. Sem nenhum id, `undefined` (o caminho comum, sem filtro).
+ */
+function uniaoOcultos(a: ReadonlySet<Id> | undefined, b: readonly Id[] | undefined): ReadonlySet<Id> | undefined {
+  if (!b?.length) return a;
+  if (!a?.size) return new Set(b);
+  const s = new Set<Id>(a);
+  for (const id of b) s.add(id);
+  return s;
+}
+
+/**
+ * Projetos com as paredes ocultas no Hide in View fora (memo por projeto e conjunto de paredes): a resolução da planta
+ * (`planViewOf`) enxerga o nível sem elas, então a junção dos vizinhos fecha e nenhuma silhueta da parede oculta sobra.
+ * As aberturas dessas paredes saem junto (não há mais hospedeiro). O projeto é imutável, então o memo não envelhece.
+ */
+const semParedes = new WeakMap<Project, Map<string, Project>>();
+
+function projetoSemParedes(p: Project, levelId: Id, ids: readonly Id[]): Project {
+  if (ids.length === 0) return p;
+  const key = `${levelId}|${[...ids].sort().join(',')}`;
+  let porChave = semParedes.get(p);
+  if (!porChave) {
+    porChave = new Map();
+    semParedes.set(p, porChave);
+  }
+  const hit = porChave.get(key);
+  if (hit) return hit;
+  const ocultas = new Set(ids.filter((id) => {
+    const e = p.elements[id];
+    return isWall(e) && e.levelId === levelId;
+  }));
+  const elements = { ...p.elements };
+  for (const id of ocultas) delete elements[id];
+  for (const [id, e] of Object.entries(p.elements)) if (isOpening(e) && ocultas.has(e.hostId)) delete elements[id];
+  const next: Project = { ...p, elements };
+  porChave.set(key, next);
+  return next;
+}
+
 /**
  * Contexto derivado do nível e da vista: o mesmo para a geometria e para a sobreposição. Não depende de pan, de
  * seleção nem do cursor; só do projeto, do nível, do zoom e da planta de cobertura. Por isso a sobreposição pode ser
@@ -40,10 +122,16 @@ export interface PlanContext {
   up: boolean;
   /** Geometria do nível que a planta desenha (com o intervalo de vista, ou a padrão). */
   geo: ResolvedLevel;
+  /** Ocultos efetivos da vista: intervalo, categoria (em `view`) e Hide in View + temporário (`input.hidden`), sem os revelados. */
   hidden: ReadonlySet<Id> | undefined;
+  /**
+   * Paredes ocultas pelo Hide in View (não pelo intervalo nem pela categoria): são as que a vista resolve fora do nível,
+   * então as aberturas delas também não têm hospedeiro para desenhar.
+   */
+  hiddenWalls: ReadonlySet<Id> | undefined;
   /** Telhados ocultos pela categoria. */
   roofOff: ReadonlySet<Id> | undefined;
-  /** Telhados ocultos para a seleção e o realce (a vista ou a categoria). */
+  /** Telhados ocultos para a seleção e o realce (a vista, a categoria ou o Hide in View). */
   roofHidden: ReadonlySet<Id> | undefined;
   /** Escadas do nível que a planta mostra (sem as ocultas pela vista). */
   stairs: ResolvedStair[];
@@ -56,13 +144,24 @@ export function planContext(input: PlanInput): PlanContext {
   const style = planStyleOf(p, input.levelId, v.zoom, input.areaPlan?.scale);
   const paint = style.paint;
   const rp = input.roofPlanMode === true;
-  const view = rp ? null : planViewOf(p, input.levelId);
+  const revealed = input.revealed;
+  // Hide in View (permanente + temporário) que não está no modo Reveal. O Reveal o desenha de novo, com borda azul.
+  const doUsuario = input.hidden ? [...input.hidden].filter((id) => !revealed?.has(id)) : undefined;
+  // Parede oculta pelo usuário: a vista é resolvida sem ela (as vizinhas fecham a junção); o id continua em `hidden`.
+  const paredesOcultas = doUsuario?.filter((id) => {
+    const e = p.elements[id];
+    return isWall(e) && e.levelId === input.levelId;
+  });
+  const pVis = paredesOcultas?.length ? projetoSemParedes(p, input.levelId, paredesOcultas) : p;
+  const view = rp ? null : planViewOf(pVis, input.levelId);
   const up = view?.range.direction === 'up';
   const geo: ResolvedLevel = view ? view.geo : input.resolved;
-  const hidden = view?.hidden;
+  // `view.hidden` já traz o intervalo e a categoria; ele manda sobre o Reveal (o intervalo não é Hide in View).
+  const hidden = uniaoOcultos(view?.hidden, doUsuario);
   const roofOff: ReadonlySet<Id> | undefined = view ? view.categoryHidden : paint.roof.visible ? undefined : new Set(telhadosDoNivel(p, input.levelId).map((r) => r.roofId));
-  const roofHidden = view ? hidden : roofOff;
+  const roofHidden = view ? hidden : uniaoOcultos(roofOff, doUsuario);
   const stairs = escadasDoNivel(p, input.levelId).filter((s) => !hidden?.has(s.id));
   const ramps = rampasDoNivel(p, input.levelId).filter((r) => !hidden?.has(r.id));
-  return { style, rp, view, up, geo, hidden, roofOff, roofHidden, stairs, ramps };
+  const hiddenWalls = paredesOcultas?.length ? new Set(paredesOcultas) : undefined;
+  return { style, rp, view, up, geo, hidden, hiddenWalls, roofOff, roofHidden, stairs, ramps };
 }

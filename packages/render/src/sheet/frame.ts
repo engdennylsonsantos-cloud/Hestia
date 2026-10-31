@@ -1,5 +1,5 @@
 import type { Project, Sheet, SheetViewport, SheetViewSource } from '@hestia/model';
-import { sectionTitleOf, sheetInnerBox, areaPlanOf, viewportFrameVisible, viewportLabel } from '@hestia/model';
+import { sectionTitleOf, sheetInnerBox, areaPlanOf, view3DPointOf, viewportFrameVisible, viewportLabel } from '@hestia/model';
 import { emptyParts, type ViewportParts } from './types.ts';
 
 /** Altura das linhas do carimbo e largura da caixa (mm de papel). */
@@ -27,10 +27,11 @@ const rectPts = (x0: number, y0: number, x1: number, y1: number) => [
   { x: x0, y: y1 },
 ];
 
-/** Nome da vista na legenda: nível, corte ou "3D", com a escala. Vista sem origem válida fica "Vista inexistente". */
+/** Nome da vista na legenda: nível, corte ou o ponto de vista 3D. Vista sem origem válida fica "Vista inexistente". */
 export function captionOf(p: Project, view: SheetViewSource, vp: SheetViewport): string {
   const base = vp.title?.trim() ? vp.title.trim() : sourceName(p, view);
-  return `${base} · 1:${vp.scale}`;
+  // Vista 3D não tem escala de desenho (a câmera define o enquadramento): o Revit imprime "NTS".
+  return view.kind === '3d' ? `${base} · Sem escala` : `${base} · 1:${vp.scale}`;
 }
 
 function sourceName(p: Project, view: SheetViewSource): string {
@@ -41,13 +42,13 @@ function sourceName(p: Project, view: SheetViewSource): string {
     const found = p.views.find((v) => v.id === view.sectionId);
     return found ? sectionTitleOf(found) : 'Vista inexistente';
   }
-  return '3D';
+  return (view.pointId ? view3DPointOf(p, view.pointId)?.name : undefined) ?? '3D';
 }
 
-/** Escalas usadas na prancha, sem repetição, em ordem: "1:50 · 1:100". */
+/** Escalas usadas na prancha, sem repetição, em ordem: "1:50 · 1:100". Só vistas com escala (o 3D não entra). */
 function scalesLine(s: Sheet): string {
-  const set = [...new Set(s.viewports.map((v) => v.scale))];
-  return set.map((k) => `1:${k}`).join(' · ');
+  const set = [...new Set(s.viewports.filter((v) => v.view.kind !== '3d').map((v) => v.scale))];
+  return set.length ? set.map((k) => `1:${k}`).join(' · ') : 'Sem escala';
 }
 
 /** Altura total do carimbo, já contando a tabela de revisões (uma linha por revisão, acima do bloco). */
@@ -90,7 +91,7 @@ export function furnitureParts(p: Project, s: Sheet): ViewportParts {
       const w = Math.min(v.size.w, Math.max(20, v.size.w / 2));
       out.paths.push({ pts: [{ x: v.at.x, y: yBase - 1 }, { x: v.at.x + w, y: yBase - 1 }], closed: false, widthMm: VIEW_MM, color: paperInk });
     }
-    if (label.scaleBar) scaleBarParts(out, v.at.x + caption.length * label.sizeMm * CHAR_W + SCALE_BAR_GAP_MM, yBase);
+    if (label.scaleBar && v.view.kind !== '3d') scaleBarParts(out, v.at.x + caption.length * label.sizeMm * CHAR_W + SCALE_BAR_GAP_MM, yBase);
   }
   const tb = s.titleBlock;
   const x0 = box.x1 - STAMP_W;

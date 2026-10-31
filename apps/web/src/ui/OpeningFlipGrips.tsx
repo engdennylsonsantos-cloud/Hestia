@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, type CSSProperties, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, type CSSProperties, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
 import { frameOfWall } from '@hestia/engine';
 import { openingTypeById, isOpening, type Id } from '@hestia/model';
 import { worldToScreen } from '@hestia/render';
@@ -25,8 +25,18 @@ const BASE: CSSProperties = {
   boxShadow: 'var(--shadow)',
 };
 
-/** Para os eventos do ponteiro não chegarem ao canvas (que selecionaria/arrastaria a vista por baixo). */
-const stop = (e: { stopPropagation(): void }): void => e.stopPropagation();
+/**
+ * Só o botão esquerdo pertence à alça. Meio e direito precisam seguir para o canvas: o meio inicia o pan e o direito
+ * abre o menu de contexto. Antes, a alça consumia qualquer botão (e invertia a abertura no meio).
+ */
+export function deveTratarGrip(button: number): boolean {
+  return button === 0;
+}
+
+/** Contém o ponteiro para não competir com a seleção do canvas; nos demais botões deixa o evento seguir. */
+const conterSeEsquerdo = (e: RPointerEvent<HTMLElement>): void => {
+  if (deveTratarGrip(e.button)) e.stopPropagation();
+};
 
 /**
  * Alças de inverter a abertura selecionada na planta (Revit: flip controls). Ficam do lado oposto ao da abertura,
@@ -84,9 +94,13 @@ export function OpeningFlipGrips({ openingId }: { openingId: Id }): ReactElement
         title="Inverter sentido (Tab)"
         aria-label="Inverter sentido"
         style={{ ...BASE, left: facing.x, top: facing.y }}
-        onPointerDown={stop}
-        onPointerUp={stop}
-        onClick={(e) => { stop(e); apply('facing'); }}
+        onPointerDown={conterSeEsquerdo}
+        onPointerUp={conterSeEsquerdo}
+        onClick={(e) => {
+          if (!deveTratarGrip(e.button)) return;
+          e.stopPropagation();
+          apply('facing');
+        }}
       >
         ⇅
       </button>
@@ -96,9 +110,13 @@ export function OpeningFlipGrips({ openingId }: { openingId: Id }): ReactElement
           title="Inverter dobradiça (Espaço)"
           aria-label="Inverter dobradiça"
           style={{ ...BASE, left: hand.x, top: hand.y }}
-          onPointerDown={stop}
-          onPointerUp={stop}
-          onClick={(e) => { stop(e); apply('hand'); }}
+          onPointerDown={conterSeEsquerdo}
+          onPointerUp={conterSeEsquerdo}
+          onClick={(e) => {
+            if (!deveTratarGrip(e.button)) return;
+            e.stopPropagation();
+            apply('hand');
+          }}
         >
           ⇄
         </button>

@@ -103,6 +103,10 @@ function chavesDoProjeto(p: Project): Map<Id, string> {
 /**
  * Monta a 3D por níveis, em fatias, sem bloquear a tela.
  *
+ * Prewarm completo: quando `iniciar` roda e `fonte.pronto` já tem todos os níveis (prewarm da planta terminou), a
+ * montagem aplica todos num único `update` — o primeiro quadro já vem completo, sem worker nem cálculo na hora. Se
+ * faltar algum, o caminho progressivo abaixo segue como antes.
+ *
  * Com worker (`worker` em `OpcoesMontagem`), a thread da interface não calcula nenhum nível: a primeira fatia traz só o
  * nível visível (vindo do segundo plano, ou calculado uma vez, para o primeiro quadro ter o que mostrar) e os demais
  * chegam do worker, com até `PEDIDOS_EM_VOO` pedidos em voo, na ordem da montagem. Cada resposta monta um nível na cena
@@ -187,6 +191,16 @@ export class Montagem3dProgressiva {
     this.lote = this.worker ? 1 : LOTE_INICIAL;
     this.falhas = 0;
     this.concluido = false;
+    // Prewarm completo: todos os níveis já estão prontos (segundo plano/cache). Monta tudo no primeiro quadro, num
+    // único `update`, em vez de mostrar só o visível e esperar as fatias do worker.
+    const preaquecidos = this.todosProntos();
+    if (preaquecidos) {
+      this.pendentes = [];
+      for (const [id, nivel] of preaquecidos) this.prontos.set(id, nivel);
+      this.aplicar();
+      this.concluir();
+      return;
+    }
     if (this.worker) this.worker.iniciar(p);
     // Primeira fatia na hora: com worker, só o visível (o primeiro quadro mostra o pavimento ativo).
     this.fatia(geracao);
@@ -425,6 +439,22 @@ export class Montagem3dProgressiva {
     this.concluido = true;
     this.limparPrazo();
     this.op.aoConcluir();
+  }
+
+  /**
+   * Todos os níveis do projeto já prontos na fonte (`fonte.pronto`), na ordem do projeto. `null` quando não há fonte,
+   * o projeto está vazio ou algum nível ainda não chegou — aí a montagem segue progressiva, como antes.
+   */
+  private todosProntos(): Map<Id, ResolvedLevel> | null {
+    const pronto = this.op.fonte.pronto;
+    if (!pronto || this.ordemProjeto.length === 0) return null;
+    const niveis = new Map<Id, ResolvedLevel>();
+    for (const id of this.ordemProjeto) {
+      const nivel = pronto.call(this.op.fonte, id);
+      if (!nivel) return null;
+      niveis.set(id, nivel);
+    }
+    return niveis;
   }
 
   /** O pronto em segundo plano quando há; senão o que o worker acabou de entregar; senão calcula. */

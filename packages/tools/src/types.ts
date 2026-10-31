@@ -104,6 +104,8 @@ export interface SnapOptions {
   endpoint?: boolean;
   /** Captura de pontos médios (AutoCAD Midpoint - triângulo). */
   midpoint?: boolean;
+  /** Captura nos desenhos CAD importados (DXF): vértices, meios, pontos e cruzamentos das linhas. */
+  cad?: boolean;
 }
 
 export const DEFAULT_SNAP: SnapOptions = {
@@ -118,6 +120,8 @@ export const DEFAULT_SNAP: SnapOptions = {
   alignment: true,
   endpoint: true,
   midpoint: true,
+  // O DXF importado serve de referência por padrão: é para isso que ele entra no projeto.
+  cad: true,
 };
 
 /** Padrões do "Desconectar": Mover e Espelhar acompanham a vizinha (falso) e Rotacionar é livre (verdadeiro). */

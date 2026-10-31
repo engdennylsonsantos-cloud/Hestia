@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react';
-import { sectionTitleOf, sheetInnerBox, sheetOf, type SheetViewSource } from '@hestia/model';
+import { projectView3DPoints, sectionTitleOf, sheetInnerBox, sheetOf, type SheetViewSource } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { SCALE_OPTIONS } from '../../editor/sheetActions.ts';
 import { addViewsAction, autoScaleForView, type InsertRequest } from '../../editor/sheetInsert.ts';
@@ -13,18 +13,27 @@ interface Source {
   view: SheetViewSource;
 }
 
-/** Vistas que uma prancha pode mostrar: plantas dos níveis, cortes e elevações do projeto, e o 3D. */
+/**
+ * Vistas que uma prancha pode mostrar: plantas dos níveis, cortes e elevações do projeto, e o 3D — uma opção por ponto
+ * de vista salvo (decisão 0040), mais o enquadramento padrão para quando o catálogo está vazio ou como alternativa.
+ */
 function sourcesOf(p: ReturnType<typeof useProject>): Source[] {
   return [
     ...p.levels.map((l) => ({ key: `plan:${l.id}`, label: `Planta · ${l.name}`, view: { kind: 'plan' as const, levelId: l.id } })),
     ...p.views.map((v) => ({ key: `section:${v.id}`, label: `${v.kind === 'elevation' ? 'Elevação' : 'Corte'} · ${sectionTitleOf(v)}`, view: { kind: 'section' as const, sectionId: v.id } })),
-    { key: '3d', label: 'Modelo 3D (quadro no PDF)', view: { kind: '3d' as const } },
+    ...projectView3DPoints(p).map((ponto) => ({
+      key: `3d:${ponto.id}`,
+      label: `Modelo 3D · ${ponto.name}`,
+      view: { kind: '3d' as const, pointId: ponto.id },
+    })),
+    { key: '3d', label: 'Modelo 3D (enquadramento padrão)', view: { kind: '3d' as const } },
   ];
 }
 
 /**
- * "Adicionar vista" à prancha: marca uma ou várias origens (plantas, cortes/elevações e 3D), escolhe a escala — ou
- * deixa a automática — e insere todas no primeiro lugar livre, num único passo de desfazer.
+ * "Adicionar vista" à prancha: marca uma ou várias origens (plantas, cortes/elevações e o 3D — um ponto de vista salvo
+ * por opção), escolhe a escala — ou deixa a automática — e insere todas no primeiro lugar livre, num único passo de
+ * desfazer.
  */
 export function AddViewDialog({ sheetId }: { sheetId: string }): ReactElement | null {
   const p = useProject();

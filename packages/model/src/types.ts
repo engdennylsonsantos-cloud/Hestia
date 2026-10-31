@@ -4,8 +4,9 @@ import type { Stair, StairType } from './stairTypes.ts';
 import type { Ramp, RampType } from './rampTypes.ts';
 import type { ViewRange } from './viewRange.ts';
 import type { Sheet } from './sheet.ts';
+import type { View3DPoint } from './view3dPoints.ts';
 import type { Grid, GridType } from './grid.ts';
-import type { ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
+import type { ProjectGraphics, View3DSettings, ViewGraphics, ViewHidden } from './graphics.ts';
 import type { Opening, OpeningLineConvention, OpeningType } from './openingTypes.ts';
 import type { ProfilePreset } from './openingComposition.ts';
 import type { DimensionSettings } from './dimensionSettings.ts';
@@ -144,6 +145,10 @@ export interface Level {
   viewRange: ViewRange;
   /** Gráficos da planta deste nível (decisão 0015); ausente = padrão. */
   graphics?: ViewGraphics;
+  /** Elementos/categorias ocultos na planta de piso deste nível (Hide in View). */
+  hidden?: ViewHidden;
+  /** Elementos/categorias ocultos na planta de cobertura deste nível (vista separada da planta de piso). */
+  roofHidden?: ViewHidden;
   /** Cotas permanentes da planta (decisão 0019); ausente = nenhuma. */
   dimensions?: Dimension[];
   /** Textos de anotação da planta (decisão 0019); ausente = nenhum. */
@@ -732,7 +737,17 @@ export interface SectionView {
   refs?: { a?: SectionRef; b?: SectionRef };
   /** Papel de uma elevação gerada automaticamente; ausente em vistas antigas e em cortes. */
   role?: SectionRole;
+  /** Elementos/categorias ocultos nesta vista de corte/elevação (Hide in View). */
+  hidden?: ViewHidden;
 }
+
+/** Vista alvo de uma ocultação permanente (Hide in View). */
+export type ViewHiddenTarget =
+  | { kind: 'plan'; levelId: Id }
+  | { kind: 'roof'; levelId: Id }
+  | { kind: 'area'; planId: Id }
+  | { kind: 'section'; viewId: Id }
+  | { kind: '3d' };
 
 export interface Project {
   schemaVersion: number;
@@ -762,6 +777,11 @@ export interface Project {
   graphics?: ProjectGraphics;
   /** Gráficos do modelo 3D (decisão 0015); ausente = padrão. */
   view3d?: View3DSettings;
+  /**
+   * Pontos de vista 3D salvos (decisão 0040): catálogo do projeto, referenciado pelas pranchas. Ausente = nenhum.
+   * Ver `view3dPoints.ts`.
+   */
+  view3dPoints?: View3DPoint[];
   /** Gráficos do corte e da elevação (decisão 0015); ausente = padrão. */
   sectionGraphics?: ViewGraphics;
   /** Pranchas (decisão 0022); ausente = nenhuma. */

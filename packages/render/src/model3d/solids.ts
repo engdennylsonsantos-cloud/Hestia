@@ -389,6 +389,20 @@ export function appendSolid(b: SolidBatch, f: SolidBatch): void {
 }
 
 /**
+ * Nível só com as paredes aceitas pelo predicado. É o filtro de visibilidade (Hide in View) antes dos sólidos e das
+ * aberturas: a parede oculta não gera malha, caixa, aresta nem picking. Sem nada removido, devolve o mesmo nível.
+ */
+export function filtrarParedesDoNivel(lv: ResolvedLevel, manter: (id: Id) => boolean): ResolvedLevel {
+  const walls: ResolvedLevel['walls'] = {};
+  let removeu = false;
+  for (const [id, w] of Object.entries(lv.walls)) {
+    if (manter(id)) walls[id] = w;
+    else removeu = true;
+  }
+  return removeu ? { ...lv, walls } : lv;
+}
+
+/**
  * Sólidos de todas as camadas das paredes do nível, por material. Cada camada sai de `wallLayerSolid` (cache por
  * conteúdo): ao anexar uma parede ao telhado, só as camadas dela são extrudadas de novo (decisão 0016, desempenho).
  */

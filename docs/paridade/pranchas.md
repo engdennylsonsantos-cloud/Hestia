@@ -2,8 +2,9 @@
 
 Legenda: `[x]` feito e testado · `[ ]` pendente · `[-]` fora de escopo, com o motivo na própria linha.
 Itens marcados **(bloqueante)** precisam estar feitos antes de abrir o próximo elemento.
-Fonte: [docs/04](../04-ROTEIRO.md) Fase 6 (prancha impressa a partir do projeto). Decisões em [0022](../decisoes/0022-pranchas.md)
-e [0039](../decisoes/0039-editor-de-layout-da-prancha.md) (editor de layout).
+Fonte: [docs/04](../04-ROTEIRO.md) Fase 6 (prancha impressa a partir do projeto). Decisões em [0022](../decisoes/0022-pranchas.md),
+[0039](../decisoes/0039-editor-de-layout-da-prancha.md) (editor de layout) e [0040](../decisoes/0040-3d-na-prancha.md)
+(3D vetorial na prancha).
 
 ## A · Modelo
 - [x] A1 Prancha (`Sheet`) com tamanho A0–A4, orientação, margem e carimbo, opcional em `Project.sheets` **(bloqueante)**
@@ -15,8 +16,11 @@ e [0039](../decisoes/0039-editor-de-layout-da-prancha.md) (editor de layout).
 - [x] B1 Lista de desenho da folha em mm de papel: moldura, legenda e carimbo **(bloqueante)**
 - [x] B2 Vista escalada 1:S, recortada à caixa; 1 m a 1:100 = 10 mm **(bloqueante)**
 - [x] B3 Pesos de linha em mm de papel (`lineWeightMm`), sem o mínimo de 1 px
-- [x] B4 Vista 3D como quadro com o aviso "3D não vai no PDF"
-- [-] B5 Imagem do 3D no papel: fora desta etapa (sem raster; a decisão pede o quadro)
+- [x] B4 3D vetorial na prancha (pontos de vista): mesma `ModelScene`/`OrbitCamera` da aba 3D, linhas ocultas por
+  z-buffer e recorte no quadro — evidência: `packages/render/src/sheet/vista3d.test.ts`,
+  `packages/render/src/sheet/build.test.ts`, `packages/model/src/view3dPoints.test.ts`
+- [x] B5 3D no papel como caminhos (`SheetPath[]`) em SVG, PDF e DXF, sem raster nem imagem — decisão
+  [0040](../decisoes/0040-3d-na-prancha.md)
 - [x] B6 Hachura de padrão de superfície na prancha: traços a 45° (e cruzados, pontos ou cobertura) recortados ao polígono pela regra par-ímpar; mesmas definições da planta (`diagonal`, `cross`, `dots`, `solid`) — evidência: `packages/render/src/sheet/hatch.test.ts`
 
 ## C · PDF
@@ -30,7 +34,9 @@ e [0039](../decisoes/0039-editor-de-layout-da-prancha.md) (editor de layout).
 - [x] D2 Aba de prancha com a folha em escala de tela (SVG) — evidência: `tests/e2e/pranchas.mjs` (captura `02-aba-prancha.png`)
 - [x] D3 Arrastar vista (limitada à área de desenho) e escala pela faixa — evidência: `tests/e2e/pranchas.mjs` (remoção não exercida no fluxo)
 - [x] D4 Diálogo de propriedades da prancha (folha, margem e carimbo) — evidência: `tests/e2e/pranchas.mjs` (carimbo editado e conferido no PDF)
-- [x] D5 "Adicionar vista": escolhe planta, corte, elevação ou 3D, e a escala — evidência: `tests/e2e/pranchas.mjs` (planta 1:100 e corte 1:50)
+- [x] D5 "Adicionar vista": escolhe planta, corte, elevação ou o 3D — uma opção por ponto de vista salvo, mais o
+  enquadramento padrão (0040) — e a escala; evidência: `tests/e2e/pranchas.mjs` (planta 1:100 e corte 1:50) e
+  `tests/e2e/pranchas-3d.mjs` (3D por ponto de vista)
 - [x] D6 Conferência visual no navegador (aba de prancha e PDF aberto em leitor) — evidência: `node tests/e2e/pranchas.mjs` (PDF validado: cabeçalho, xref, uma página, texto do carimbo, raster `prancha.png`)
 - [x] D7 Deslocar o conteúdo dentro da vista (pan, Alt+arrastar) — 0039; evidência: `tests/e2e/prancha-editor.mjs`
 
@@ -74,3 +80,7 @@ uma prancha A3 paisagem numa casa de teste,
 monta planta 1:100 e corte, arrasta e reescala vistas, edita o carimbo e exporta o PDF. Valida o arquivo (cabeçalho,
 xref, uma página por prancha, texto do carimbo) e gera o raster em `test-results/pranchas/`. Precisa de `pdftotext` e
 `pdftoppm` (poppler) no sistema.
+
+`node tests/e2e/pranchas-3d.mjs` (decisão 0040): salva um ponto de vista 3D, insere a vista na prancha pelo diálogo
+real e captura a folha em `tests/e2e/out/pranchas-3d/`; confere que o 3D saiu como traços (sem `<image>`) e com a
+legenda "Sem escala". Não precisa de poppler.

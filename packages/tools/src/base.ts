@@ -3,6 +3,7 @@ import type { Inference, PointerInfo, PreviewItem, Tool, ToolEnv } from './types
 import { infer, type InferContext } from './infer.ts';
 import { floorEdges, floorVertices } from './floorPick.ts';
 import { openingSnapGeometry } from './openingSnapPoints.ts';
+import { cadSnapIndexes } from './snapCad.ts';
 import type { Vec2 } from '@hestia/geom';
 
 /** Implementação comum: Esc em dois passos, inferência e rótulos. */
@@ -87,6 +88,8 @@ export abstract class ToolBase implements Tool {
       // Vértices dos pisos do nível entram sempre; os pontos que a ferramenta passa (contorno em construção) somam-se a eles.
       extraPoints: [...levels.flatMap((l) => floorVertices(project, l)), ...openings.flatMap((g) => g.points), ...(extra.extraPoints ?? [])],
       extraSegments: [...levels.flatMap((l) => floorEdges(project, l)), ...openings.flatMap((g) => g.segments), ...(extra.extraSegments ?? [])],
+      // Desenhos CAD importados visíveis: o que a vista oculta (temporária ou permanentemente) não se captura.
+      cad: cadSnapIndexes(project, levels).filter((ix) => !hidden?.has(ix.id)),
     };
   }
 

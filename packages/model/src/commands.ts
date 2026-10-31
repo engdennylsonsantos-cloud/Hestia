@@ -32,6 +32,7 @@ import {
   type OpeningType,
   type Project,
   type SectionView,
+  type ViewHiddenTarget,
   type Wall,
   type WallType,
 } from './types.ts';
@@ -50,7 +51,8 @@ import { withBridgedComposition } from './openingCompositionOf.ts';
 import { comTerminoValido } from './termino.ts';
 import { viewRangeIssues, type ViewRange } from './viewRange.ts';
 import type { DxfLayerStyle } from './dxfLayerStyle.ts';
-import type { DeepPartial, ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
+import type { DeepPartial, ProjectGraphics, View3DSettings, ViewGraphics, ViewHidden } from './graphics.ts';
+import { applyViewHidden } from './viewHiddenCommands.ts';
 import {
   applyLevelGraphics,
   applyProjectGraphics,
@@ -63,6 +65,7 @@ import {
 
 import { applyAnnotationCommand, type AnnotationCommand } from './annotations.ts';
 import { applySheetCommand, dropOrphanViewports, type SheetCommand } from './sheetCommands.ts';
+import { applyView3DPointCommand, type View3DPointCommand } from './view3dPoints.ts';
 import { applyGridCommand, type GridCommand } from './grid.ts';
 import { applyViewCommand } from './viewCommands.ts';
 import { applyCeilingCommand } from './ceilingCommands.ts';
@@ -117,6 +120,7 @@ export type Command =
   | { type: 'upsertLevel'; level: Level }
   | AnnotationCommand
   | SheetCommand
+  | View3DPointCommand
   | GridCommand
   | { type: 'deleteLevel'; id: Id }
   | { type: 'setLevelViewRange'; levelId: Id; patch: Partial<ViewRange> }
@@ -125,6 +129,7 @@ export type Command =
   | { type: 'resetLevelGraphics'; levelId: Id }
   | { type: 'setView3D'; patch: DeepPartial<View3DSettings> }
   | { type: 'resetView3D' }
+  | { type: 'setViewHidden'; target: ViewHiddenTarget; hidden: ViewHidden | undefined }
   | { type: 'setSectionGraphics'; patch: DeepPartial<ViewGraphics> }
   | { type: 'resetSectionGraphics' }
   | { type: 'setProjectName'; name: string }
@@ -428,6 +433,12 @@ export function applyCommand(p: Project, c: Command): void {
     case 'setSheetOrder':
       applySheetCommand(p, c);
       break;
+    case 'addView3DPoint':
+    case 'updateView3DPoint':
+    case 'removeView3DPoint':
+    case 'setView3DPointOrder':
+      applyView3DPointCommand(p, c);
+      break;
     case 'addGrid':
     case 'updateGrid':
     case 'removeGrid':
@@ -460,6 +471,9 @@ export function applyCommand(p: Project, c: Command): void {
       break;
     case 'resetView3D':
       resetView3D(p);
+      break;
+    case 'setViewHidden':
+      applyViewHidden(p, c.target, c.hidden);
       break;
     case 'setSectionGraphics':
       applySectionGraphics(p, c.patch);

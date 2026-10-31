@@ -1,5 +1,6 @@
 export * from './types.ts';
 export * from './infer.ts';
+export * from './snapCad.ts';
 export * from './numeric.ts';
 export { perpendicularNeighbors, type PerpendicularWall } from './openingPlacement.ts';
 export * from './openingGrips.ts';

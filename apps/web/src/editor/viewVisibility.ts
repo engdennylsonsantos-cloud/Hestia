@@ -1,0 +1,340 @@
+import type { GraphicsCategory, Id, Project, ViewHiddenTarget, ViewHidden } from '@hestia/model';
+import { editor } from './controller.ts';
+import { useUi } from './state.ts';
+
+/** Estado temporário de visibilidade de uma vista (não vai para o arquivo do projeto). */
+export interface TempViewVisibility {
+  /** Hide temporário (HH): elementos/categorias que somem até HR. */
+  hidden?: ViewHidden;
+  /** Isolate temporário (HI/IC): só estes ficam visíveis até HR. */
+  isolated?: ViewHidden;
+  /** Modo Reveal (RH): mostra os ocultos com bordas azuis enquanto ativo. */
+  reveal?: boolean;
+}
+
+/** Chave estável da vista ativa (a mesma ideia de `Editor.viewKey`, mas para a visibilidade). */
+export function visibilityKeyOf(st: Pick<ReturnType<typeof useUi.getState>, 'view' | 'planKind' | 'levelId' | 'areaPlanId' | 'sectionId'>): string | null {
+  if (st.view === 'sheet') return null;
+  if (st.view === '3d') return '3d';
+  if (st.view === 'section') return st.sectionId ? `section:${st.sectionId}` : null;
+  if (st.planKind === 'area') return st.areaPlanId ? `area:${st.areaPlanId}` : null;
+  if (st.planKind === 'roof') return `roof:${st.levelId}`;
+  return `plan:${st.levelId}`;
+}
+
+/** Vista alvo de ocultação permanente para o estado atual; null na prancha ou sem vista. */
+export function viewHiddenTargetOf(st: Pick<ReturnType<typeof useUi.getState>, 'view' | 'planKind' | 'levelId' | 'areaPlanId' | 'sectionId'>): ViewHiddenTarget | null {
+  if (st.view === 'sheet') return null;
+  if (st.view === '3d') return { kind: '3d' };
+  if (st.view === 'section') return st.sectionId ? { kind: 'section', viewId: st.sectionId } : null;
+  if (st.planKind === 'area') return st.areaPlanId ? { kind: 'area', planId: st.areaPlanId } : null;
+  if (st.planKind === 'roof') return { kind: 'roof', levelId: st.levelId };
+  return { kind: 'plan', levelId: st.levelId };
+}
+
+/** Ocultação permanente da vista atual, já normalizada. */
+export function permanentHiddenOf(p: Project, target: ViewHiddenTarget | null): ViewHidden {
+  if (!target) return {};
+  switch (target.kind) {
+    case 'plan': return p.levels.find((l) => l.id === target.levelId)?.hidden ?? {};
+    case 'roof': return p.levels.find((l) => l.id === target.levelId)?.roofHidden ?? {};
+    case 'area': return p.areaPlans?.find((a) => a.id === target.planId)?.hidden ?? {};
+    case 'section': return p.views.find((v) => v.id === target.viewId)?.hidden ?? {};
+    case '3d': return p.view3d?.hidden ?? {};
+  }
+}
+
+const uniq = (xs: readonly string[]): string[] => [...new Set(xs)];
+
+/** Categoria gráfica de um elemento do modelo (o que "Ocultar categoria" atinge). */
+function categoriaDoElemento(e: { kind: string }): GraphicsCategory | null {
+  switch (e.kind) {
+    case 'wall': return 'wall';
+    case 'door': return 'door';
+    case 'window': return 'window';
+    case 'floor': return 'floor';
+    case 'slab': return 'slab';
+    case 'ceiling': return 'floor';
+    case 'roof': return 'roof';
+    case 'stair':
+    case 'ramp': return 'stair';
+    case 'room': return 'room';
+    case 'cad':
+    case 'generic': return 'generic';
+    case 'dimension':
+    case 'text':
+    case 'detailLine':
+    case 'detailRegion':
+    case 'tag':
+    case 'roomSeparator': return 'annotation';
+    default: return null;
+  }
+}
+
+/** Ids dos elementos que pertencem às categorias dadas. */
+export function categoryIdsOf(p: Project, categories: readonly GraphicsCategory[] | undefined): Id[] {
+  if (!categories?.length) return [];
+  const cats = new Set(categories);
+  return Object.values(p.elements)
+    .filter((e) => {
+      const c = categoriaDoElemento(e);
+      return c !== null && cats.has(c);
+    })
+    .map((e) => e.id);
+}
+
+/** Junta duas ocultações (elementos e categorias, sem repetição). */
+export function mergeHidden(a: ViewHidden | undefined, b: ViewHidden | undefined): ViewHidden | undefined {
+  const elements = uniq([...(a?.elements ?? []), ...(b?.elements ?? [])]);
+  const categories = uniq([...(a?.categories ?? []), ...(b?.categories ?? [])]) as GraphicsCategory[];
+  if (elements.length === 0 && categories.length === 0) return undefined;
+  return { ...(elements.length ? { elements } : {}), ...(categories.length ? { categories } : {}) };
+}
+
+/** Remove elementos/categorias de uma ocultação; devolve undefined quando não sobra nada. */
+export function removeHidden(a: ViewHidden | undefined, remove: ViewHidden): ViewHidden | undefined {
+  const remE = new Set(remove.elements ?? []);
+  const remC = new Set(remove.categories ?? []);
+  const elements = (a?.elements ?? []).filter((id) => !remE.has(id));
+  const categories = (a?.categories ?? []).filter((c) => !remC.has(c));
+  if (elements.length === 0 && categories.length === 0) return undefined;
+  return { ...(elements.length ? { elements } : {}), ...(categories.length ? { categories } : {}) };
+}
+
+/** Conjuntos efetivos de visibilidade da vista ativa. `hidden` não é desenhado; `revealed` é desenhado com borda azul. */
+export interface ViewVisibilitySets {
+  hidden: ReadonlySet<Id>;
+  revealed: ReadonlySet<Id>;
+  reveal: boolean;
+  temporary: boolean;
+}
+
+const VAZIO: ViewVisibilitySets = { hidden: new Set(), revealed: new Set(), reveal: false, temporary: false };
+
+/** Resolve permanente + temporário + Reveal para a vista ativa. */
+export function visibilityOf(p: Project, st: ReturnType<typeof useUi.getState>): ViewVisibilitySets {
+  const target = viewHiddenTargetOf(st);
+  const key = visibilityKeyOf(st);
+  if (!target || !key) return VAZIO;
+  const temp = st.viewTemp[key] ?? {};
+  const permanent = permanentHiddenOf(p, target);
+  const permanentIds = uniq([...(permanent.elements ?? []), ...categoryIdsOf(p, permanent.categories)]);
+  const tempIds = uniq([...(temp.hidden?.elements ?? []), ...categoryIdsOf(p, temp.hidden?.categories)]);
+  const isolate = temp.isolated;
+  const isolateIds = uniq([...(isolate?.elements ?? []), ...categoryIdsOf(p, isolate?.categories)]);
+  const reveal = temp.reveal === true;
+  const allIds = Object.keys(p.elements);
+  const isolateSet = new Set(isolateIds);
+  const baseHidden = isolateIds.length > 0 ? allIds.filter((id) => !isolateSet.has(id)) : uniq([...permanentIds, ...tempIds]);
+  const revealedIds = reveal ? uniq([...permanentIds, ...tempIds]) : [];
+  const revealed = new Set(revealedIds);
+  const hidden = new Set(baseHidden.filter((id) => !revealed.has(id)));
+  const temporary = !!(temp.hidden || temp.isolated || temp.reveal);
+  return { hidden, revealed, reveal, temporary };
+}
+
+/** Atualiza o estado temporário da vista ativa. */
+function setTemp(patch: Partial<TempViewVisibility> | null): void {
+  const st = useUi.getState();
+  const key = visibilityKeyOf(st);
+  if (!key) return;
+  const next = { ...st.viewTemp };
+  if (patch === null) delete next[key];
+  else next[key] = { ...(next[key] ?? {}), ...patch };
+  useUi.setState({ viewTemp: next });
+}
+
+/** Ocultação permanente (Hide in View) dos elementos/categorias na vista ativa. */
+export function hideInView(elements: readonly Id[], categories: readonly GraphicsCategory[] = []): void {
+  if (elements.length === 0 && categories.length === 0) {
+    useUi.setState({ status: 'Selecione elementos (ou uma categoria) para ocultar na vista.' });
+    return;
+  }
+  const st = useUi.getState();
+  const target = viewHiddenTargetOf(st);
+  if (!target) return;
+  const atual = permanentHiddenOf(editor.project, target);
+  const hidden = mergeHidden(atual, {
+    ...(elements.length ? { elements: [...elements] } : {}),
+    ...(categories.length ? { categories: [...categories] } : {}),
+  });
+  editor.store.exec({ type: 'setViewHidden', target, hidden }, 'Ocultar na vista');
+  useUi.setState({ status: 'Elementos ocultos nesta vista. Ctrl+Z desfaz.' });
+}
+
+/** Reexibe elementos/categorias na vista ativa (modo Reveal). */
+export function unhideInView(elements: readonly Id[], categories: readonly GraphicsCategory[] = []): void {
+  if (elements.length === 0 && categories.length === 0) {
+    useUi.setState({ status: 'Selecione elementos (ou uma categoria) para reexibir na vista.' });
+    return;
+  }
+  const st = useUi.getState();
+  const target = viewHiddenTargetOf(st);
+  if (!target) return;
+  const atual = permanentHiddenOf(editor.project, target);
+  const hidden = removeHidden(atual, {
+    ...(elements.length ? { elements: [...elements] } : {}),
+    ...(categories.length ? { categories: [...categories] } : {}),
+  });
+  editor.store.exec({ type: 'setViewHidden', target, hidden }, 'Reexibir na vista');
+  useUi.setState({ status: 'Elementos reexibidos nesta vista. Ctrl+Z desfaz.' });
+}
+
+/** Limpa toda a ocultação permanente da vista ativa. */
+export function clearViewHidden(): void {
+  const st = useUi.getState();
+  const target = viewHiddenTargetOf(st);
+  if (!target || !permanentHiddenOf(editor.project, target)) return;
+  editor.store.exec({ type: 'setViewHidden', target, hidden: undefined }, 'Reexibir tudo na vista');
+  useUi.setState({ status: 'Tudo reexibido nesta vista. Ctrl+Z desfaz.' });
+}
+
+/** Hide temporário (HH): some até HR, sem gravar no projeto. */
+export function temporaryHide(elements: readonly Id[], categories: readonly GraphicsCategory[] = []): void {
+  if (elements.length === 0 && categories.length === 0) {
+    useUi.setState({ status: 'Selecione elementos para ocultar temporariamente (HH).' });
+    return;
+  }
+  const st = useUi.getState();
+  const key = visibilityKeyOf(st);
+  if (!key) return;
+  const temp = st.viewTemp[key];
+  setTemp({ hidden: mergeHidden(temp?.hidden, {
+    ...(elements.length ? { elements: [...elements] } : {}),
+    ...(categories.length ? { categories: [...categories] } : {}),
+  }), isolated: undefined });
+  useUi.setState({ status: 'Oculto temporariamente nesta vista. HR restaura.' });
+}
+
+/** Isolate temporário (HI/IC): só a seleção/categoria fica visível até HR. */
+export function temporaryIsolate(elements: readonly Id[], categories: readonly GraphicsCategory[] = []): void {
+  if (elements.length === 0 && categories.length === 0) {
+    useUi.setState({ status: 'Selecione elementos para isolar temporariamente (HI).' });
+    return;
+  }
+  const st = useUi.getState();
+  const key = visibilityKeyOf(st);
+  if (!key) return;
+  setTemp({ isolated: {
+    ...(elements.length ? { elements: [...elements] } : {}),
+    ...(categories.length ? { categories: [...categories] } : {}),
+  }, hidden: undefined });
+  useUi.setState({ status: 'Isolado temporariamente nesta vista. HR restaura.' });
+}
+
+/** Reexibe tudo da vista: ocultação permanente e temporária (não mexe no modo Reveal). */
+export function unhideAllInView(): void {
+  const st = useUi.getState();
+  const target = viewHiddenTargetOf(st);
+  if (target && permanentHiddenOf(editor.project, target)) {
+    editor.store.exec({ type: 'setViewHidden', target, hidden: undefined }, 'Reexibir tudo na vista');
+  }
+  setTemp({ hidden: undefined, isolated: undefined });
+  useUi.setState({ status: 'Tudo reexibido nesta vista. Ctrl+Z desfaz a ocultação permanente.' });
+}
+
+/** Reset do hide/isolate temporário (HR). */
+export function resetTemporaryHidden(): void {
+  setTemp({ hidden: undefined, isolated: undefined });
+  useUi.setState({ status: 'Hide/isolate temporário restaurado.' });
+}
+
+/** Liga/desliga o modo Reveal da vista ativa (RH). */
+export function toggleRevealHidden(): void {
+  const st = useUi.getState();
+  const key = visibilityKeyOf(st);
+  if (!key) return;
+  const atual = st.viewTemp[key]?.reveal === true;
+  setTemp({ reveal: !atual });
+  useUi.setState({ status: !atual ? 'Revelar elementos ocultos ativo. Bordas azuis.' : 'Revelar elementos ocultos desligado.' });
+}
+
+/** Limpa o temporário ao trocar/abrir projeto. */
+export function resetAllTemporary(): void {
+  useUi.setState({ viewTemp: {} });
+}
+
+/** Elemento oculto na vista ativa? (para seleção/hit-test) */
+export function isHiddenInView(id: Id): boolean {
+  return visibilityOf(editor.project, useUi.getState()).hidden.has(id);
+}
+
+/** Categorias gráficas presentes na seleção atual. */
+export function selectedCategories(p: Project, ids: readonly Id[] = useUi.getState().selection): GraphicsCategory[] {
+  const out = new Set<GraphicsCategory>();
+  for (const id of ids) {
+    const e = p.elements[id];
+    const c = e ? categoriaDoElemento(e) : null;
+    if (c) out.add(c);
+  }
+  return [...out];
+}
+
+/** Hide in View dos elementos selecionados. */
+export function hideSelectionInView(): void {
+  hideInView(useUi.getState().selection);
+}
+
+/** Hide in View da categoria dos elementos selecionados (só se todos forem da mesma categoria). */
+export function hideSelectedCategoryInView(): void {
+  const cats = selectedCategories(editor.project);
+  if (cats.length !== 1) {
+    useUi.setState({ status: 'Selecione elementos de uma só categoria para ocultar a categoria.' });
+    return;
+  }
+  hideInView([], cats);
+}
+
+/** Reexibe os elementos selecionados. */
+export function unhideSelectionInView(): void {
+  unhideInView(useUi.getState().selection);
+}
+
+/** Reexibe a categoria dos elementos selecionados. */
+export function unhideSelectedCategoryInView(): void {
+  const cats = selectedCategories(editor.project);
+  if (cats.length !== 1) {
+    useUi.setState({ status: 'Selecione elementos de uma só categoria para reexibir a categoria.' });
+    return;
+  }
+  unhideInView([], cats);
+}
+
+/** Hide temporário da seleção (HH). */
+export function temporaryHideSelection(): void {
+  temporaryHide(useUi.getState().selection);
+}
+
+/** Isolate temporário da seleção (HI). */
+export function temporaryIsolateSelection(): void {
+  temporaryIsolate(useUi.getState().selection);
+}
+
+/** Hide/isolate temporário da categoria dos selecionados (HC/IC). */
+export function temporarySelectedCategory(only: boolean): void {
+  const cats = selectedCategories(editor.project);
+  if (cats.length !== 1) {
+    useUi.setState({ status: 'Selecione elementos de uma só categoria.' });
+    return;
+  }
+  if (only) temporaryIsolate([], cats);
+  else temporaryHide([], cats);
+}
+
+/** O modo Reveal está ativo na vista atual? */
+export function revealActive(): boolean {
+  return visibilityOf(editor.project, useUi.getState()).reveal;
+}
+
+/** Há hide/isolate temporário ativo na vista atual? */
+export function temporaryActive(): boolean {
+  const st = useUi.getState();
+  const key = visibilityKeyOf(st);
+  const t = key ? st.viewTemp[key] : undefined;
+  return !!(t?.hidden || t?.isolated);
+}
+
+/** Há hide temporário (não Reveal) ativo na vista atual? */
+export function temporaryHideActive(): boolean {
+  return temporaryActive();
+}

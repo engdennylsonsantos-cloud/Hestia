@@ -99,6 +99,7 @@ export function ghostBands(p: Project, wallIds: Id[], t: Transform): PreviewItem
       }
       continue;
     }
+    // Ambiente: o contorno é derivado do circuito, então o fantasma é o ponto interior movido.
     if (isRoom(fl)) {
       out.push({ kind: 'point', at: applyTransform(t, fl.point) });
       continue;

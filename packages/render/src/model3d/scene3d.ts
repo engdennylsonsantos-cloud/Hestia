@@ -431,16 +431,6 @@ export class ModelScene {
     this.mats.descartarNaoUsados();
   }
 
-  /** Projeto da última atualização (null antes da primeira). A prancha confere se a cena viva é a do projeto. */
-  projetoDaCena(): Project | null {
-    return this.projeto;
-  }
-
-  /** Quantos níveis a cena tem montados agora (a montagem progressiva começa com menos que o projeto). */
-  niveisNaCena(): number {
-    return this.cenaNiveis.length;
-  }
-
   /**
    * Geometria do modelo em coordenadas de mundo, para a etapa "papel" da prancha (decisão 0040). Lê `this.model`, o
    * mesmo grupo que a GPU desenha: as malhas viram triângulos e as `LineSegments` viram as arestas que a vista 3D mostra.

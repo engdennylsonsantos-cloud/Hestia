@@ -48,10 +48,11 @@ visual) e a [0039](0039-editor-de-layout-da-prancha.md) (editor de layout), sem 
 - A **câmera é a mesma `OrbitCamera`**: a câmera salva é aplicada por `aplicarCameraNaOrbita` e a proporção do quadro
   entra em `setAspect` (é o *crop region* da vista). Sem câmera, `fit(box)` enquadra o modelo.
 - **Projeção e linhas ocultas**: as arestas são projetadas por `projectionMatrix × matrixWorldInverse`, com recorte no
-  plano próximo; um z-buffer em CPU rasteriza os triângulos exportados e cada aresta é amostrada (passo de 1,2 px). Um
-  ponto é visível quando nenhuma superfície está mais perto que ele (folga proporcional à diagonal do modelo); o teste
-  usa o mínimo de uma vizinhança 3×3 para fechar frestas de 1 px. Só as corridas visíveis viram `SheetPath`; uma amostra
-  oculta isolada entre duas visíveis é tratada como ruído e não parte o traço.
+  plano próximo. A visibilidade é testada por **raio contra o BVH dos mesmos triângulos exportados**: de cada amostra do
+  segmento, o raio vai na direção da câmera (perspectiva) ou contra a frente dela (ortogonal); o ponto é visível quando o
+  raio não atinge nenhuma superfície antes da câmera, com folga de ~2 mm. Um pré-teste de 3–5 amostras resolve as arestas
+  inteiras visíveis ou ocultas (a maioria); só as mistas são amostradas a cada 0,35 mm de papel. Só as corridas visíveis
+  viram `SheetPath`; uma amostra oculta isolada entre duas visíveis é tratada como ruído e não parte o traço.
 - O traço sai com **0,18 mm** de espessura e a tinta do desenho (`#16181c`), como a planta em papel.
 - **Legenda "Sem escala"**: `captionOf` (`frame.ts`) imprime `${nome} · Sem escala` para o 3D — a câmera define o
   enquadramento, não uma escala de desenho. O carimbo ignora a escala das vistas 3D (`scalesLine`); sem nenhuma vista
@@ -70,19 +71,19 @@ visual) e a [0039](0039-editor-de-layout-da-prancha.md) (editor de layout), sem 
 - A cena vetorial é montada **uma vez por objeto de projeto** (`WeakMap<Project, CenaVetorial | null>` em `vista3d.ts`)
   e o `ModelScene` é descartado em seguida; ficam só triângulos, arestas e a caixa. Como o projeto é imutável, qualquer
   edição gera outro objeto e a cena é refeita na próxima composição.
-- O **BVH** (`buildTriBvh`) é construído **por cena** e guardado junto com os triângulos. As arestas duplicadas que a GPU
-  desenha duas vezes são deduplicadas antes do teste de visibilidade (no papel o traço é o mesmo).
-- O z-buffer é montado por vista, na proporção do quadro: **8 px por mm** de papel, com teto de 2400 px no lado maior
-  (um A0 a 8 px/mm passaria de 9000 px). O custo cresce com a área do quadro e com o número de arestas amostradas.
-- A resolução do z-buffer não aparece no arquivo: ela só decide a visibilidade. O PDF e o DXF continuam vetoriais.
+- O **BVH** (`buildTriBvh`) é construído **por cena** e guardado junto com os triângulos; é ele que responde ao teste de
+  visibilidade de cada amostra. As arestas duplicadas que a GPU desenha duas vezes são deduplicadas antes do teste (no
+  papel o traço é o mesmo).
+- O custo cresce com o número de arestas e com o comprimento das arestas **mistas** (as que pagam a amostragem fina); não
+  há z-buffer nem textura intermediária. A geometria não aparece no arquivo: o PDF e o DXF continuam vetoriais.
 
 ## 6 · Limitações desta etapa
 
 - **Espessura única** de 0,18 mm para todas as arestas; não há peso por categoria nem silhueta com peso próprio no 3D.
 - **Sem hachura, sombreado ou transparência**: o papel mostra linhas ocultas removidas, não faces pintadas.
 - **Linhas ocultas são omitidas**, não tracejadas.
-- O z-buffer é uma **aproximação na resolução de 8 px/mm** (teto de 2400 px): arestas rasantes e coincidentes podem
-  sumir ou aparecer; a vizinhança 3×3 e a ponte de uma amostra reduzem, mas não eliminam, o efeito.
+- A amostragem de **0,35 mm** no papel pode perder oclusores mais finos que esse passo; arestas rasantes e coincidentes
+  também podem oscilar entre visível e oculta. O pré-teste e a ponte de uma amostra reduzem, mas não eliminam, o efeito.
 - O recorte da vista é o do quadro; o **pan do conteúdo** (`SheetViewport.offset`) não desloca o 3D — para mudar o
   enquadramento, edite o ponto de vista.
 - Não há escala métrica no 3D (a legenda diz "Sem escala").

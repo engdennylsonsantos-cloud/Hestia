@@ -329,7 +329,9 @@ export class Editor {
       this.visTimer = setTimeout(() => {
         this.visTimer = undefined;
         this.visBuf = '';
-      }, 1200);
+        if (useUi.getState().status === `Atalho: ${tentativa}…`) useUi.setState({ status: '' });
+      }, 2000);
+      useUi.setState({ status: `Atalho: ${tentativa}…` });
       return true;
     }
     this.limparVisibilidadeBuffer();

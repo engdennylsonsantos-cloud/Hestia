@@ -90,7 +90,8 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
 **Pranchas e PDF** — 34 feitos, 2 fora de escopo, 0 pendentes (`docs/paridade/pranchas.md`); editor de layout na
 decisão 0039 e 3D vetorial na 0040.
 - Prancha A0–A4 com margem, carimbo (com disciplina e tabela de revisões) e logo reservado; vistas de planta, corte ou
-  3D (o 3D não tem escala); **3D vetorial** na prancha, com pontos de vista salvos, linhas ocultas por z-buffer e
+  3D (o 3D não tem escala); **3D vetorial** na prancha, com pontos de vista salvos, linhas ocultas por raio no BVH da
+  própria cena e
   legenda "Sem escala" (0040).
 - **Editor de layout** (0039): zoom no cursor e pan (roda/botão do meio/Espaço), redimensionar o recorte com 8 alças,
   pan do conteúdo (Alt), recorte e moldura ligáveis, legenda por vista, travar vista, encaixe e guias, alinhar/distribuir,

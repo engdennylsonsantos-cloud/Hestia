@@ -31,7 +31,8 @@ Revit (*Sheet*, *Viewport*, bloco de título) e ArchiCAD (*Layout*, *Drawing*). 
   projeto copiado só para o desenho). Traço de 0,5 mm fica com 0,5 mm no papel.
 - Rótulos: texto em `fontPx` (anotações, decisão 0019) sai no tamanho em mm; rótulo sem tamanho próprio sai com 2,5 mm.
   Deslocamentos de rótulo em px de tela viram mm com 96 dpi.
-- Vista 3D: sem imagem no papel. O quadro traz o aviso "3D não vai no PDF" (decisão desta etapa).
+- Vista 3D: sem imagem no papel. O quadro traz o aviso "3D não vai no PDF" (decisão desta etapa). **Substituído pela
+  [decisão 0040](0040-3d-na-prancha.md): a vista 3D sai vetorial, com linhas ocultas, no SVG, no PDF e no DXF.**
 - Vista com origem inexistente: quadro vazio com a legenda "Vista inexistente".
 
 ## 3 · PDF (`packages/io/src/pdf/`)

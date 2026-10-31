@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- a vista reúne planta, 3D, corte e o editor da cota; extrair depois. */
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import { DARK, LIGHT, ModelScene, PickGpu3d, PlanFrame, PlanScene, aplicarCameraNaOrbita, criarControladorGpu, definirProvedorVetores3D, drawPlanOnCanvas, pickDimension, pickElement, pickModelPoint, planFrameUpdateOf, reiniciarEstadoGpu, sameView, screenToWorld, type ControladorGpu, type GpuContext, type LabelOp, type PlanDrawList, type PreferenciaGpu, type Viewport } from '@hestia/render';
+import { DARK, LIGHT, ModelScene, PickGpu3d, PlanFrame, PlanScene, aplicarCameraNaOrbita, criarControladorGpu, drawPlanOnCanvas, pickDimension, pickElement, pickModelPoint, planFrameUpdateOf, reiniciarEstadoGpu, sameView, screenToWorld, type ControladorGpu, type GpuContext, type LabelOp, type PlanDrawList, type PreferenciaGpu, type Viewport } from '@hestia/render';
 import { view3dOf } from '@hestia/model';
 import { useShallow } from 'zustand/react/shallow';
 import { editor } from '../editor/controller.ts';
@@ -61,26 +61,11 @@ export function ViewportCanvas(): ReactElement {
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) Object.assign(window, { __hestia3d: model.current.orbit, __hestia3dModel: model.current });
   const modelKey = useRef('');
   const montagem = useRef<Montagem3dProgressiva | null>(null);
-  // A prancha lê a câmera e a geometria da MESMA cena da aba 3D (decisão 0040): nada é remontado à parte quando a
-  // cena viva já está completa. Sem ela, a prancha monta uma instância própria (mesmo caminho, mesma geometria).
+  // A prancha lê a câmera da MESMA vista 3D (decisão 0040) por `vista3dAoVivo`.
   useEffect(() => {
     const m = model.current;
     registrarOrbita3D(m.orbit);
-    definirProvedorVetores3D((proj) => {
-      if (m.projetoDaCena() !== proj || m.niveisNaCena() !== proj.levels.length) return null;
-      // Hide/isolate/reveal temporários não vão para o projeto: a prancha mostraria outra coisa. Nesse caso, monta a
-      // cena própria (que só conhece a ocultação permanente da vista 3D).
-      if (visibilityOf(proj, useUi.getState()).temporary) return null;
-      const v3 = view3dOf(proj);
-      // No aramado a cena não tem malhas; sem arestas (estilo sombreado) não há o que desenhar em linha.
-      if (v3.style === 'wireframe') return null;
-      if (!v3.edges && v3.style !== 'hiddenLine') return null;
-      return m.exportarVetores();
-    });
-    return () => {
-      registrarOrbita3D(null);
-      definirProvedorVetores3D(null);
-    };
+    return () => registrarOrbita3D(null);
   }, []);
   const [size, setSize] = useState({ w: 0, h: 0 });
   // Rótulos da planta e a vista deles: o estado só troca quando o conteúdo ou a vista muda (`publish`).
@@ -207,7 +192,10 @@ export function ViewportCanvas(): ReactElement {
       }
       // Sombras e arestas são da vista 3D no projeto (decisão 0015 §1): a chave inclui a versão do projeto.
       const v3 = view3dOf(p);
-      const key = `${editor.store.version}|${dark}|${v3.shadows}|${v3.edges}|${v3.openOpenings === true}|${v3.showLevels !== false}`;
+      // A visibilidade temporária/Reveal não muda a versão do projeto: ela precisa entrar na chave para a cena
+      // receber `hidden`/`revealed` (sem isto HH/RH mudavam o estado, mas o modelo continuava na tela).
+      const visKey = `${[...vis.hidden].sort().join(',')}|${[...vis.revealed].sort().join(',')}`;
+      const key = `${editor.store.version}|${dark}|${v3.shadows}|${v3.edges}|${v3.openOpenings === true}|${v3.showLevels !== false}|${visKey}`;
       if (key !== modelKey.current) {
         modelKey.current = key;
         // Os níveis entram em fatias (ver montagem3dProgressiva.ts): a tela não espera o projeto inteiro. Depois da

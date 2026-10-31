@@ -17,7 +17,7 @@ Fonte: [docs/04](../04-ROTEIRO.md) Fase 6 (prancha impressa a partir do projeto)
 - [x] B2 Vista escalada 1:S, recortada à caixa; 1 m a 1:100 = 10 mm **(bloqueante)**
 - [x] B3 Pesos de linha em mm de papel (`lineWeightMm`), sem o mínimo de 1 px
 - [x] B4 3D vetorial na prancha (pontos de vista): mesma `ModelScene`/`OrbitCamera` da aba 3D, linhas ocultas por
-  z-buffer e recorte no quadro — evidência: `packages/render/src/sheet/vista3d.test.ts`,
+  raio no BVH da cena e recorte no quadro - evidência: `packages/render/src/sheet/vista3d.test.ts`,
   `packages/render/src/sheet/build.test.ts`, `packages/model/src/view3dPoints.test.ts`
 - [x] B5 3D no papel como caminhos (`SheetPath[]`) em SVG, PDF e DXF, sem raster nem imagem — decisão
   [0040](../decisoes/0040-3d-na-prancha.md)

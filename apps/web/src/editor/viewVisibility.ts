@@ -45,6 +45,7 @@ export function permanentHiddenOf(p: Project, target: ViewHiddenTarget | null): 
 }
 
 const uniq = (xs: readonly string[]): string[] => [...new Set(xs)];
+const redesenhar = (): void => useUi.setState((s) => ({ previewTick: s.previewTick + 1 }));
 
 /** Categoria gráfica de um elemento do modelo (o que "Ocultar categoria" atinge). */
 function categoriaDoElemento(e: { kind: string }): GraphicsCategory | null {
@@ -141,7 +142,7 @@ function setTemp(patch: Partial<TempViewVisibility> | null): void {
   const next = { ...st.viewTemp };
   if (patch === null) delete next[key];
   else next[key] = { ...(next[key] ?? {}), ...patch };
-  useUi.setState({ viewTemp: next });
+  useUi.setState((s) => ({ viewTemp: next, previewTick: s.previewTick + 1 }));
 }
 
 /** Ocultação permanente (Hide in View) dos elementos/categorias na vista ativa. */
@@ -159,6 +160,7 @@ export function hideInView(elements: readonly Id[], categories: readonly Graphic
     ...(categories.length ? { categories: [...categories] } : {}),
   });
   editor.store.exec({ type: 'setViewHidden', target, hidden }, 'Ocultar na vista');
+  redesenhar();
   useUi.setState({ status: 'Elementos ocultos nesta vista. Ctrl+Z desfaz.' });
 }
 
@@ -177,6 +179,7 @@ export function unhideInView(elements: readonly Id[], categories: readonly Graph
     ...(categories.length ? { categories: [...categories] } : {}),
   });
   editor.store.exec({ type: 'setViewHidden', target, hidden }, 'Reexibir na vista');
+  redesenhar();
   useUi.setState({ status: 'Elementos reexibidos nesta vista. Ctrl+Z desfaz.' });
 }
 
@@ -186,6 +189,7 @@ export function clearViewHidden(): void {
   const target = viewHiddenTargetOf(st);
   if (!target || !permanentHiddenOf(editor.project, target)) return;
   editor.store.exec({ type: 'setViewHidden', target, hidden: undefined }, 'Reexibir tudo na vista');
+  redesenhar();
   useUi.setState({ status: 'Tudo reexibido nesta vista. Ctrl+Z desfaz.' });
 }
 

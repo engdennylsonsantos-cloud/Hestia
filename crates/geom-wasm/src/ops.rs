@@ -27,7 +27,9 @@
 //!    reproduz isso. `arc_tolerance` do Clipper só afeta cantos arredondados, que não usamos.
 
 use i_overlay::core::fill_rule::FillRule;
+use i_overlay::core::overlay::{Overlay, ShapeType};
 use i_overlay::core::overlay_rule::OverlayRule;
+use i_overlay::i_float::int::point::IntPoint;
 use i_overlay::float::scale::FixedScaleFloatOverlay;
 use i_overlay::mesh::float::outline::offset::OutlineOffset;
 use i_overlay::mesh::float::style::{LineJoin, OutlineStyle};
@@ -36,6 +38,12 @@ use crate::{Anel, MultiPoligono, Poligono, ERRO_ENTRADA, ERRO_INTERNO};
 
 /// Escala da quantização: 1 µm, a mesma de `CLIP_SCALE` em `boolean.ts`.
 const ESCALA: f64 = 1e6;
+
+/// Escala fina (1 nm) para o pintor da sub-etapa A2. Com 1 µm a quantização desloca cada aresta até 0,5 µm e a área de
+/// um fragmento de perímetro de alguns metros até ~1e-5 m² — mais que a tolerância de 1e-6 m² da decisão 0046 §2.4 —,
+/// enquanto o TypeScript (`difference` = polygon-clipping, exato em todas as medições) não quantiza. A 1 nm o erro cai
+/// três ordens de grandeza e as coordenadas ficam muito abaixo de 1 µm. Mesmo algoritmo (non-zero, `i_overlay`).
+pub const ESCALA_FINA: f64 = 1e9;
 
 /// Limite de coordenada escalada para o arredondamento continuar exato em `f64` (bem abaixo de
 /// 2^53). Coordenadas acima disso não são representáveis em µm sem perder precisão; recusar é
@@ -63,11 +71,11 @@ fn area_com_sinal(anel: &Anel) -> f64 {
 
 /// `Math.round(x * 1e6)` do JS, inclusive para negativos (meio para +∞). Recusa NaN, infinito e
 /// coordenadas fora da faixa exata de `f64`.
-fn quantizar(valor: f64) -> Result<f64, u32> {
+fn quantizar(valor: f64, escala: f64) -> Result<f64, u32> {
     if !valor.is_finite() {
         return Err(ERRO_ENTRADA);
     }
-    let escalado = valor * ESCALA;
+    let escalado = valor * escala;
     if !escalado.is_finite() || escalado.abs() > LIMITE_ESCALADO {
         return Err(ERRO_ENTRADA);
     }
@@ -75,7 +83,7 @@ fn quantizar(valor: f64) -> Result<f64, u32> {
 }
 
 /// Valida, orienta e quantiza um multipolígono para o formato do `i_overlay`.
-fn preparar(m: &MultiPoligono) -> Result<Formas, u32> {
+fn preparar(m: &MultiPoligono, escala: f64) -> Result<Formas, u32> {
     let mut formas: Formas = Vec::with_capacity(m.len());
     for poli in m {
         // Geometria degenerada (polígono sem anéis, anel externo com menos de 3 pontos) não tem área: o TypeScript a
@@ -93,11 +101,11 @@ fn preparar(m: &MultiPoligono) -> Result<Formas, u32> {
             let mut pontos: Anel = Vec::with_capacity(anel.len());
             if inverter {
                 for p in anel.iter().rev() {
-                    pontos.push([quantizar(p[0])?, quantizar(p[1])?]);
+                    pontos.push([quantizar(p[0], escala)?, quantizar(p[1], escala)?]);
                 }
             } else {
                 for p in anel.iter() {
-                    pontos.push([quantizar(p[0])?, quantizar(p[1])?]);
+                    pontos.push([quantizar(p[0], escala)?, quantizar(p[1], escala)?]);
                 }
             }
             aneis.push(pontos);
@@ -108,7 +116,7 @@ fn preparar(m: &MultiPoligono) -> Result<Formas, u32> {
 }
 
 /// Converte a saída do `i_overlay` para o modelo do ABI, de volta em metros.
-fn converter(formas: Formas) -> MultiPoligono {
+fn converter(formas: Formas, escala: f64) -> MultiPoligono {
     let mut saida: MultiPoligono = Vec::with_capacity(formas.len());
     for poli in formas {
         let mut aneis: Poligono = Vec::with_capacity(poli.len());
@@ -123,7 +131,7 @@ fn converter(formas: Formas) -> MultiPoligono {
             aneis.push(
                 anel
                     .into_iter()
-                    .map(|p| [p[0] / ESCALA, p[1] / ESCALA])
+                    .map(|p| [p[0] / escala, p[1] / escala])
                     .collect(),
             );
         }
@@ -142,12 +150,18 @@ fn aplicar(a: &Formas, b: &Formas, regra: OverlayRule) -> Result<Formas, u32> {
 
 /// `union(...)` e `unionClipper(...)`.
 pub fn uniao(args: &[MultiPoligono]) -> Result<MultiPoligono, u32> {
+    uniao_com_escala(args, ESCALA)
+}
+
+/// `uniao` com a escala da quantização à escolha de quem chama. A sub-etapa B2 usa [`ESCALA_FINA`] nas zonas bloqueadas das paredes (a mesma
+/// razão do corte dos furos da B1: o `polygon-clipping` do TS não quantiza).
+pub fn uniao_com_escala(args: &[MultiPoligono], escala: f64) -> Result<MultiPoligono, u32> {
     if args.is_empty() {
         return Ok(Vec::new());
     }
     let mut todas: Formas = Vec::new();
     for m in args {
-        todas.extend(preparar(m)?);
+        todas.extend(preparar(m, escala)?);
     }
     if todas.is_empty() {
         return Ok(Vec::new());
@@ -156,18 +170,24 @@ pub fn uniao(args: &[MultiPoligono]) -> Result<MultiPoligono, u32> {
     // depender da ordem (equivale ao `unionClipper` do TS).
     let vazio: Formas = Vec::new();
     let resultado = aplicar(&todas, &vazio, OverlayRule::Union)?;
-    Ok(converter(resultado))
+    Ok(converter(resultado, escala))
 }
 
 /// `difference(a, ...bs)` e `differenceClipper(a, ...bs)`.
 pub fn diferenca(args: &[MultiPoligono]) -> Result<MultiPoligono, u32> {
+    diferenca_com_escala(args, ESCALA)
+}
+
+/// `diferenca` com a escala da quantização (inteiros por metro) à escolha de quem chama. A sub-etapa A2 usa
+/// [`ESCALA_FINA`] (ver lá).
+pub fn diferenca_com_escala(args: &[MultiPoligono], escala: f64) -> Result<MultiPoligono, u32> {
     let Some(primeiro) = args.first() else {
         return Err(ERRO_ENTRADA);
     };
     // Valida todos antes dos atalhos: entrada degenerada nunca chega ao `i_overlay`.
     let preparados: Vec<Formas> = args
         .iter()
-        .map(preparar)
+        .map(|m| preparar(m, escala))
         .collect::<Result<_, _>>()?;
     if primeiro.is_empty() || preparados[0].is_empty() {
         return Ok(Vec::new());
@@ -186,36 +206,46 @@ pub fn diferenca(args: &[MultiPoligono]) -> Result<MultiPoligono, u32> {
     if resultado.is_empty() {
         return Ok(Vec::new());
     }
-    Ok(converter(resultado))
+    Ok(converter(resultado, escala))
 }
 
 /// `intersection(a, b)`.
 pub fn interseccao(a: &MultiPoligono, b: &MultiPoligono) -> Result<MultiPoligono, u32> {
+    interseccao_com_escala(a, b, ESCALA)
+}
+
+/// `interseccao` com a escala da quantização à escolha de quem chama. A sub-etapa A3d usa [`ESCALA_FINA`] no recorte das faixas
+/// pelo perfil (a mesma razão do pintor: o `polygon-clipping` do TS não quantiza).
+pub fn interseccao_com_escala(a: &MultiPoligono, b: &MultiPoligono, escala: f64) -> Result<MultiPoligono, u32> {
     if a.is_empty() || b.is_empty() {
         return Ok(Vec::new());
     }
-    let a = preparar(a)?;
-    let b = preparar(b)?;
+    let a = preparar(a, escala)?;
+    let b = preparar(b, escala)?;
     if a.is_empty() || b.is_empty() {
         return Ok(Vec::new());
     }
     let resultado = aplicar(&a, &b, OverlayRule::Intersect)?;
-    Ok(converter(resultado))
+    Ok(converter(resultado, escala))
 }
 
 /// `offsetMulti(m, delta)`.
 pub fn offset(m: &MultiPoligono, delta: f64) -> Result<MultiPoligono, u32> {
-    if m.is_empty() {
-        return Ok(Vec::new());
-    }
     if !delta.is_finite() {
         return Err(ERRO_ENTRADA);
     }
-    let delta_em_um = delta * ESCALA;
+    offset_em_um(m, delta * ESCALA)
+}
+
+/// Offset com `delta` já em unidades de 1 µm (positivo dilata), cantos em esquadria.
+fn offset_em_um(m: &MultiPoligono, delta_em_um: f64) -> Result<MultiPoligono, u32> {
+    if m.is_empty() {
+        return Ok(Vec::new());
+    }
     if !delta_em_um.is_finite() || delta_em_um.abs() > LIMITE_ESCALADO {
         return Err(ERRO_ENTRADA);
     }
-    let formas = preparar(m)?;
+    let formas = preparar(m, ESCALA)?;
     if formas.is_empty() {
         return Ok(Vec::new());
     }
@@ -227,7 +257,225 @@ pub fn offset(m: &MultiPoligono, delta: f64) -> Result<MultiPoligono, u32> {
     let resultado = formas
         .outline_fixed_scale_as::<i64>(&estilo, 1.0)
         .map_err(|_| ERRO_INTERNO)?;
-    Ok(converter(resultado))
+    Ok(converter(resultado, ESCALA))
+}
+
+/// `closeGaps(m, eps)` de `boolean.ts` (A3c): fechamento morfológico, dilata `eps` metros, une (non-zero), contrai `eps` e une de
+/// novo. O TS usa `ClipperOffset(2, ...)` em inteiros de 1 µm; aqui o offset é o de `offset` (i_overlay, miter até 60°), o mesmo
+/// que a ABI v1 já expõe como `offsetMulti`. `eps` vira inteiros de 1 µm exatos (`eps * 1e6` arredondado, 3 para 3e-6).
+pub fn fechar_frestas(m: &MultiPoligono, eps: f64) -> Result<MultiPoligono, u32> {
+    if m.is_empty() {
+        return Ok(Vec::new());
+    }
+    let passo = (eps * ESCALA).round();
+    let dilatado = uniao(&[offset_em_um(m, passo)?])?;
+    let contraido = offset_em_um(&dilatado, -passo)?;
+    uniao(&[contraido])
+}
+
+/// `closeGapsSafe(m, eps, maxLoss)`: o fechamento só vale se a área não cair mais que `max_perda` nem subir mais que 1e-3 m².
+pub fn fechar_frestas_seguro(m: &MultiPoligono, eps: f64, max_perda: f64) -> Result<MultiPoligono, u32> {
+    let fechado = fechar_frestas(m, eps)?;
+    let delta = crate::pintor::area_da_forma(&fechado) - crate::pintor::area_da_forma(m);
+    Ok(if delta >= -max_perda && delta <= 1e-3 { fechado } else { m.clone() })
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Offset fiel ao Clipper (B2): `ClipperOffset(2, ...)` do TS com cantos em esquadria, polígonos fechados.
+//
+// O `offset` acima usa o miter do `i_overlay`, que para cantos mais agudos que 60° faz chanfro (bevel); o Clipper faz o canto
+// "quadrado" (`DoSquare`), que acrescenta área (~delta² por canto agudo: 3,3e-4 m² num canto de 49° com delta de 2 cm, medido na B2).
+// Isto NÃO é arredondamento (a diferença não encolhe com escala fina), por isso o `{cm}` das camadas de piso e laje usa este porte, ponto a ponto:
+// `AddPath` (sem pontos repetidos), `FixOrientations`, `OffsetPoint`/`DoMiter`/`DoSquare`, arredondamento de cada ponto a inteiro de 1 µm
+// (`Clipper.Round`: meio afastando do zero) e a união final pelo enrolamento POSITIVO (`pftPositive`; para delta < 0 o Clipper soma um
+// retângulo externo invertido e usa `pftNegative`, que é o mesmo conjunto: enrolamento > 0 dos caminhos deslocados).
+// O `offset` acima segue como está (a A3c o usa no fechamento de frestas).
+// ---------------------------------------------------------------------------------------------------------------------------------
+
+/// `ClipperLib.Clipper.Round`: meio afastando do zero.
+fn arredonda_clipper(a: f64) -> f64 {
+    if a < 0.0 {
+        (a - 0.5).ceil()
+    } else {
+        (a + 0.5).floor()
+    }
+}
+
+/// `Clipper.Area` (positivo = anti-horário, y para cima) de um caminho em inteiros.
+fn area_clipper(p: &[[f64; 2]]) -> f64 {
+    let n = p.len();
+    if n < 3 {
+        return 0.0;
+    }
+    let mut a = 0.0;
+    let mut j = n - 1;
+    for i in 0..n {
+        a += (p[j][0] + p[i][0]) * (p[j][1] - p[i][1]);
+        j = i;
+    }
+    -a * 0.5
+}
+
+/// `GetUnitNormal`.
+fn normal_unitaria(a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
+    if a == b {
+        return [0.0, 0.0];
+    }
+    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+    let f = 1.0 / (dx * dx + dy * dy).sqrt();
+    [dy * f, -(dx * f)]
+}
+
+/// Os pontos deslocados do vértice `j` (anterior `k`), como `OffsetPoint` com `jtMiter` e `miterLimit = 2` (`m_miterLim = 0.5`).
+fn deslocar_vertice(src: &[[f64; 2]], normais: &[[f64; 2]], j: usize, k: usize, delta: f64, saida: &mut Vec<[f64; 2]>) {
+    let pt = src[j];
+    let (nk, nj) = (normais[k], normais[j]);
+    let mut sen = nk[0] * nj[1] - nj[0] * nk[1];
+    if (sen * delta).abs() < 1.0 {
+        let cos = nk[0] * nj[0] + nj[1] * nk[1];
+        if cos > 0.0 {
+            saida.push([arredonda_clipper(pt[0] + nk[0] * delta), arredonda_clipper(pt[1] + nk[1] * delta)]);
+            return;
+        }
+    } else if sen > 1.0 {
+        sen = 1.0;
+    } else if sen < -1.0 {
+        sen = -1.0;
+    }
+    if sen * delta < 0.0 {
+        saida.push([arredonda_clipper(pt[0] + nk[0] * delta), arredonda_clipper(pt[1] + nk[1] * delta)]);
+        saida.push(pt);
+        saida.push([arredonda_clipper(pt[0] + nj[0] * delta), arredonda_clipper(pt[1] + nj[1] * delta)]);
+        return;
+    }
+    let r = 1.0 + (nj[0] * nk[0] + nj[1] * nk[1]);
+    if r >= 0.5 {
+        // DoMiter
+        let q = delta / r;
+        saida.push([arredonda_clipper(pt[0] + (nk[0] + nj[0]) * q), arredonda_clipper(pt[1] + (nk[1] + nj[1]) * q)]);
+    } else {
+        // DoSquare
+        let dx = (sen.atan2(nk[0] * nj[0] + nk[1] * nj[1]) / 4.0).tan();
+        saida.push([arredonda_clipper(pt[0] + delta * (nk[0] - nk[1] * dx)), arredonda_clipper(pt[1] + delta * (nk[1] + nk[0] * dx))]);
+        saida.push([arredonda_clipper(pt[0] + delta * (nj[0] + nj[1] * dx)), arredonda_clipper(pt[1] + delta * (nj[1] - nj[0] * dx))]);
+    }
+}
+
+/// `ClipperOffset(2, ...)` + `AddPaths(jtMiter, etClosedPolygon)` + `Execute(delta)` do TS (`offsetMulti`), em metros.
+pub fn offset_clipper(m: &MultiPoligono, delta: f64) -> Result<MultiPoligono, u32> {
+    if !delta.is_finite() {
+        return Err(ERRO_ENTRADA);
+    }
+    if m.is_empty() {
+        return Ok(Vec::new());
+    }
+    let delta_um = delta * ESCALA;
+    if delta_um.abs() > LIMITE_ESCALADO {
+        return Err(ERRO_ENTRADA);
+    }
+    // operandPaths + AddPath: orientação normalizada, pontos a 1 µm (`Math.round`), sem repetidos consecutivos nem o último igual ao primeiro.
+    let mut caminhos: Vec<Vec<[f64; 2]>> = Vec::new();
+    for poligono in m {
+        for (i, anel) in poligono.iter().enumerate() {
+            let anti_horario = area_com_sinal(anel) > 0.0;
+            let orientado: Vec<[f64; 2]> = if anti_horario == (i == 0) { anel.clone() } else { anel.iter().rev().copied().collect() };
+            let mut q: Vec<[f64; 2]> = Vec::with_capacity(orientado.len());
+            for p in &orientado {
+                q.push([quantizar(p[0], ESCALA)?, quantizar(p[1], ESCALA)?]);
+            }
+            if q.is_empty() {
+                continue;
+            }
+            let mut alto = q.len() - 1;
+            while alto > 0 && q[0] == q[alto] {
+                alto -= 1;
+            }
+            let mut limpo: Vec<[f64; 2]> = vec![q[0]];
+            for p in q.iter().take(alto + 1).skip(1) {
+                if *limpo.last().unwrap_or(&q[0]) != *p {
+                    limpo.push(*p);
+                }
+            }
+            if limpo.len() < 3 {
+                continue;
+            }
+            caminhos.push(limpo);
+        }
+    }
+    if caminhos.is_empty() {
+        return Ok(Vec::new());
+    }
+    // FixOrientations: se o caminho do vértice mais baixo (maior Y; em empate, menor X) não é anti-horário, inverte todos.
+    let mut mais_baixo = (0usize, 0usize);
+    for (ci, c) in caminhos.iter().enumerate() {
+        let mut k = 0usize;
+        for (pi, p) in c.iter().enumerate() {
+            if p[1] > c[k][1] || (p[1] == c[k][1] && p[0] < c[k][0]) {
+                k = pi;
+            }
+        }
+        let (a, b) = (c[k], caminhos[mais_baixo.0][mais_baixo.1]);
+        if ci == 0 || a[1] > b[1] || (a[1] == b[1] && a[0] < b[0]) {
+            mais_baixo = (ci, k);
+        }
+    }
+    if area_clipper(&caminhos[mais_baixo.0]) < 0.0 {
+        for c in caminhos.iter_mut() {
+            c.reverse();
+        }
+    }
+    // DoOffset
+    let mut deslocados: Vec<Vec<[f64; 2]>> = Vec::with_capacity(caminhos.len());
+    for src in &caminhos {
+        let n = src.len();
+        let mut normais: Vec<[f64; 2]> = Vec::with_capacity(n);
+        for j in 0..n - 1 {
+            normais.push(normal_unitaria(src[j], src[j + 1]));
+        }
+        normais.push(normal_unitaria(src[n - 1], src[0]));
+        let mut saida: Vec<[f64; 2]> = Vec::with_capacity(n * 2);
+        let mut k = n - 1;
+        for j in 0..n {
+            deslocar_vertice(src, &normais, j, k, delta_um, &mut saida);
+            k = j;
+        }
+        deslocados.push(saida);
+    }
+    // Execute: união pelo enrolamento positivo, direto sobre os inteiros de 1 µm (`Overlay` do `i_overlay`, sem o adaptador de ponto flutuante: ele
+    // centra a grade na caixa dos pontos e, com a caixa de extensão ímpar, devolve coordenadas em meio micrômetro; o Clipper trabalha na grade
+    // absoluta de 1 µm). O enrolamento decide externo e furo, por isso todo caminho entra como contorno do mesmo operando.
+    let total: usize = deslocados.iter().map(|c| c.len()).sum();
+    let mut sobrepor: Overlay<i64> = Overlay::new(total);
+    let mut algum = false;
+    for c in &deslocados {
+        if c.len() < 3 {
+            continue;
+        }
+        let pontos: Vec<IntPoint<i64>> = c.iter().map(|p| IntPoint::new(p[0] as i64, p[1] as i64)).collect();
+        sobrepor.add_contour(&pontos, ShapeType::Subject);
+        algum = true;
+    }
+    if !algum {
+        return Ok(Vec::new());
+    }
+    let resultado = sobrepor.overlay(OverlayRule::Union, FillRule::Positive);
+    let mut saida: MultiPoligono = Vec::with_capacity(resultado.len());
+    for forma in resultado {
+        let mut aneis: Poligono = Vec::with_capacity(forma.len());
+        for contorno in forma {
+            let mut anel: Anel = contorno.iter().map(|p| [p.x as f64 / ESCALA, p.y as f64 / ESCALA]).collect();
+            if anel.len() > 1 && anel[0] == anel[anel.len() - 1] {
+                anel.pop();
+            }
+            if anel.len() >= 3 {
+                aneis.push(anel);
+            }
+        }
+        if !aneis.is_empty() {
+            saida.push(aneis);
+        }
+    }
+    Ok(saida)
 }
 
 #[cfg(test)]
@@ -258,6 +506,37 @@ mod testes {
 
     fn erro(r: Result<MultiPoligono, u32>) -> Option<u32> {
         r.err()
+    }
+
+    #[test]
+    fn fechar_frestas_cola_pecas_separadas_por_2_micrometros() {
+        // dois quadrados de 1 m com uma fresta de 2 µm: o fechamento (eps 3 µm) os une num retângulo só
+        let a = quadrado(0.0, 0.0, 1.0);
+        let mut b = quadrado(1.000002, 0.0, 1.0);
+        let mut dois = a.clone();
+        dois.append(&mut b);
+        let r = fechar_frestas(&dois, 3e-6).expect("fechar");
+        assert_eq!(r.len(), 1, "uma peça só");
+        assert!((area(&r) - 2.000002).abs() < 1e-5, "área {}", area(&r));
+        // fresta de 10 µm (maior que 2 x eps): continua em duas peças
+        let mut c = quadrado(1.00001, 0.0, 1.0);
+        let mut dois = a.clone();
+        dois.append(&mut c);
+        assert_eq!(fechar_frestas(&dois, 3e-6).expect("fechar").len(), 2);
+        assert!(fechar_frestas(&Vec::new(), 3e-6).expect("vazio").is_empty());
+    }
+
+    #[test]
+    fn fechar_frestas_seguro_devolve_a_entrada_se_a_area_muda_demais() {
+        // quadrado de 0,5 m com furo quadrado de 2 µm de lado: o fechamento preencheria o furo (ganho < 1e-3: vale)
+        let mut q = quadrado(0.0, 0.0, 0.5);
+        q[0].push(vec![[0.2, 0.2], [0.2, 0.200002], [0.200002, 0.200002], [0.200002, 0.2]]);
+        let r = fechar_frestas_seguro(&q, 3e-6, 2e-5).expect("seguro");
+        assert!((area(&r) - 0.25).abs() < 1e-5);
+        // tira fina de 2 µm x 20 m: o fechamento a mantém (dilata e contrai), mas se perdesse mais que maxLoss devolveria a entrada
+        let fina: MultiPoligono = vec![vec![vec![[0.0, 0.0], [20.0, 0.0], [20.0, 0.000002], [0.0, 0.000002]]]];
+        let s = fechar_frestas_seguro(&fina, 3e-6, 2e-5).expect("seguro");
+        assert!(area(&s) >= area(&fina) - 2e-5 - 1e-12);
     }
 
     #[test]
@@ -436,5 +715,63 @@ mod testes {
             erro(diferenca(&[quadrado(0.0, 0.0, 10.0), invalido])),
             Some(ERRO_ENTRADA)
         );
+    }
+
+    #[test]
+    fn offset_clipper_quadrado_cresce_e_encolhe_em_esquadria() {
+        let q = quadrado(0.0, 0.0, 1.0);
+        let fora = offset_clipper(&q, 0.02).expect("offset");
+        assert_eq!(fora.len(), 1);
+        assert!((area(&fora) - 1.04 * 1.04).abs() < 1e-9, "área {}", area(&fora));
+        let dentro = offset_clipper(&q, -0.02).expect("offset");
+        assert!((area(&dentro) - 0.96 * 0.96).abs() < 1e-9, "área {}", area(&dentro));
+        // encolher além do tamanho some com a forma; vazio devolve vazio
+        assert!(offset_clipper(&q, -0.6).expect("offset").is_empty());
+        assert!(offset_clipper(&Vec::new(), 0.1).expect("offset").is_empty());
+        assert_eq!(offset_clipper(&q, f64::NAN).err(), Some(ERRO_ENTRADA));
+    }
+
+    #[test]
+    fn offset_clipper_com_furo_acompanha_o_furo() {
+        let mut q = quadrado(0.0, 0.0, 2.0);
+        q[0].push(vec![[0.8, 0.8], [0.8, 1.2], [1.2, 1.2], [1.2, 0.8]]);
+        let fora = offset_clipper(&q, 0.1).expect("offset");
+        // o externo vai a 2,2 x 2,2 e o furo (0,4 x 0,4) encolhe para 0,2 x 0,2
+        assert!((area(&fora) - (2.2 * 2.2 - 0.2 * 0.2)).abs() < 1e-9, "área {}", area(&fora));
+    }
+
+    #[test]
+    fn offset_clipper_canto_agudo_faz_quadrado_e_nao_o_miter_do_i_overlay() {
+        // triângulo isósceles de ponta 28° (mais agudo que 60°): o Clipper faz o canto quadrado no vértice agudo (turno de 152°: r = 0,117 < 0,5)
+        // e esquadria nos dois da base (76°). Área = triângulo (4) + perímetro x d + miter exato nos dois cantos da base + o quadrado do canto agudo.
+        let t: MultiPoligono = vec![vec![vec![[0.0, 0.0], [4.0, -1.0], [4.0, 1.0]]]];
+        let d: f64 = 0.05;
+        let clip = area(&offset_clipper(&t, d).expect("offset"));
+        let perimetro = 2.0 * 17f64.sqrt() + 2.0;
+        let miter_exato_agudo = d * d * (76f64.to_radians()).tan();
+        let miter_base = 2.0 * d * d * (52f64.to_radians()).tan();
+        let sem_canto_agudo = 4.0 + perimetro * d + miter_base;
+        assert!(clip > sem_canto_agudo && clip < sem_canto_agudo + miter_exato_agudo, "área {clip}: o quadrado fica entre o chanfro e o miter exato");
+        // o miter do i_overlay deixa passar mais área neste canto: as duas operações NÃO são a mesma
+        let miter_do_overlay = area(&offset(&t, d).expect("offset"));
+        assert!((miter_do_overlay - clip).abs() > 1e-4, "i_overlay {miter_do_overlay} x Clipper {clip}");
+        // canto de 90°: igual ao miter do i_overlay
+        let q = quadrado(0.0, 0.0, 1.0);
+        assert!((area(&offset_clipper(&q, 0.05).expect("a")) - area(&offset(&q, 0.05).expect("b"))).abs() < 1e-9);
+    }
+
+    #[test]
+    fn offset_clipper_fica_na_grade_absoluta_de_1_micrometro() {
+        // caixa de extensão ímpar em y (o adaptador de ponto flutuante do i_overlay centraria a grade e devolveria meio micrômetro)
+        let m: MultiPoligono = vec![vec![vec![[4.092, 4.121], [5.879, 4.121], [5.879, 6.520283], [5.726803, 6.507855], [5.266106, 6.454609], [4.807458, 6.385917], [4.351376, 6.301856], [4.092, 6.244978]]]];
+        for delta in [-0.03, 0.02] {
+            let r = offset_clipper(&m, delta).expect("offset");
+            assert!(!r.is_empty());
+            for p in r.iter().flatten().flatten() {
+                for v in p {
+                    assert!((v * 1e6 - (v * 1e6).round()).abs() < 1e-6, "coordenada {v} fora da grade de 1 µm");
+                }
+            }
+        }
     }
 }

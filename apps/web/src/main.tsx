@@ -1,12 +1,13 @@
 import { createRoot } from 'react-dom/client';
 import { ativarKernelExperimental, estadoKernel, medicaoOperacoes } from '@hestia/geom';
+import { iniciarDespachoKernel } from '@hestia/engine';
 import './styles.css';
 import './ribbon.css';
 import './appshell.css';
 import './dock.css';
 import './contextmenu.css';
 import { installAppShell } from './editor/appShell.ts';
-import { kernelExperimentalLigado } from './editor/preferenciasKernel.ts';
+import { configDoDespacho, kernelExperimentalLigado } from './editor/preferenciasKernel.ts';
 import { installRecentCommands } from './editor/recentCommands.ts';
 import { instalarConsentimentoAnalytics } from './consentimento.ts';
 import { App } from './App.tsx';
@@ -23,6 +24,17 @@ createRoot(document.getElementById('root')!).render(<App />);
 // TypeScript — nenhum resultado muda. Fire-and-forget: nunca bloqueia e o carregador nunca lança.
 if (kernelExperimentalLigado()) {
   const ativar = (): void => void ativarKernelExperimental();
+  const g = globalThis as { requestIdleCallback?: (cb: () => void, opcoes?: { timeout: number }) => number };
+  if (typeof g.requestIdleCallback === 'function') g.requestIdleCallback(ativar, { timeout: 4000 });
+  else setTimeout(ativar, 2500);
+}
+
+// Fatias A e B do kernel v2 (0047 §12; B: pisos, lajes e junção, 0050): `?kernelFatias=A,B`, `?kernel=rust` ou `hestia:kernel:fatias`. `resolveLevel` passa a pedir o nível ao Rust
+// (ou, no modo sombra, compara e devolve o TS). Mesma ativação adiada: até o wasm ficar pronto, e se ele falhar, vale o TypeScript. Sem a
+// fatia ligada, nada é instalado nem baixado.
+const despacho = configDoDespacho();
+if (despacho.fatiaA || despacho.fatiaB) {
+  const ativar = (): void => void iniciarDespachoKernel(despacho);
   const g = globalThis as { requestIdleCallback?: (cb: () => void, opcoes?: { timeout: number }) => number };
   if (typeof g.requestIdleCallback === 'function') g.requestIdleCallback(ativar, { timeout: 4000 });
   else setTimeout(ativar, 2500);

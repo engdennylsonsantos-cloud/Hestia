@@ -40,6 +40,12 @@ npm run check
 
 Veja [docs/07-STATUS-V1.md](docs/07-STATUS-V1.md) para o estado atual e o roteiro de teste.
 
+## Apoie o projeto
+
+O Hestia é open source e gratuito. Se ele te ajuda, você pode apoiar o desenvolvimento
+pelo [GitHub Sponsors](https://github.com/sponsors/engdennylsonsantos-cloud). O apoio
+financia manutenção, novos recursos (render, importadores, kernel em Rust) e suporte.
+
 ## Licença e contribuições
 
 MIT. Veja [LICENSE](LICENSE). As regras de contribuição, licenciamento e marca

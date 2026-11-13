@@ -11,6 +11,9 @@ function hashMesh(pos: number[], idx: number[]): string {
   return (h >>> 0).toString(16) + ':' + pos.length;
 }
 
+/** Posições em metros com resolução de 1 µm: o float32 da GPU vira "0.10000000149011612" em JSON; arredondado fica "0.1". */
+const q = (n: number): number => Math.round(n * 1e6) / 1e6;
+
 interface Range { id: string; start: number; count: number }
 
 /**
@@ -18,7 +21,7 @@ interface Range { id: string; start: number; count: number }
  * modelo traz `userData.ranges` (faixas de índice por elemento); só elas entram. Malhas instanciadas, datum, chão,
  * grade e realces não têm faixas e ficam de fora.
  */
-export function extractElementMeshes(root: THREE.Object3D): Map<string, SceneMesh> {
+export function extractElementMeshes(root: THREE.Object3D, quantize = true): Map<string, SceneMesh> {
   root.updateMatrixWorld(true);
   const acc = new Map<string, { pos: number[]; idx: number[]; remap: Map<string, number> }>();
   const v = new THREE.Vector3();
@@ -39,7 +42,8 @@ export function extractElementMeshes(root: THREE.Object3D): Map<string, SceneMes
         if (to === undefined) {
           v.fromBufferAttribute(pos, vi).applyMatrix4(mesh.matrixWorld);
           to = a.pos.length / 3;
-          a.pos.push(v.x, v.y, v.z);
+          if (quantize) a.pos.push(q(v.x), q(v.y), q(v.z));
+          else a.pos.push(v.x, v.y, v.z);
           a.remap.set(key, to);
         }
         a.idx.push(to);

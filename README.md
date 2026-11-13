@@ -65,8 +65,6 @@ para WebGL2) e o núcleo geométrico é separado da interface, escrito em Rust.
 
 **No Windows:** baixe o instalador na [última versão](https://github.com/engdennylsonsantos-cloud/Hestia/releases/latest) e execute.
 
-Quer um projeto para testar? O [site](https://www.hestiabim.com) tem uma casa térrea de 2 quartos para abrir.
-
 ## Apoie o projeto
 
 O Hestia é open source e gratuito, e continua assim. Ele é desenvolvido com tempo e cuidado,

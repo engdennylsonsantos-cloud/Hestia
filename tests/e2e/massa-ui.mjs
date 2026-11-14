@@ -3,15 +3,12 @@
 // CONFERIR o resultado. Capturas em docs/massa/evidencias/fase3/. Sai com código 1 se alguma verificação falhar ou houver erro de
 // console/página (achados do app entram como FALHA, com o erro completo na lista final).
 //   npm run build && node tests/e2e/massa-ui.mjs
-import { createServer } from 'node:http';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { clickWorld, launch, pressTool } from './helpers.mjs';
+import { aba, botaoDoPainel, capturar as capturarComum, dialogo, enquadrarPlanta, enquadrarTudo, lerMassas, massasNa3d, resumoErro, servirDist, statusTexto } from './massaHelpers.mjs';
 
-const RAIZ_DIST = path.resolve('apps/web/dist');
 const DIR = path.resolve('docs/massa/evidencias/fase3');
-const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const VIEWPORT = { width: 1440, height: 860 };
 
 let falhas = 0;
@@ -21,9 +18,6 @@ const check = (nome, ok, extra = '') => {
   console.log(`${ok ? 'OK   ' : 'FALHA'} ${nome}${extra !== '' ? ` (${extra})` : ''}`);
   if (!ok) falhas++;
 };
-
-/** Primeira linha do erro e a linha "waiting for" do Playwright (o seletor que não apareceu). */
-const resumoErro = (e) => e.message.split('\n').filter((l) => /^\s*(locator|waiting for|Error|expect)/i.test(l) || l.includes('waiting for')).slice(0, 2).join(' | ') || e.message.split('\n')[0];
 
 /** Um passo do roteiro: uma exceção vira uma verificação falha e o roteiro segue (para mostrar os problemas de uma vez). */
 async function passo(nome, fn) {
@@ -35,96 +29,11 @@ async function passo(nome, fn) {
   }
 }
 
-/**
- * Serve o build por HTTP local. Por `file://` o Chrome bloqueia o fetch do `geom_wasm.wasm` (CORS) e o kernel não sobe. O favicon
- * responde 204: o app não declara ícone (achado conhecido, fora da massa), e o 404 não deve mascarar erros de verdade.
- */
-function servirDist() {
-  const srv = createServer(async (req, res) => {
-    const rel = decodeURIComponent(new URL(req.url ?? '/', 'http://local').pathname);
-    const arq = path.join(RAIZ_DIST, rel === '/' ? 'index.html' : rel);
-    if (!arq.startsWith(RAIZ_DIST)) {
-      res.writeHead(403).end();
-      return;
-    }
-    if (rel === '/favicon.ico') {
-      res.writeHead(204).end();
-      return;
-    }
-    let corpo;
-    try {
-      corpo = await readFile(arq);
-    } catch {
-      errosPagina.push(`[HTTP 404 do servidor local] ${rel}`);
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': TIPOS[path.extname(arq)] ?? 'application/octet-stream' }).end(corpo);
-  });
-  return new Promise((ok) => srv.listen(0, '127.0.0.1', () => ok(srv)));
-}
 
-/**
- * Captura quando dois quadros seguidos saem iguais (a tela parou de mudar). Tira o cursor da área de desenho antes, para o hover
- * não entrar na foto. Sem estabilizar em 25 tentativas, grava a última e falha.
- */
-async function capturar(page, nome) {
-  const semBarra = await page.waitForFunction(() => !document.querySelector('[role="progressbar"]'), null, { timeout: 180000 }).then(() => true, () => false);
-  check(`${nome}: sem barra de progresso na tela`, semBarra);
-  await page.mouse.move(2, 2);
-  await page.waitForTimeout(400);
-  let anterior = null;
-  let atual = null;
-  for (let i = 1; i <= 25; i++) {
-    atual = await page.screenshot({ type: 'png' });
-    if (anterior && atual.equals(anterior)) {
-      writeFileSync(path.join(DIR, nome), atual);
-      check(`captura ${nome} estável`, true, `${i} quadros, ${(atual.length / 1024).toFixed(0)} kB`);
-      return;
-    }
-    anterior = atual;
-    await page.waitForTimeout(600);
-  }
-  writeFileSync(path.join(DIR, nome), atual);
-  check(`captura ${nome} estável`, false, 'não estabilizou em 25 quadros; gravada a última');
-}
-
-/** "Enquadrar tudo" da barra de navegação do canvas (o botão do app, não uma chamada direta). */
-const enquadrarTudo = async (page) => {
-  await page.getByRole('button', { name: /Enquadrar tudo|Zoom to Fit/ }).first().click();
-  await page.waitForTimeout(500);
-};
-
-/** Só leitura: as massas do projeto em ordem de criação. */
-const lerMassas = (page) => page.evaluate(() => Object.values(window.__hestia.editor.project.elements)
-  .filter((e) => e.kind === 'mass')
-  .map((m) => ({ id: m.id, nome: m.name, order: m.order, origem: m.origem, n: m.secoes.length, zs: m.secoes.map((s) => s.z), rot: m.secoes.map((s) => s.rotacao), forma: m.secoes[0].perfil.forma, raio: m.secoes[0].perfil.raio ?? null, arranjo: m.arranjo ?? null }))
-  .sort((a, b) => a.order - b.order));
-
-/** Só leitura: o texto da barra de status (o que o usuário vê na linha de baixo). */
-const statusTexto = (page) => page.evaluate(() => { const s = window.__hestia.useUi.getState().status; return typeof s === 'string' ? s : JSON.stringify(s ?? ''); });
-
-/** Só leitura: grupos de massa que estão na cena 3D (a cena retira a massa quando a categoria fica oculta na vista). */
-const massasNa3d = (page) => page.evaluate(() => (window.__hestia3dModel?.massaNaCena ?? []).filter((g) => g.grupo.parent && g.grupo.children.length > 0).length);
-
-/**
- * Enquadra a planta pelo menu de contexto do canvas ("Ajustar zoom"). O botão "Enquadrar tudo" da barra de navegação não recebe o
- * clique na planta (ACHADO, ver o passo a); o menu é o caminho que funciona com o mouse.
- */
-async function enquadrarPlanta(page) {
-  await page.mouse.move(1200, 300);
-  await page.mouse.click(1200, 300, { button: 'right' });
-  await page.getByRole('menuitem', { name: /Ajustar zoom|Zoom to Fit/ }).first().click();
-  await page.waitForTimeout(500);
-}
-
-const dialogo = (page, nome) => page.getByRole('dialog', { name: nome, exact: true });
-/** Botão de um painel da faixa (o grupo tem o título do painel): a barra de acesso rápido repete alguns rótulos. */
-const botaoDoPainel = (page, painel, nome) => page.getByRole('group', { name: painel, exact: true }).getByRole('button', { name: nome, exact: true });
-const aba = (page, nome) => page.getByRole('button', { name: nome, exact: true }).click();
+const capturar = (page, nome) => capturarComum(page, DIR, nome, check);
 
 const browser = await launch();
-const srv = await servirDist();
+const srv = await servirDist(errosPagina);
 mkdirSync(DIR, { recursive: true });
 let bulboId = null;
 let loftId = null;

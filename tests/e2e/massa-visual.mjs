@@ -3,14 +3,11 @@
 // e de página e a contagem do kernel por massa. Código de saída 1 se houver erro de console/página, captura que não estabilizou ou verificação falha.
 //   npm run build && node tests/e2e/massa-visual.mjs
 import { execFileSync } from 'node:child_process';
-import { createServer } from 'node:http';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { abreVista3d, launch } from './helpers.mjs';
+import { capturar as capturarComum, enquadrarTudo, servirDist } from './massaHelpers.mjs';
 
-const RAIZ_DIST = path.resolve('apps/web/dist');
-const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const JSON_GERADO = '/tmp/hestia-massa-fixture.json';
 const JSON_CAPTURA = '/tmp/hestia-massa-captura.json';
 const DIR = path.resolve('docs/massa/evidencias/fase2');
@@ -30,37 +27,6 @@ const check = (nome, ok, extra = '') => {
   if (!ok) falhas++;
 };
 
-/**
- * Serve o build por HTTP local. Por `file://` o Chrome bloqueia o fetch do `geom_wasm.wasm` (CORS) e o kernel nunca sobe; esse é um achado
- * registrado no relatório, não o que este portão mede.
- */
-function servirDist() {
-  const srv = createServer(async (req, res) => {
-    const rel = decodeURIComponent(new URL(req.url ?? '/', 'http://local').pathname);
-    const arq = path.join(RAIZ_DIST, rel === '/' ? 'index.html' : rel);
-    if (!arq.startsWith(RAIZ_DIST)) {
-      res.writeHead(403).end();
-      return;
-    }
-    // O app não declara ícone (achado conhecido, fora da massa): o servidor de teste responde 204 ao pedido automático do
-    // navegador, para o 404 do favicon não mascarar erros de verdade.
-    if (rel === '/favicon.ico') {
-      res.writeHead(204).end();
-      return;
-    }
-    let corpo;
-    try {
-      corpo = await readFile(arq);
-    } catch {
-      errosPagina.push(`[HTTP 404 do servidor local] ${rel}`);
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': TIPOS[path.extname(arq)] ?? 'application/octet-stream' }).end(corpo);
-  });
-  return new Promise((ok) => srv.listen(0, '127.0.0.1', () => ok(srv)));
-}
-
 /** Gera o projeto de referência, desloca as massas e roda a contagem do kernel (Node, mesmo wasm). Devolve a contagem por massa. */
 function prepararProjeto() {
   execFileSync('npx', ['vite-node', 'tests/e2e/massa-fixture.mts', 'gerar', JSON_GERADO], { stdio: 'inherit' });
@@ -79,38 +45,6 @@ function prepararProjeto() {
   return JSON.parse(linha.slice('CONTAGEM '.length));
 }
 
-/**
- * Captura quando dois quadros seguidos saem iguais (o canvas parou de se mover). Sem estabilizar em 25 tentativas, grava a última e falha.
- * Tira o cursor da área de desenho antes, para o hover não entrar na foto.
- */
-async function capturar(page, nome) {
-  // Barras de progresso (montagem 3D e abertura em segundo plano) somem quando o trabalho termina; antes disso a tela ainda não é a final.
-  const semBarra = await page.waitForFunction(() => !document.querySelector('[role="progressbar"]'), null, { timeout: 180000 }).then(() => true, () => false);
-  check(`${nome}: sem barra de progresso na tela`, semBarra);
-  await page.mouse.move(2, 2);
-  await page.waitForTimeout(400);
-  let anterior = null;
-  let atual = null;
-  for (let i = 1; i <= 25; i++) {
-    atual = await page.screenshot({ type: 'png' });
-    if (anterior && atual.equals(anterior)) {
-      writeFileSync(path.join(DIR, nome), atual);
-      check(`captura ${nome} estável`, true, `${i} quadros, ${(atual.length / 1024).toFixed(0)} kB`);
-      return;
-    }
-    anterior = atual;
-    await page.waitForTimeout(600);
-  }
-  writeFileSync(path.join(DIR, nome), atual);
-  check(`captura ${nome} estável`, false, 'não estabilizou em 25 quadros; gravada a última');
-}
-
-/** Enquadra a vista atual com o botão "Enquadrar tudo" da barra de navegação (o do app, não uma chamada direta). */
-async function enquadrarTudo(page) {
-  await page.getByRole('button', { name: /Enquadrar tudo|Zoom to Fit/ }).first().click();
-  await page.waitForTimeout(500);
-}
-
 /** Cria a vista de corte ou elevação no projeto, abre e espera o corte ser calculado (o worker responde em `sectionOf`). */
 async function abrirVista(page, id, tipo, linha, nome) {
   await page.evaluate(({ id, tipo, linha, nome }) => {
@@ -122,12 +56,14 @@ async function abrirVista(page, id, tipo, linha, nome) {
   await page.waitForTimeout(500);
 }
 
+const capturar = (page, nome) => capturarComum(page, DIR, nome, check);
+
 const contagem = prepararProjeto();
 console.log(`kernel em Node: ${contagem.kernel ? 'ok' : 'INDISPONÍVEL'}; massas no JSON: ${(contagem.massas ?? []).join(', ')}`);
 
 mkdirSync(DIR, { recursive: true });
 const browser = await launch();
-const srv = await servirDist();
+const srv = await servirDist(errosPagina);
 try {
   // A tela inicial não tem canvas: o `openApp` dos helpers espera o canvas, então aqui só se espera o gancho de depuração.
   const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });

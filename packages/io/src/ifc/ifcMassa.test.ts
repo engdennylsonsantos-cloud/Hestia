@@ -25,8 +25,8 @@ function projetoCom(...massas: Mass[]): Project {
   return s.project;
 }
 
-const massa = (id: string, name: string): Mass =>
-  makeMass({
+const massa = (id: string, name: string): Mass => ({
+  ...makeMass({
     id,
     levelId: 'lv_0',
     name,
@@ -34,7 +34,9 @@ const massa = (id: string, name: string): Mass =>
       { z: 0, perfil: { forma: 'poligono', lados: 4, raio: 1 }, rotacao: 0, escala: 1, dx: 0, dy: 0 },
       { z: 3, perfil: { forma: 'poligono', lados: 4, raio: 1 }, rotacao: 0, escala: 1, dx: 0, dy: 0 },
     ],
-  });
+  }),
+  order: 0,
+});
 
 describe('exportIfc: massa conceitual (ficha X1)', () => {
   it('cada massa com malha sai como um IFCBUILDINGELEMENTPROXY no pavimento, com o nome em Name e a malha em IFCTRIANGULATEDFACESET', () => {

@@ -7,8 +7,8 @@ import { massesOf, type FonteMassaIfc } from './ifcExportMassa.ts';
 const count = (text: string, type: string): number => (text.match(new RegExp(`=${type}\\(`, 'g')) ?? []).length;
 const NOW = new Date('2026-10-22T12:00:00Z');
 
-const massa = (id: string): Mass =>
-  makeMass({
+const massa = (id: string): Mass => ({
+  ...makeMass({
     id,
     levelId: 'lv_0',
     name: `Massa ${id}`,
@@ -16,7 +16,9 @@ const massa = (id: string): Mass =>
       { z: 0, perfil: { forma: 'circulo', raio: 1 }, rotacao: 0, escala: 1, dx: 0, dy: 0 },
       { z: 3, perfil: { forma: 'circulo', raio: 1 }, rotacao: 0, escala: 1, dx: 0, dy: 0 },
     ],
-  });
+  }),
+  order: 0,
+});
 
 function projetoCom(...ids: string[]): Project {
   const s = new ProjectStore(createEmptyProject('Massa'));

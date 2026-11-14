@@ -125,6 +125,7 @@ export interface CsvOptions {
 export function scheduleToCsv(t: ScheduleTable, o: CsvOptions = {}): string {
   const sep = o.separator ?? ',';
   const esc = (c: ScheduleCell): string => {
+    // units-ok: separador decimal do CSV é formato de arquivo (idioma do usuário), não texto de interface.
     let s = c === null ? '' : typeof c === 'number' && o.decimalComma ? String(c).replace('.', ',') : String(c);
     if (typeof c === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /["\r\n]/.test(s) || s.includes(sep) ? `"${s.replace(/"/g, '""')}"` : s;

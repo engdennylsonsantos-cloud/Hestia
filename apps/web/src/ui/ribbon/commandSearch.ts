@@ -40,6 +40,12 @@ export function allCommands(lang: Lang): Command[] {
       }
     }
   }
+  // SUPLEMENTOS (fase J): o gerenciador também se acha pela busca de comandos, não só pelo botão da faixa.
+  if (!seen.has('act:pluginManager')) {
+    seen.add('act:pluginManager');
+    const def = ACTIONS.pluginManager;
+    out.push({ id: 'act:pluginManager', label: txt(def.label, lang), where: txt(SUPLEMENTOS_TAB.label, lang), run: def.run });
+  }
   // SUPLEMENTOS: comandos contribuídos por manifestos (permissão `ui.commands` já conferida pelo registro).
   for (const pc of pluginRegistry.commands()) {
     const id = `plug:${pc.qid}`;

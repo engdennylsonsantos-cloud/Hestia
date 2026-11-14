@@ -397,7 +397,7 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
   pluginManager: {
     label: t('Gerenciar suplementos', 'Manage Add-Ins'),
     icon: 'component',
-    hint: t('Instala suplementos (.hestiapkg ou pasta), revisa as permissões e os ativa ou desativa.', 'Install add-ins (.hestiapkg or folder), review permissions, enable or disable them.'),
+    hint: t('Lista todos os suplementos: instala, atualiza, ajusta permissões, mostra o registro e os dados. Atalho: Alt+Shift+P.', 'Lists every add-in: install, update, adjust permissions, view the log and the data. Shortcut: Alt+Shift+P.'),
     run: openDialog('pluginManager'),
   },
   importCad: {

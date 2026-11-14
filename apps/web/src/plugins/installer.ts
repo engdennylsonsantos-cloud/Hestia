@@ -54,6 +54,8 @@ export type InstallResult =
       readme?: string;
       /** `true` quando substituiu uma versão já instalada. */
       replaced: boolean;
+      /** Versão que estava instalada antes (só quando `replaced`). */
+      previousVersion?: string;
     }
   | { ok: false; code: string; message: string };
 
@@ -71,27 +73,29 @@ export class Installer {
   constructor(private readonly o: InstallerOptions) {}
 
   /** Instala a partir dos bytes de um `.hestiapkg`. */
-  async installBytes(bytes: Uint8Array): Promise<InstallResult> {
+  async installBytes(bytes: Uint8Array, expectId?: string): Promise<InstallResult> {
     try {
-      return await this.finish(await openPackage(bytes), 'package');
+      return await this.finish(await openPackage(bytes), 'package', expectId);
     } catch (e) {
       return this.refuse(e);
     }
   }
 
   /** Instala a partir de uma pasta de desenvolvimento já lida (caminho relativo → bytes). */
-  async installFolder(files: readonly ZipEntryData[]): Promise<InstallResult> {
+  async installFolder(files: readonly ZipEntryData[], expectId?: string): Promise<InstallResult> {
     try {
-      return await this.finish(openPackageFolder(files), 'folder');
+      return await this.finish(openPackageFolder(files), 'folder', expectId);
     } catch (e) {
       return this.refuse(e);
     }
   }
 
-  private async finish(pkg: OpenedPackage, source: 'package' | 'folder'): Promise<InstallResult> {
+  /** `expectId` (atualização pelo gerenciador): recusa, sem gravar nada, um pacote de OUTRO suplemento. */
+  private async finish(pkg: OpenedPackage, source: 'package' | 'folder', expectId?: string): Promise<InstallResult> {
     const reason = this.o.validateManifest?.(pkg.manifest.raw) ?? null;
     if (reason) return { ok: false, code: 'manifest_invalid', message: reason };
     const id = pkg.manifest.id;
+    if (expectId !== undefined && id !== expectId) return { ok: false, code: 'id_mismatch', message: id };
     const previous = await this.o.store.get(id);
     const granted = new Set(previous?.grants ?? []);
     const requested = pkg.manifest.capabilities;
@@ -116,6 +120,7 @@ export class Installer {
       replaced: previous !== undefined,
     };
     if (pkg.readme !== undefined) res.readme = pkg.readme;
+    if (previous) res.previousVersion = previous.manifest.version;
     return res;
   }
 

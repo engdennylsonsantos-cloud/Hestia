@@ -75,6 +75,7 @@ import { ExternalToolsDialog } from './ui/dialogs/ExternalToolsDialog.tsx';
 import { PluginDialog } from './plugins/pluginUi.tsx';
 import { PluginPanels } from './ui/PluginPanel.tsx'; // SUPLEMENTOS (fase H)
 import { SupplementsDialog } from './ui/dialogs/SupplementsDialog.tsx';
+import { isManagerShortcut } from './plugins/supShortcut.ts'; // SUPLEMENTOS: fase J
 import { PluginResultDialog } from './ui/dialogs/PluginResultDialog.tsx';
 import { PluginSchedule } from './ui/PluginSchedule.tsx';
 import { startSupplements } from './plugins/supApp.ts';
@@ -365,6 +366,12 @@ export function App(): ReactElement {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      // SUPLEMENTOS (fase J): Alt+Shift+P abre o gerenciador (vale até com o foco num campo, mas não sobre outro diálogo).
+      if (isManagerShortcut(e) && useUi.getState().tela !== 'home' && !dialog) {
+        e.preventDefault();
+        useUi.setState({ dialog: 'pluginManager', dialogArg: null });
+        return;
+      }
       const t = e.target as HTMLElement | null;
       const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
       // Na tela de projetos não há documento aberto: nenhum atalho do editor vale ali.

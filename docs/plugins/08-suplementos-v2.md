@@ -1,6 +1,6 @@
 # Suplementos 2.0: especificação
 
-**Estado:** em implementação (fases B, C, D e integração entregues; E a I pendentes). O que estiver implementado vem marcado **EXISTE**; o resto é PROPOSTO. Decisão: [0057](../decisoes/0057-suplementos-geral.md); base: [0047](../decisoes/0047-plugins-de-integracao.md) e [01](01-api.md) a [07](07-pareamento-por-token.md).
+**Estado:** implementado nas fases B a H, na integração e na fase J (gerenciador unificado, SDK e guia do autor); a fase I (token de pareamento e IA) corre em paralelo e segue PROPOSTA neste documento. O que existe vem marcado **EXISTE**; o que não existe, PROPOSTO. Guias: [09 (autor)](09-guia-do-autor.md) e [10 (referência da API)](10-referencia-da-api.md). Decisão: [0057](../decisoes/0057-suplementos-geral.md); base: [0047](../decisoes/0047-plugins-de-integracao.md) e [01](01-api.md) a [07](07-pareamento-por-token.md).
 Unidades em todo o documento: comprimentos em **metro**, ângulos em **radiano**, tempos em **milissegundos (ms)**, memória em **mebibytes (MiB)**, tamanhos de arquivo em **bytes** ou **MiB**.
 
 ## 1. Conceitos
@@ -9,7 +9,7 @@ Unidades em todo o documento: comprimentos em **metro**, ângulos em **radiano**
 - **Contribuição** (`contributes`): o que o suplemento acrescenta ao Hestia. **Permissão** (`capabilities`): o que ele pode fazer. Contribuir não concede nada; o usuário concede.
 
 ## 2. Manifesto 2.0 (`manifest.json`)
-PROPOSTO: `PluginManifestV2` em `packages/plugin-api/src/manifestV2.ts`. O validador novo (`validateManifestAny`) aceita 1.x e 2.0; o manifesto é **dado não confiável**: objeto simples, campos desconhecidos **ignorados e descartados** (não repassados), tamanhos limitados, nada de caminho absoluto, `..`, URL de código nem `eval`.
+EXISTE: `PluginManifestV2` em `packages/plugin-api/src/manifestV2.ts`. O validador novo (`validateManifestAny`) aceita 1.x e 2.0; o manifesto é **dado não confiável**: objeto simples, campos desconhecidos **ignorados e descartados** (não repassados), tamanhos limitados, nada de caminho absoluto, `..`, URL de código nem `eval`.
 
 | Campo | Tipo | Obrigatório | Regra e limite |
 |---|---|---|---|
@@ -35,7 +35,7 @@ Regras cruzadas: `runtime: 'declarative'` **não pode** ter `entry`, `external` 
 Um manifesto sem `manifestVersion` é lido por `validateManifest` atual, **sem mudança**, e tratado como `{ runtime: 'external', external.kind: <kind>, contributes: {} }`. A mensagem `hello` do protocolo 1.0 continua carregando o manifesto 1.x. Os 11 casos de `tests/integration/rustRenderer.integ.ts` e `packages/plugin-api/src/plugins.test.ts` devem passar **sem edição**; `PluginManifest`, `INTEGRATION_KINDS` e `CAPABILITIES` não perdem campo nem chave. Suplemento externo 2.0 usa `hello` protocolo 1.1 ([07](07-pareamento-por-token.md)), com `manifestVersion: 2`.
 
 ## 3. Permissões (`capabilities`)
-EXISTE: as 5 abaixo marcadas "atual". PROPOSTO: as demais, em `packages/plugin-api/src/permissions.ts` (acréscimo a `CAPABILITIES`; a tabela atual não muda). Menor privilégio: o suplemento **pede**, o usuário **concede** por permissão na tela (estendendo `PluginHost.setGrants`), o host confere a **concessão** a cada chamada e falha com `permission_denied`.
+EXISTE: as 5 abaixo marcadas "atual" e as demais (fase B), em `packages/plugin-api/src/permissions.ts` (acréscimo a `CAPABILITIES`; a tabela atual não muda). Menor privilégio: o suplemento **pede**, o usuário **concede** por permissão na tela (estendendo `PluginHost.setGrants`), o host confere a **concessão** a cada chamada e falha com `permission_denied`.
 
 | Permissão | Permite | Exige | Runtimes |
 |---|---|---|---|
@@ -63,7 +63,7 @@ EXISTE: as 5 abaixo marcadas "atual". PROPOSTO: as demais, em `packages/plugin-a
 Regras: (1) `declarative` só pode pedir `ui.*` (menos `ui.tools`), `content.*`, `checks.run`, `io.export` com formato declarativo, `plugindata.rw` e `model.read`; `model.write` é recusado. (2) Dependências: conceder a permissão sem as exigidas é impossível (a tela marca as exigidas junto) e o host trata a falta como `permission_denied`. (3) Mudar concessões reinicia a sessão/Worker do suplemento (como já ocorre em 03). (4) O manifesto é só um **pedido**; a lista concedida fica no `localStorage` (`hestia.plugins.v1`, EXISTE) e, para uso real, também registrada no projeto (§5) para auditoria.
 
 ## 4. Pontos de contribuição (`contributes`)
-Todos PROPOSTOS. Textos visíveis aceitam `string` ou `{ pt, en }` (como `Txt`/`t()` em `apps/web/src/ui/ribbon/model.ts`) ou `"%chave"` do `i18n` do manifesto. Ícone: nome de ícone interno do Hestia (`Icon.tsx`); ícone próprio só como SVG do pacote, até 20 KiB, sem `<script>`.
+Todos EXISTEM (fases B, E, F, G, H). Textos visíveis aceitam `string` ou `{ pt, en }` (como `Txt`/`t()` em `apps/web/src/ui/ribbon/model.ts`) ou `"%chave"` do `i18n` do manifesto. Ícone: nome de ícone interno do Hestia (`Icon.tsx`); ícone próprio só como SVG do pacote, até 20 KiB, sem `<script>`.
 
 | Ponto | Formato de cada entrada | Permissão | Runtime |
 |---|---|---|---|
@@ -84,17 +84,36 @@ Auxiliares: **\<Ação\>** = `{ type: 'dialog'\|'tool'\|'exporter'\|'importer'\|
 Limites gerais: `contributes` com no máximo 200 entradas; texto de título 80 caracteres; `expr` 500 caracteres e profundidade 12; `families[].types` até 200 itens por entrada; tamanho do manifesto até 256 KiB.
 
 ### 4.1 Onde cada ponto aparece
-`commands`: busca de comandos (`apps/web/src/ui/ribbon/commandSearch.ts`). `ribbon`: aba `suplementos` (hoje só `sup-externas`, em `tabsSoon.ts`). `dialogs`: novo `DialogKind` `'pluginDialog'` em `apps/web/src/editor/state.ts`, despachado em `App.tsx`. `checks`: painel de problemas (`IssuesButton.tsx`). `schedules`: caixa de quantitativos (como `'schedule'`/`'openingSchedule'` em `DialogKind`). `families`/`materials`: catálogos e `Project.materials`.
+`commands`: busca de comandos (`apps/web/src/ui/ribbon/commandSearch.ts`). `ribbon`: aba `suplementos` (parte fixa `sup-externas` e `sup-gerenciar`, mais os painéis dos suplementos ativos, `pluginRibbon.ts`). `dialogs`: novo `DialogKind` `'pluginDialog'` em `apps/web/src/editor/state.ts`, despachado em `App.tsx`. `checks`: painel de problemas (`IssuesButton.tsx`). `schedules`: caixa de quantitativos (como `'schedule'`/`'openingSchedule'` em `DialogKind`). `families`/`materials`: catálogos e `Project.materials`.
+
+### 4.2 Convenções implementadas (fases E a H)
+**Verificações (`checks`, EXISTE, fase E).** Duas formas. (1) `rule`: expressão JSONLogic restrita avaliada pelo host sobre cada elemento da origem `applyTo`; **regra FALSA gera um item** no painel de problemas (a regra descreve o que é correto). O item tem o código `plugin:<id do suplemento>:<id da verificação>`, a severidade da verificação, o `elementId` e a `message` com os `{campos}` do elemento preenchidos. (2) `handler` (script/external): função `handler(ctx)` que devolve uma lista de `{ elementId?, message? }`; cada item vira uma linha do painel. Até 200 itens por verificação, mensagem até 300 caracteres. Falha de uma verificação vira entrada no log do suplemento e nunca atrapalha as demais. A ação `check` de um comando reavalia e avisa o resultado na barra de estado.
+
+**Quantitativos (`schedules`, EXISTE, fase E).** `source` escolhe a origem (`wall`, `opening`, `door`, `window`, `floor`, `room` ou qualquer `kind`); `filter` (expressão) mantém só as linhas verdadeiras; `groupBy` agrupa por colunas; `columns[].expr` calcula a célula e `total: 'sum' | 'count'` gera a linha de totais; `sum` e `count` só valem como agregação. Até 5000 linhas (excedeu = tabela cortada com aviso); célula que falha vira vazia e é contada. A caixa de quantitativos exporta CSV. Campos consultáveis, em metro (m), metro quadrado (m2) e metro cúbico (m3): `common` (`id`, `kind`, `mark`, `levelId`, `levelName`), `wall` (`typeId`, `typeName`, `length`, `height`, `thickness`, `area`, `volume`, `material`, `materials`, `cost`, `thermalU`, `acousticRw`), `opening` (`typeId`, `typeName`, `typeCode`, `hostId`, `width`, `height`, `sill`, `area`, `leaves`), `floor` (`typeId`, `typeName`, `area`, `material`, `materials`), `room` (`name`, `number`). Detalhe em [10](10-referencia-da-api.md).
+
+**Ações (EXISTE).** `{ type, ref }` com `type` em `handler` (chama a função do script), `dialog` (abre o diálogo declarado), `tool` (ativa a ferramenta), `exporter`, `importer`, `check` e `schedule` (abrem verificação e quantitativo). Ação sem suporte no ambiente avisa "ação ainda não disponível" e o app segue.
+
+**Exportar e importar (EXISTE, fase F).** `exporters`: handler `(ctx, { project, fileName })` devolve texto, bytes ou `{ data, name? }` (até 64 MiB; nome e extensão conferidos), ou `template` declarativo; o host entrega o arquivo. `importers`: handler `(ctx, { name, bytes })` devolve `commands[]` ou `{ commands, report? }`; o host mostra **prévia** (comandos e elementos novos) e só aplica após confirmação, em um passo de desfazer.
+
+**Carga de conteúdo (EXISTE, fase G).** `families` e `materials` ficam no pacote; nada entra no projeto até o usuário clicar em **Carregar conteúdo** (cartão do suplemento ativo). Os tipos e materiais entram sob `<pluginId>:<id>` (nunca substituem os do projeto), com prévia (novo, já carregado, atualização, recusado) e um passo de desfazer; remover é seguro (o que está em uso fica e é avisado).
+
+**Ferramentas e diálogos (EXISTE, fase H).** Ver §6.3: eventos `start`, `point`, `move`, `key`, `cancel`; resposta com `draft`, `commit`, `message`, `done`; campos de diálogo e de painel com `length` e `angle` nas unidades do projeto (o handler recebe metro e radiano).
+
+### 4.3 Gerenciador unificado (EXISTE, fase J)
+Aba Suplementos > **Gerenciar suplementos** (também na busca de comandos e pelo atalho **Alt+Shift+P**) é a ÚNICA tela de gestão: lista os suplementos de pacote e os de processo externo ("Ferramentas externas", que seguem funcionando e mantêm o diálogo próprio para adicionar por porta). Cada cartão mostra estado (ativo, desativado, aguardando permissão, falhou), versão, runtime, autor e descrição, o aviso de **pacote sem assinatura** (ou de pasta de desenvolvimento), as permissões concedidas (conceder e revogar depois, com as dependências marcadas junto; mudar reinicia o suplemento), o **log por suplemento** (filtro por nível e texto, copiar, limpar; o log só aparece aqui), o motivo da falha com **Reativar**, ativar e desativar, **Atualizar** (nova versão do MESMO id; mantém concessões e pede só as novas), **Desinstalar** com confirmação (o conteúdo já carregado e os dados no projeto permanecem) e o **espaço de dados** no projeto, somente leitura (bytes por chave; aviso quando o `dataSchema` do projeto é maior que o instalado). Busca (nome, id, autor, descrição, sem acento) e filtro por estado; rótulos ARIA, foco por teclado e `role="log"`/`role="status"` nas regiões vivas. Lógica pura em `apps/web/src/plugins/supManage.ts`; núcleo em `supRuntime.ts` (`setGrants`, `update`, `dataSpace`).
+
+### 4.4 SDK para autores (EXISTE, fase J)
+Pasta `sdk/` (fora dos pacotes do monorepo; não altera `check-boundaries`): `hestia-plugin.d.ts` (tipos de `ctx`, handlers, ferramentas e manifesto), `template/` (manifesto e `main.js` comentados), `validar.ts` (mesmo validador do app, mensagens em português), `testkit.ts` (executa o script sem abrir o app) e `novo.ts`. Comandos: `npm run suplementos:novo -- <id>` e `npm run suplementos:empacotar` (valida antes de empacotar; `--validar` só valida). Ver [09](09-guia-do-autor.md).
 
 ## 5. Dados do suplemento no projeto
-PROPOSTO, em `packages/model/src/pluginData.ts` (EXISTE: `PluginProjectData` com `projectUid` e `viewOverrides`; `applyPluginDataCommand`). Acréscimos opcionais, **sem mudar `SCHEMA_VERSION`**:
+EXISTE, em `packages/model/src/pluginData.ts` (também: `PluginProjectData` com `projectUid` e `viewOverrides`; `applyPluginDataCommand`). Acréscimos opcionais, **sem mudar `SCHEMA_VERSION`**:
 
 ```ts
 interface PluginProjectData {
   projectUid?: string;                     // EXISTE
   viewOverrides?: Record<string, Record<Id, ViewMaterialOverrideData>>; // EXISTE
-  data?: Record<string /*pluginId*/, PluginDataSpace>;  // PROPOSTO
-  grants?: Record<string, string[]>;       // PROPOSTO: permissões concedidas ao salvar (auditoria)
+  data?: Record<string /*pluginId*/, PluginDataSpace>;  // EXISTE
+  grants?: Record<string, string[]>;       // PROPOSTO: o tipo existe, mas o app ainda não grava as concessões no projeto (ficam no IndexedDB do app)
 }
 interface PluginDataSpace {
   schema: number;                          // = manifest.dataSchema
@@ -102,10 +121,10 @@ interface PluginDataSpace {
   values: Record<string, JsonValue>;       // chave livre (<= 64 caracteres) -> JSON
 }
 ```
-Limites (aplicados pelo host em `applyPluginDataCommand`): 1 MiB por suplemento, 4 MiB no projeto, profundidade JSON 16, chaves até 64 caracteres, só JSON puro (sem `undefined`, funções, `NaN`). Comandos PROPOSTOS: `{ type: 'setPluginData', pluginId, key, value }` e `{ type: 'deletePluginData', pluginId, key }`; um suplemento só escreve no **seu** `pluginId` (o host força o id, o suplemento não o escolhe). Se `dataSchema` do suplemento instalado for **maior** que o salvo, ele migra (`onMigrate`, só script/external); se for **menor** (projeto de versão mais nova), o espaço fica **somente leitura** e o app avisa. Se o suplemento sumir, o espaço é **preservado** (nunca apagado sozinho). Isto é a mitigação para "tipos novos de elemento definidos por plugin" (não-objetivo): dados próprios por id de elemento, em `values`, sem entrar em `Project.elements`.
+Limites (aplicados pelo host em `applyPluginDataCommand`): 1 MiB por suplemento, 4 MiB no projeto, profundidade JSON 16, chaves até 64 caracteres, só JSON puro (sem `undefined`, funções, `NaN`). Comandos EXISTENTES: `{ type: 'setPluginData', pluginId, key, value }` e `{ type: 'deletePluginData', pluginId, key }`; um suplemento só escreve no **seu** `pluginId` (o host força o id, o suplemento não o escolhe). Se `dataSchema` do suplemento instalado for **maior** que o salvo, ele migra (`onMigrate`, só script/external); se for **menor** (projeto de versão mais nova), o espaço fica **somente leitura** e o app avisa. Se o suplemento sumir, o espaço é **preservado** (nunca apagado sozinho). Isto é a mitigação para "tipos novos de elemento definidos por plugin" (não-objetivo): dados próprios por id de elemento, em `values`, sem entrar em `Project.elements`.
 
 ## 6. Escrita no modelo (API de comandos)
-Porta PROPOSTA `ModelPort` em `packages/plugin-api/src/hostPorts.ts` (junto de `ScenePort`, EXISTE):
+Porta EXISTENTE `ModelPort` em `packages/plugin-api/src/hostPorts.ts` (junto de `ScenePort`, EXISTE):
 ```ts
 interface ModelPort {
   read(): ProjectSnapshot;                               // cópia imutável (model.read)
@@ -113,8 +132,8 @@ interface ModelPort {
 }
 type ApplyResult = { ok: true; applied: number } | { ok: false; index: number; error: string };
 ```
-Regras do host (implementação em `apps/web/src/plugins/appModelPort.ts`, PROPOSTO, ao lado de `appPorts.ts`, EXISTE):
-1. O lote é `unknown[]`: cada item é **validado** contra uma lista branca de tipos de `Command` permitidos ao plugin (`packages/model/src/pluginCommands.ts`, PROPOSTO) e por `validateProject` depois de aplicar. Comando fora da lista (ex.: apagar o projeto, trocar `plugins` de outro id, `import` em massa) é recusado.
+Regras do host (implementação em `apps/web/src/plugins/appModelPort.ts`, EXISTE, ao lado de `appPorts.ts`, EXISTE):
+1. O lote é `unknown[]`: cada item é **validado** contra uma lista branca de tipos de `Command` permitidos ao plugin (`packages/model/src/pluginCommands.ts`, EXISTE) e por `validateProject` depois de aplicar. Comando fora da lista (ex.: apagar o projeto, trocar `plugins` de outro id, `import` em massa) é recusado.
 2. **Atômico:** `ProjectStore.transaction(label, fn)` (EXISTE em `history.ts`) executa `exec` de cada comando; se algum lançar erro ou `validateProject` achar erro novo, o lote inteiro é desfeito sem entrar no histórico. Sucesso = **um** passo de desfazer, rótulo `"<nome do suplemento>: <label>"`.
 3. Limite: `maxCommandsPerAction` (padrão 5000) e 8 MiB por lote; ids novos devem vir de `newId` do host (o plugin pede ids por `model.newId(prefix)`; ids inventados pelo plugin são recusados).
 4. O plugin **nunca** recebe o `Project` mutável nem o `ProjectStore`; só cópias (como nas portas atuais).
@@ -132,7 +151,7 @@ O que um handler `export async function nome(ctx, valores)` devolve é **dado n�
 - **Painel (`panels`):** `view` é validada por `parseView` já na instalação (blocos `text`, `value`, `row`, `table`, `button`, `input`; profundidade 6, 200 nós; caminho de campo só de propriedades próprias). O painel lateral persistente (`ui/PluginPanel.tsx`) fica à direita, recolhível, e respeita `when`; `value`/`table` leem a seleção, com `unit: 'length' | 'angle'` nas unidades do projeto; `button` envia os `input` validados mais `$selection` (ids). Exemplo: `plugins-exemplo/grade-de-paredes/`.
 
 ## 7. Ciclo de vida
-Estados PROPOSTOS (estendem `PluginState` de `pluginHost.ts`, EXISTE: `absent`, `disconnected`, `connecting`, `connected`, `reconnecting`, `incompatible`): `installed`, `needs-grant`, `active`, `failed`, `disabled`.
+Estados EXISTENTES (estendem `PluginState` de `pluginHost.ts`, EXISTE: `absent`, `disconnected`, `connecting`, `connected`, `reconnecting`, `incompatible`): `installed`, `needs-grant`, `active`, `failed`, `disabled`.
 
 1. **Instalar:** o usuário escolhe um `.hestiapkg` (ou pasta, em desenvolvimento). O host lê o zip (limites em §8), valida `manifest.json` (dado não confiável) e **nada executa**. Resultado: `installed`, com a lista de permissões pedidas na tela. Falha de validação mostra o motivo e não instala.
 2. **Conceder e ativar:** o usuário marca as permissões e ativa (nada vem concedido de início). **Concessão parcial** ativa só o concedido (o registro esconde as contribuições sem permissão e o host nega as portas não concedidas); **nenhuma** concessão, tendo o manifesto pedido alguma, deixa o suplemento em `needs-grant`. `declarative`: contribuições registradas, sem código. `script`: cria o Worker, carrega `entry`, chama `activate(ctx)`. `external`: conecta como hoje (e exige token).
@@ -143,7 +162,7 @@ Estados PROPOSTOS (estendem `PluginState` de `pluginHost.ts`, EXISTE: `absent`, 
 7. **Atualização:** nova `version` com mesmo `id` substitui o pacote; se pediu **mais** permissões, volta a `needs-grant` só para as novas.
 
 ## 8. Formato `.hestiapkg`
-Arquivo **zip** (método store ou deflate), extensão `.hestiapkg`, tipo `application/zip`. EXISTE só o **escritor** zip (`packages/io/src/zip.ts`, `ZipFile`, store); o **leitor** é PROPOSTO (`packages/io/src/zipRead.ts`, com inflate e proteção contra zip bomb).
+Arquivo **zip** (método store ou deflate), extensão `.hestiapkg`, tipo `application/zip`. EXISTEM o **escritor** (`packages/io/src/zip.ts`, store), o **leitor** (`zipRead.ts`, com inflate e proteção contra zip bomb) e a validação do pacote (`pkg.ts`).
 ```
 meu-suplemento.hestiapkg
 ├── manifest.json        (obrigatório, na raiz, UTF-8, até 256 KiB)
@@ -269,6 +288,8 @@ Regra anti-conflito: cada fase é **dona** dos arquivos listados e só **acresce
 | **G. Famílias e materiais** | `families`, `materials`, carregar como tipos do projeto | `packages/model/src/pluginContent.ts`; `apps/web/src/plugins/contentBridge.ts`; catálogos (só acréscimo em `catalogoAberturas*.ts` e `Project.materials` via comando existente) |
 | **H. Ferramentas e diálogos** | `tools` interativas, `dialogs`/`panels` declarativos completos | `packages/tools/src/pluginTool.ts`; `apps/web/src/plugins/toolBridge.ts`; `ui/PluginDialog.tsx`, `PluginPanel.tsx` |
 | **I. IA e processo externo** | prévia confirmável, token de pareamento obrigatório ([07](07-pareamento-por-token.md)), protocolo 1.1, endurecimento | `packages/plugin-api/src/protocol.ts` (acréscimo de `auth`), `hostSession.ts`, `pluginHost.ts`; `apps/web/src/plugins/aiPreview.ts`; `crates/hestia-renderer` (token); `desktop/src-tauri/src` (cofre) |
+
+**Estado das fases:** B, C, D, E, F, G, H e J entregues (**EXISTE**); I (token de pareamento, protocolo 1.1, prévia da IA) em andamento em frente separada (**PROPOSTO** aqui até ser mesclada).
 
 Critérios de pronto, comuns: testes de unidade da fase, **os 11 casos de integração e `plugins.test.ts` verdes sem edição**, nenhuma importação de store/React em `plugin-api`, nenhum caminho de escrita fora de `Command`.
 

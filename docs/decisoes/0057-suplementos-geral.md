@@ -1,6 +1,6 @@
 # 0057 · Suplementos: plataforma geral (declarativos, script e processo externo)
 
-**Data:** 2026-11-13 · **Estado:** PROPOSTO (Fase 0, só documentação; nada disto está implementado).
+**Data:** 2026-11-13 · **Estado:** ACEITO e IMPLEMENTADO em 2026-11 (fases B a H, integração e fase J); a fase I (token de pareamento obrigatório, protocolo 1.1, prévia da IA) segue em frente separada. Ver "Implementação e o que ficou fora" no fim.
 **Relação com o 0047:** **estende, não substitui**. Tudo que o [0047](0047-plugins-de-integracao.md) decidiu continua valendo (host
 com portas, cena como dados, menor privilégio, loopback, substituições de visualização). Este ADR acrescenta runtimes,
 escrita no modelo e contribuição de UI. Especificação concreta: [docs/plugins/08-suplementos-v2.md](../plugins/08-suplementos-v2.md).
@@ -50,3 +50,17 @@ em `apps/web/src/ui/ribbon/tabsSoon.ts`). O dono do projeto quer uma **plataform
 - `checks` e `schedules` usam **JSONLogic restrito** (lista branca de operadores), sem linguagem própria e sem sintaxe em pt-BR.
 - Uma única permissão de escrita, `model.write` (sem divisão em `elements` e `types`).
 - Demais padrões da proposta aceitos; detalhes em `docs/plugins/08-suplementos-v2.md` §12.
+
+## Implementação e o que ficou fora (2026-11)
+**Entregue:** manifesto 2.0 e permissões (B); escrita no modelo por comandos validados, atômica, com um passo de Desfazer, e espaço de dados por suplemento (C); leitor `.hestiapkg`, instalador, carregador, Worker de script com limites e log por suplemento (D); verificações e quantitativos com JSONLogic restrito (E); importar e exportar com prévia (F); famílias e materiais carregáveis (G); ferramentas interativas e diálogos/painéis com unidades do projeto (H); gerenciador unificado, SDK (`sdk/`, `npm run suplementos:novo` e `suplementos:empacotar` com validação, testkit) e documentação do autor (J). Documentos: [08](../plugins/08-suplementos-v2.md), [09](../plugins/09-guia-do-autor.md), [10](../plugins/10-referencia-da-api.md).
+
+**Decisões fechadas na implementação:** log por suplemento só no gerenciador; o suplemento não escolhe a aba (sempre Suplementos); pacote sem assinatura é aceito com aviso; desinstalar não remove o conteúdo já carregado nem os dados no projeto; `dataSchema` maior que o instalado deixa o espaço de dados somente leitura.
+
+**Ficou fora (pendências):**
+- Fase I: token de pareamento obrigatório para processo externo, protocolo 1.1 e prévia confirmável da IA (frente separada; ver [07](../plugins/07-pareamento-por-token.md)).
+- Loja ou índice da comunidade; assinatura digital de pacotes (hoje só o aviso); Python embutido; tipos novos de elemento definidos por suplemento; `.wasm` no pacote; rede (`net.fetch`) para script.
+- Registro das concessões dentro do projeto salvo (campo `grants` existe no tipo, o app ainda não o grava); concessões ficam no IndexedDB do app.
+- "Limpar dados do suplemento" no projeto e listagem de dados órfãos de suplementos já desinstalados (o gerenciador mostra os dados só dos instalados, somente leitura).
+- Log de suplementos de processo externo no gerenciador (a conexão não grava no log por suplemento).
+- Tela de gestão do processo externo: a lista é única, mas adicionar por porta continua no diálogo "Ferramentas externas".
+- Atalho do gerenciador (Alt+Shift+P) não é configurável pela tela de atalhos.

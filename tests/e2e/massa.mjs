@@ -68,6 +68,8 @@ async function afastarPlanta(page, largura) {
 }
 
 const opcao = async (page, id, valor) => { await page.locator(id).fill(String(valor)); await page.keyboard.press('Enter'); await page.waitForTimeout(150); };
+/** Renomeia a massa selecionada pelo campo "Nome" do painel de propriedades. */
+const nomear = async (page, nome) => { await page.locator('#ms-name').fill(nome); await page.keyboard.press('Enter'); await page.waitForTimeout(150); };
 const ferramentaMassa = async (page, modo) => {
   await aba(page, 'Massa e terreno');
   await page.getByRole('button', { name: 'Massa', exact: true }).click();
@@ -99,6 +101,7 @@ try {
 
   // 1. Extrusão de um quadrado de 8 m (perfil livre 8 x 8), altura 30 m, torção total de 90° pelo painel.
   await passo('1. Extrusão do quadrado de 8 m, 30 m de altura, torção de 90°', async () => {
+    await afastarPlanta(page, 90);
     await ferramentaMassa(page, 'Extrusão');
     await page.locator('#opt-mass-perfil').selectOption('livre');
     await opcao(page, '#opt-mass-altura', ALTURA_TORRE);
@@ -109,10 +112,12 @@ try {
     torre = ms.massas[0] ?? null;
     check('1 massa, 2 seções, perfil livre de 4 pontos', ms.massas.length === 1 && torre?.secoes.length === 2 && torre.secoes[0].perfil.forma === 'livre' && torre.secoes[0].perfil.pontos.length === 4, torre ? `${torre.secoes.length} seções` : 'sem massa');
     const pts = torre?.secoes[0].perfil.pontos ?? [];
-    check(`perfil é um quadrado de ${LADO} m (lado e área)`, pts.length === 4 && Math.abs(areaDoAnel(pts) - LADO * LADO) < 1e-6, pts.length ? `área ${areaDoAnel(pts).toFixed(4)}` : '');
+    // O clique cai em pixel (sem captura de grade): o erro de posição é da ordem de 1e-6 m, então a área do perfil sai 64 com erro de 1e-4.
+    check(`perfil é um quadrado de ${LADO} m (área 64, erro de pixel)`, pts.length === 4 && Math.abs(areaDoAnel(pts) - LADO * LADO) < 1e-4, pts.length ? `área ${areaDoAnel(pts).toFixed(4)}` : '');
     check(`altura de ${ALTURA_TORRE} m`, torre && Math.abs(torre.secoes[1].z - torre.secoes[0].z - ALTURA_TORRE) < 1e-6, torre ? String(torre.secoes[1].z) : '');
     await selecionarMassa(page, torre.id, { x: 0, y: 0 }, worldToPage);
     check('painel da massa mostra "Torção total (graus)"', await page.locator('#ms-torcao').isVisible());
+    await nomear(page, 'Torre');
     await opcao(page, '#ms-torcao', 90);
     torre = (await lerProjeto(page)).massas[0];
     check('rotação da última seção = π/2 (1e-9)', Math.abs(torre.secoes[1].rotacao - Math.PI / 2) < 1e-9, String(torre.secoes[1].rotacao));
@@ -130,6 +135,9 @@ try {
     const ms = (await lerProjeto(page)).massas;
     bulbo = ms[1] ?? null;
     check('2 massas no projeto', ms.length === 2, String(ms.length));
+    await selecionarMassa(page, bulbo.id, { x: 25, y: 0 }, worldToPage);
+    await nomear(page, 'Bulbo');
+    bulbo = (await lerProjeto(page)).massas[1];
     check('bulbo: 5 seções, altura 15 m', bulbo?.secoes.length === 5 && Math.abs(bulbo.secoes[4].z - 15) < 1e-6, bulbo ? `${bulbo.secoes.length} seções, topo ${bulbo.secoes[4]?.z}` : '');
     const raios = (bulbo?.secoes ?? []).map((s) => s.perfil.raio ?? 0);
     check('bulbo: raio máximo de 6 m', Math.abs(Math.max(...raios) - 6) < 0.05, Math.max(...raios).toFixed(3));
@@ -154,6 +162,7 @@ try {
     check('pétala: 3 seções depois do diálogo', petala?.secoes.length === 3, String(petala?.secoes.length));
     await pressTool(page, 'v');
     check('pétala selecionada pelo clique', await selecionarMassa(page, petala.id, { x: 33, y: 0 }, worldToPage));
+    await nomear(page, 'Pétala');
     await page.locator('#ms-arr').check();
     await opcao(page, '#ms-arr-n', 12);
     await opcao(page, '#ms-arr-cx', bulbo.origem.x);
@@ -206,7 +215,7 @@ try {
 
     await page.evaluate(() => {
       const { editor, useUi } = window.__hestia;
-      editor.store.exec({ type: 'addSheet', sheet: { id: 'sh_massa', number: 'A-101', name: 'Massas', size: 'A3', orientation: 'landscape', margin: 10, discipline: 'Arquitetura', titleBlock: { project: editor.project.name, client: 'Cliente', author: 'Equipe', date: '14/11/2026', revision: '0' }, viewports: [] } }, 'Criar prancha');
+      editor.store.exec({ type: 'addSheet', sheet: { id: 'sh_massa', number: 'A-101', name: 'Massas', size: 'A1', orientation: 'landscape', margin: 10, discipline: 'Arquitetura', titleBlock: { project: editor.project.name, client: 'Cliente', author: 'Equipe', date: '14/11/2026', revision: '0' }, viewports: [] } }, 'Criar prancha');
       useUi.setState({ view: 'sheet', sheetId: 'sh_massa' });
     });
     await page.waitForSelector('.sheet-stage svg');
@@ -314,9 +323,11 @@ try {
     check('kernel em Node pronto', k.pronto === true);
     const fT = (k.fatias ?? []).filter((f) => f.massaId === torre.id && f.nivelId !== null);
     check('torre: fatia em cada um dos 11 níveis', fT.length === 11, String(fT.length));
-    check('torre: toda fatia com área 64 (1e-6)', fT.length > 0 && fT.every((f) => Math.abs(f.area - 64) < 1e-6), fT.map((f) => f.area.toFixed(9)).join(' '));
+    const areaPerfil = areaDoAnel(torre.secoes[0].perfil.pontos);
+    check('torre: toda fatia com a área do perfil (1e-6; a torção não muda a área)', fT.length > 0 && fT.every((f) => Math.abs(f.area - areaPerfil) < 1e-6), `perfil ${areaPerfil.toFixed(9)}`);
+    check('torre: toda fatia com 64 m² (1e-3, o perfil clicado tem erro de pixel)', fT.length > 0 && fT.every((f) => Math.abs(f.area - 64) < 1e-3), fT.map((f) => f.area.toFixed(6)).join(' '));
     const linhasT = (k.linhas ?? []).filter((l) => l.massaName === torre.name);
-    check('tabela exata: 64 m² em todos os níveis da torre (1e-6)', linhasT.length === 11 && linhasT.every((l) => Math.abs(l.area - 64) < 1e-6), linhasT.map((l) => l.area.toFixed(9)).join(' '));
+    check('tabela exata: área do perfil em todos os níveis da torre (1e-6)', linhasT.length === 11 && linhasT.every((l) => Math.abs(l.area - areaPerfil) < 1e-6), linhasT.map((l) => l.area.toFixed(9)).join(' '));
     // O quadrado gira: o canto mais distante do centro da fatia acompanha a torção linear (0 a 90° em 30 m), módulo 90°.
     const meio = fT.find((f) => Math.abs(f.z - 12) < 1e-9);
     const cx = meio.pontos.reduce((s, q) => s + q.x, 0) / meio.pontos.length;

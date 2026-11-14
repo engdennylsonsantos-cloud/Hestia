@@ -806,5 +806,21 @@
     "fr": "Masses par étage",
     "it": "Masse per piano",
     "pl": "Bryły według kondygnacji"
+  },
+  {
+    "pt": "Pisos da massa",
+    "es": "Pisos de la masa",
+    "de": "Massenböden",
+    "fr": "Planchers de la masse",
+    "it": "Solai della massa",
+    "pl": "Stropy z bryły"
+  },
+  {
+    "pt": "Selecione uma massa.",
+    "es": "Seleccione una masa.",
+    "de": "Masse auswählen.",
+    "fr": "Sélectionnez une masse.",
+    "it": "Seleziona una massa.",
+    "pl": "Wybierz bryłę."
   }
 ]

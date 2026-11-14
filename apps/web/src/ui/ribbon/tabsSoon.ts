@@ -5,7 +5,7 @@ import { act, panel, soon, soonS, stack, t, tool, type RibbonItem, type RibbonPa
 /**
  * Abas do Revit que o Hestia ainda não tem por inteiro. Existem para manter a sequência e o roteiro: o que ainda não
  * existe é `soon` (esmaecido, tooltip "ainda não disponível"); quando uma ferramenta nascer, troque o `soon` pela
- * ferramenta. Já têm botões reais: Massa e terreno (ferramenta Massa, os quatro modos e "Mostrar massa"), alguns
+ * ferramenta. Já têm botões reais: Massa e terreno (ferramenta Massa, os quatro modos, "Mostrar massa" e "Pisos da massa"), alguns
  * botões que reaproveitam ferramentas do Arquitetura (parede, laje, nível, grade...) e Suplementos (ferramentas
  * externas). Os nomes de painel destas abas são aproximados; confira com o Revit antes de implementar.
  */
@@ -76,7 +76,7 @@ export const TABS_SOON: RibbonTab[] = [
       soon(t('Massa no local', 'In-Place Mass')),
       soon(t('Colocar massa', 'Place Mass')),
     ),
-    p('mas-por-massa', t('Modelo por massa', 'Model by Face'), [t('Telhado por face', 'Roof by Face'), 'roof'], [t('Parede por face', 'Wall by Face'), 'wall'], [t('Forro por face', 'Ceiling by Face'), 'ceiling'], [t('Piso por face', 'Floor by Face'), 'floor']),
+    panel('mas-por-massa', t('Modelo por massa', 'Model by Face'), act('pisosDaMassa'), soon(t('Telhado por face', 'Roof by Face'), 'roof'), soon(t('Parede por face', 'Wall by Face'), 'wall'), soon(t('Forro por face', 'Ceiling by Face'), 'ceiling'), soon(t('Piso por face', 'Floor by Face'), 'floor')),
     p('mas-terreno', t('Terreno', 'Site Modeling'), [t('Topografia', 'Toposurface')], [t('Subdivisão', 'Subregion')], [t('Plataforma', 'Building Pad')], [t('Componente de terreno', 'Site Component')], [t('Linhas de propriedade', 'Property Line')]),
   ),
   tab('colaborar', t('Colaborar', 'Collaborate'),

@@ -13,6 +13,7 @@ import { useUi } from '../editor/state.ts';
 import { saveBytes } from '../editor/saveBytes.ts';
 import { pickFileForImport } from './ioPick.ts';
 import type { IoOutcome } from './ioBridge.ts';
+import type { BatchOutcome } from './batchPreview.ts';
 import { runPluginCheckAction } from './pluginChecks.ts';
 import { setCheckHandlerRunner } from './pluginChecksRun.ts';
 import { editor } from '../editor/controller.ts';
@@ -36,6 +37,18 @@ function ioStatus(o: IoOutcome): void {
     case 'imported': useUi.setState({ status: { key: 'supio_status_imported', args: { name, n: o.created } } }); return;
     case 'cancelled': useUi.setState({ status: { key: 'supio_status_cancelled', args: { name } } }); return;
     case 'error': useUi.setState({ status: { key: 'supio_status_error', args: { name, detail: o.detail } } }); return;
+  }
+}
+
+/** Prévia confirmável (fase I) na barra de estado; a proposta abre o diálogo de prévia. */
+function batchStatus(o: BatchOutcome): void {
+  const name = o.pluginName;
+  switch (o.kind) {
+    case 'proposed': useUi.setState({ dialog: 'pluginBatchPreview', dialogArg: null, status: { key: 'supbp_status_proposed', args: { name, commands: o.commands } } }); return;
+    case 'applied': useUi.setState({ status: { key: 'supbp_status_applied', args: { name } } }); return;
+    case 'cancelled': useUi.setState({ status: { key: 'supbp_status_cancelled', args: { name } } }); return;
+    case 'undone': useUi.setState({ status: { key: 'supbp_status_undone', args: { name } } }); return;
+    case 'error': useUi.setState({ dialog: null, status: { key: 'supbp_status_error', args: { name, detail: o.detail } } }); return;
   }
 }
 
@@ -65,6 +78,7 @@ export function supplementRuntime(): SupplementRuntime {
     deliver: (fileName, bytes) => saveBytes(fileName, bytes),
     pickFile: pickFileForImport,
     onIo: ioStatus,
+    batch: { version: () => editor.store.version, undo: () => editor.store.undo(), onOutcome: batchStatus },
     runCheck: runPluginCheckAction,
     // Ferramentas interativas (fase H): o editor ativa `PluginTool`; textos no idioma da interface.
     tools: {

@@ -1,4 +1,4 @@
-import { PluginIdIssuer, applyPluginBatch, pluginDataReadOnly, pluginDataSpace, type ProjectStore } from '@hestia/model';
+import { PluginIdIssuer, applyPluginBatch, rehearsePluginBatch, pluginDataReadOnly, pluginDataSpace, type ProjectStore } from '@hestia/model';
 import type { ApplyResult, ModelPort, PluginDataPort, ProjectSnapshot } from '@hestia/plugin-api';
 import { editor } from '../editor/controller.ts';
 
@@ -37,6 +37,12 @@ export function createModelPort(getStore: () => ProjectStore, issuer = new Plugi
         dataSchema: info.dataSchema,
         version: info.version,
         maxCommands: opts?.maxCommands,
+      });
+    },
+    rehearse(pluginId, commands, opts) {
+      const info = resolveInfo(pluginId);
+      return rehearsePluginBatch(getStore(), {
+        pluginId, label: info.name, commands, isIssuedId: (id) => issuer.has(pluginId, id), dataSchema: info.dataSchema, version: info.version, maxCommands: opts?.maxCommands,
       });
     },
   };

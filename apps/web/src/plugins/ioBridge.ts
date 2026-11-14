@@ -7,7 +7,7 @@
  * branca, atomicidade, UM passo de desfazer) e só depois de prévia e confirmação do usuário; erro de handler vira
  * resultado `error` + registro, nunca exceção para o app.
  */
-import type { ContributionRegistry, ModelPort, PluginAction } from '@hestia/plugin-api';
+import type { ContributionRegistry, ModelPort, PluginAction, RehearsalResult } from '@hestia/plugin-api';
 import {
   PluginIoError, checkImportFile, deepFreeze, parseExportResult, parseImportResult, previewCommands, renderTemplate,
   type ImportPreview, toExportBytes,
@@ -20,6 +20,8 @@ export interface PendingImport {
   importerId: string;
   fileName: string;
   preview: ImportPreview;
+  /** Ensaio do lote no projeto (fase I): criados, alterados, apagados e erros. Ausente se a porta não ensaia. */
+  rehearsal?: RehearsalResult;
   report?: string;
 }
 
@@ -142,7 +144,9 @@ export class IoBridge {
       const value = await this.callHandler(pluginId, imp.handler, [{ name: file.name, bytes: copy }]);
       const batch = parseImportResult(value);
       const preview = previewCommands(batch.commands);
-      const info: PendingImport = { pluginId, pluginName: this.name(pluginId), importerId, fileName: file.name, preview, ...(batch.report ? { report: batch.report } : {}) };
+      let rehearsal: RehearsalResult | undefined;
+      try { rehearsal = this.d.model.rehearse?.(pluginId, batch.commands); } catch { rehearsal = undefined; } // a prévia não depende do ensaio
+      const info: PendingImport = { pluginId, pluginName: this.name(pluginId), importerId, fileName: file.name, preview, ...(rehearsal ? { rehearsal } : {}), ...(batch.report ? { report: batch.report } : {}) };
       this.setPending({ info, commands: batch.commands });
       return this.out({ kind: 'prepared', pluginName: info.pluginName, created: preview.created });
     } catch (e) {

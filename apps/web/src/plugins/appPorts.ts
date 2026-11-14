@@ -6,6 +6,7 @@ import { safeGet, safeSet } from '../editor/storage.ts';
 import { appDataPort, appModelPort } from './appModelPort.ts';
 import { fromSceneCamera, toSceneCamera } from './cameraConvert.ts';
 import { buildSceneContent } from './sceneExport.ts';
+import { lerToken, politicaDoToken } from './pluginTokens.ts';
 import { connectWebSocket } from './wsTransport.ts';
 
 /** Intervalo mínimo entre leituras da cena para os deltas (a extração de malhas é cara). */
@@ -90,6 +91,9 @@ export function pluginHost(): PluginHost {
     connect: connectWebSocket,
     store: { get: safeGet, set: safeSet },
     builtins: [RENDERER_ENTRY],
+    // Pareamento por token: obrigatório em uso real; opcional só em desenvolvimento (a tela avisa).
+    tokenPolicy: politicaDoToken(),
+    getToken: lerToken,
   });
   return host;
 }

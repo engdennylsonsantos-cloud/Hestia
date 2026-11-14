@@ -200,21 +200,81 @@ function newErrors(before: Project, after: Project): string[] {
   return validateProject(after).filter((i) => i.severity === 'error' && !old.has(errorKey(i))).map((i) => i.message);
 }
 
+/** Formato, quantidade e tamanho do lote (compartilhado entre o ensaio e a aplicação). Devolve o problema ou null. */
+function checkBatchLimits(o: PluginBatchOptions): string | null {
+  if (!Array.isArray(o.commands)) return 'O lote precisa ser uma lista de comandos.';
+  const max = Math.min(o.maxCommands ?? PLUGIN_BATCH_LIMITS.maxCommands, PLUGIN_BATCH_LIMITS.maxCommands);
+  if (o.commands.length > max) return `Lote com ${o.commands.length} comandos; o máximo é ${max}.`;
+  const bytes = new TextEncoder().encode(JSON.stringify(o.commands)).length;
+  return bytes > PLUGIN_BATCH_LIMITS.maxBytes ? `Lote com ${bytes} bytes; o máximo é ${PLUGIN_BATCH_LIMITS.maxBytes} (8 MiB).` : null;
+}
+
+/** Resultado do ENSAIO de um lote (prévia): nada foi gravado nem entrou no histórico. */
+export interface BatchRehearsal {
+  /** O lote seria aceito por `applyPluginBatch` agora (sem erros). */
+  ok: boolean;
+  commands: number;
+  /** Elementos que passariam a existir. */
+  created: number;
+  /** Elementos existentes que mudariam. */
+  changed: number;
+  /** Elementos existentes que seriam apagados. */
+  deleted: number;
+  /** Problemas (no máximo 20): índice do comando (-1 = lote inteiro) e mensagem. */
+  errors: Array<{ index: number; message: string }>;
+}
+
+const MAX_REHEARSAL_ERRORS = 20;
+
+/**
+ * Ensaia o lote numa cópia do projeto, com as MESMAS validações de `applyPluginBatch` (lista branca, ids emitidos pelo
+ * host, `validateProject`), e conta o que mudaria. Não grava, não emite evento e não toca no histórico. Nunca lança.
+ */
+export function rehearsePluginBatch(store: ProjectStore, o: PluginBatchOptions): BatchRehearsal {
+  const empty = (errors: BatchRehearsal['errors']): BatchRehearsal => ({ ok: false, commands: Array.isArray(o.commands) ? o.commands.length : 0, created: 0, changed: 0, deleted: 0, errors });
+  const lim = checkBatchLimits(o);
+  if (lim) return empty([{ index: -1, message: lim }]);
+  const raws = o.commands as unknown[];
+  if (raws.length === 0) return { ok: true, commands: 0, created: 0, changed: 0, deleted: 0, errors: [] };
+  const before = store.project;
+  const sc: Scope = { pluginId: o.pluginId, known: new Set(Object.keys(before.elements)), isIssuedId: o.isIssuedId, dataSchema: o.dataSchema ?? 1, version: o.version };
+  const cmds: Command[] = [];
+  const errors: BatchRehearsal['errors'] = [];
+  raws.forEach((raw, i) => {
+    try { cmds.push(sanitizeOne(sc, raw)); } catch (e) { if (errors.length < MAX_REHEARSAL_ERRORS) errors.push({ index: i, message: (e as Error).message }); }
+  });
+  if (errors.length > 0) return empty(errors);
+  let i = 0;
+  let after: Project;
+  try {
+    after = produce(before, (draft) => { for (; i < cmds.length; i++) applyCommand(draft as Project, cmds[i]!); });
+  } catch (e) {
+    return empty([{ index: i, message: (e as Error).message }]);
+  }
+  const bad = newErrors(before, after);
+  const b = before.elements;
+  const a = after.elements;
+  let created = 0;
+  let changed = 0;
+  let deleted = 0;
+  for (const id of Object.keys(a)) { if (!(id in b)) created += 1; else if (a[id] !== b[id]) changed += 1; }
+  for (const id of Object.keys(b)) if (!(id in a)) deleted += 1;
+  return { ok: bad.length === 0, commands: cmds.length, created, changed, deleted, errors: bad.slice(0, MAX_REHEARSAL_ERRORS).map((message) => ({ index: -1, message: `O lote deixaria o projeto inválido: ${message}` })) };
+}
+
 /** Valida e aplica o lote. Atômico (tudo ou nada) e UM passo de desfazer. Nunca lança: devolve o resultado. */
 export function applyPluginBatch(store: ProjectStore, o: PluginBatchOptions): PluginBatchResult {
   const fail = (index: number, error: string): PluginBatchResult => ({ ok: false, index, error });
   try {
-    if (!Array.isArray(o.commands)) return fail(-1, 'O lote precisa ser uma lista de comandos.');
-    const max = Math.min(o.maxCommands ?? PLUGIN_BATCH_LIMITS.maxCommands, PLUGIN_BATCH_LIMITS.maxCommands);
-    if (o.commands.length > max) return fail(-1, `Lote com ${o.commands.length} comandos; o máximo é ${max}.`);
-    if (o.commands.length === 0) return { ok: true, applied: 0 };
-    const bytes = new TextEncoder().encode(JSON.stringify(o.commands)).length;
-    if (bytes > PLUGIN_BATCH_LIMITS.maxBytes) return fail(-1, `Lote com ${bytes} bytes; o máximo é ${PLUGIN_BATCH_LIMITS.maxBytes} (8 MiB).`);
+    const lim = checkBatchLimits(o);
+    if (lim) return fail(-1, lim);
+    const list = o.commands as unknown[];
+    if (list.length === 0) return { ok: true, applied: 0 };
 
     const before = store.project;
     const sc: Scope = { pluginId: o.pluginId, known: new Set(Object.keys(before.elements)), isIssuedId: o.isIssuedId, dataSchema: o.dataSchema ?? 1, version: o.version };
     const cmds: Command[] = [];
-    o.commands.forEach((raw, i) => {
+    list.forEach((raw, i) => {
       try { cmds.push(sanitizeOne(sc, raw)); } catch (e) { throw new BatchError(i, (e as Error).message); }
     });
 

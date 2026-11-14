@@ -65,9 +65,11 @@ export function PluginImportPreview(): ReactElement | null {
     <div className="fm-hint" role="status">
       <p><b>{t('supio_preview_title')}</b></p>
       <p>{t('supio_preview_body', { name: p.pluginName, file: p.fileName, n: p.preview.created, commands: p.preview.commands })}</p>
+      {p.rehearsal && <p>{t('supbp_import_extra', { changed: p.rehearsal.changed, deleted: p.rehearsal.deleted, errors: p.rehearsal.errors.length })}</p>}
+      {p.rehearsal && p.rehearsal.errors.length > 0 && <p role="alert">{p.rehearsal.errors[0]!.message}</p>}
       {p.report && <p style={{ whiteSpace: 'pre-wrap' }}>{p.report}</p>}
       <p>
-        <button className="btn primary" onClick={() => io.confirmImport()}>{t('supio_confirm', { n: p.preview.created })}</button>{' '}
+        <button className="btn primary" disabled={!!p.rehearsal && !p.rehearsal.ok} onClick={() => io.confirmImport()}>{t('supio_confirm', { n: p.preview.created })}</button>{' '}
         <button className="btn" onClick={() => io.cancelImport()}>{t('supio_cancel')}</button>
       </p>
     </div>

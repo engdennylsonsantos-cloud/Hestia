@@ -71,6 +71,7 @@ import { ManageCadDialog } from './ui/dialogs/ManageCadDialog.tsx';
 import { ExperimentosDialog } from './ui/dialogs/ExperimentosDialog.tsx';
 import { SobreDialog } from './ui/dialogs/SobreDialog.tsx';
 import { pluginHost } from './plugins/appPorts.ts';
+import { PluginBatchPreviewDialog } from './ui/dialogs/PluginBatchPreviewDialog.tsx';
 import { ExternalToolsDialog } from './ui/dialogs/ExternalToolsDialog.tsx';
 import { PluginDialog } from './plugins/pluginUi.tsx';
 import { PluginPanels } from './ui/PluginPanel.tsx'; // SUPLEMENTOS (fase H)
@@ -218,6 +219,8 @@ function Dialogs(): ReactElement | null {
       return <SupplementsDialog />;
     case 'pluginResult': // SUPLEMENTOS
       return <PluginResultDialog />;
+    case 'pluginBatchPreview': // SUPLEMENTOS (fase I)
+      return <PluginBatchPreviewDialog />;
     case 'pluginSchedule': // SUPLEMENTOS
       return <PluginSchedule />;
     case 'updatePrompt':

@@ -18,6 +18,7 @@ import {
 } from '@hestia/plugin-api';
 import type { ZipEntryData } from '@hestia/io';
 import type { PluginInfo } from './appModelPort.ts';
+import { BatchPreview, type BatchOutcome } from './batchPreview.ts'; // SUPLEMENTOS (fase I)
 import { IoBridge, type IoOutcome } from './ioBridge.ts';
 import { Installer, type InstallResult, type PackageStore } from './installer.ts';
 import { PluginLoader, type SupState } from './loader.ts';
@@ -86,6 +87,8 @@ export interface SupplementRuntimeOptions {
   runCheck?: (pluginId: string, checkId: string) => void;
   /** Fase H: liga as ferramentas interativas ao editor e traduz os textos delas. Ausente = ferramenta vira `unsupported`. */
   tools?: Pick<ToolBridgeDeps, 'start' | 'text' | 'message'>;
+  /** Fase I: prévia confirmável de lotes propostos por handlers (`{ proposal }`). Ausente = a proposta cai no resultado comum. */
+  batch?: { version: () => number; undo: () => void; onOutcome?: (o: BatchOutcome) => void };
 }
 
 export type ApproveResult = { ok: true; state: SupState } | { ok: false; code: 'unknown' | 'missing_dependency' | 'not_requested' | 'activation_failed'; detail?: string };
@@ -119,6 +122,8 @@ export class SupplementRuntime {
   readonly installer: Installer;
   /** Importar e exportar de suplementos (fase F). */
   readonly io: IoBridge;
+  /** Prévia confirmável de lotes propostos por suplementos de IA (fase I); null se o app não ligou o desfazer. */
+  readonly batch: BatchPreview | null;
   private rows: SupplementRow[] = [];
   private readonly subs = new Set<() => void>();
   private readonly infos = new Map<string, PluginInfo>();
@@ -150,6 +155,15 @@ export class SupplementRuntime {
       ...(o.onIo ? { onOutcome: o.onIo } : {}),
       onHandlerError: (id) => this.o.notify?.({ kind: 'handler-error', pluginName: this.infos.get(id)?.name ?? id }),
     });
+    const b = o.batch;
+    this.batch = b ? new BatchPreview({
+      model: o.model,
+      canWrite: (id) => o.registry.isGranted(id, 'model.write') && o.registry.isGranted(id, 'model.read'),
+      version: b.version,
+      undo: b.undo,
+      log: (id, level, text) => this.log.append(id, level, text),
+      ...(b.onOutcome ? { onOutcome: b.onOutcome } : {}),
+    }) : null;
     this.installer = new Installer({ store: o.store, validateManifest: validateManifestForInstall });
   }
 
@@ -272,6 +286,8 @@ export class SupplementRuntime {
     const name = this.infos.get(pluginId)?.name ?? pluginId;
     try {
       const value = await this.loader.call(pluginId, handler, values ? [values] : []);
+      // Proposta de lote (suplemento de IA): vira prévia confirmável; nada é aplicado sem o clique do usuário.
+      if (this.batch?.offer(pluginId, name, value)) return { ok: true, value };
       const res = formatHandlerResult(value);
       if (res) this.o.showResult?.({ pluginId, pluginName: name, ...res });
       return { ok: true, value };

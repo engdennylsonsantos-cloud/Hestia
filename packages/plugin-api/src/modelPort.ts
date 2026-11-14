@@ -16,6 +16,16 @@ export interface ApplyOptions {
   maxCommands?: number;
 }
 
+/** Ensaio de um lote numa cópia do projeto (espelha `BatchRehearsal` de `@hestia/model`): nada é gravado. */
+export interface RehearsalResult {
+  ok: boolean;
+  commands: number;
+  created: number;
+  changed: number;
+  deleted: number;
+  errors: Array<{ index: number; message: string }>;
+}
+
 export interface ModelPort {
   /** Cópia imutável do projeto (`model.read`). */
   read(): ProjectSnapshot;
@@ -26,6 +36,11 @@ export interface ModelPort {
    * Erro de lote inteiro (formato, tamanho) usa `index: -1`.
    */
   apply(pluginId: string, label: string, commands: unknown[], opts?: ApplyOptions): ApplyResult;
+  /**
+   * Ensaia o lote com as mesmas validações de `apply` e conta o que mudaria, sem gravar nada (prévia confirmável).
+   * Opcional para não quebrar portas antigas; o app sempre a implementa.
+   */
+  rehearse?(pluginId: string, commands: unknown[], opts?: ApplyOptions): RehearsalResult;
 }
 
 /** Espaço de dados do PRÓPRIO plugin (`plugindata.rw`); o host força o id do plugin. */

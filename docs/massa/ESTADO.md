@@ -24,7 +24,7 @@ Modelo dos subagentes: R1 e R2 rodaram com fable (consumiu o limite do dono). **
 | U1 (interface) | mesclada | merge de massa/u1 | 0 | sonnet medium; conferida. **Árvore combinada T1c+U1: typecheck ✔, lint ✔, test:rapido 1001/11607, test:wasm 59/1359, check:ribbon-i18n 0 faltando** |
 | U2 | mesclada | merge de massa/u2 | 0 | haiku high; conferida na árvore combinada: typecheck ✔, lint ✔, test:rapido 1004/11622, test:wasm 60/1363, check:ribbon-i18n 0 faltando; test:i18n não roda (Chromium 1248 ausente); emenda E14. **Fase 3 concluída em código** |
 | G3 (teste de interface no navegador) | mesclada | merge de massa/g3 | 0 | haiku high; roteiro passa (0 erros de console), 2 falhas = defeito do app fora da massa (Enquadrar tudo); capturas olhadas pelo fiscal; emenda E15 |
-| D1 | pendente | | 0 | |
+| D1 | mesclada | merge de massa/d1 | 0 | haiku high; interrompida pelo limite de uso e retomada; conferida na árvore combinada: typecheck ✔, lint ✔, test:rapido 1007/11649, test:wasm 61/1365, check:ribbon-i18n 0 faltando; emenda E16 |
 | D2 | pendente | | 0 | |
 | X1 | pendente | | 0 | |
 | Q1 | pendente | | 0 | |

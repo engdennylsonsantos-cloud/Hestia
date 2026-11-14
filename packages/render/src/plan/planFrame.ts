@@ -363,6 +363,7 @@ export class PlanFrame {
       this.massaKey = u.massaKey;
       this.massaLinhas = u.massa?.() ?? EMPTY;
       linhasAcima = true;
+      contadores.contarRebuild('massa');
     }
     if (linhasAcima) {
       this.guard = { fills: [...this.guardaLinhas.fills, ...this.massaLinhas.fills], strokes: [...this.guardaLinhas.strokes, ...this.massaLinhas.strokes], labels: [...this.guardaLinhas.labels, ...this.massaLinhas.labels] };

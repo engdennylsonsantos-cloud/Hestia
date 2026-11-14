@@ -7,6 +7,7 @@ import {
   derivarContornosParedesDaMassa,
   emSentidoHorario,
   fundirSegmentosCurtos,
+  semColineares,
   SEGMENTO_MINIMO_PADRAO,
   TOLERANCIA_PAREDE_PADRAO,
 } from './massaDerivaParedes.ts';
@@ -188,5 +189,25 @@ describe('derivação de paredes por nível (fonte simulada)', () => {
     const r = derivarContornosParedesDaMassa(p, 'm1', [terreo], { segmentoMinimo: 3 }, fonteDe([fatia('m1', 0, terreo, retangulo(0, 0, 4, 2))]));
     // Todos os lados (4 e 2 m) ficam abaixo de 3 m nos dois lados menores: sobra o que for ≥ 3 m, e a cadeia não fecha.
     expect(r!.porNivel[0]!.cadeias).toEqual([]);
+  });
+
+  it('vértice no meio de um lado reto não divide a parede em duas (anel que começa no meio do lado)', () => {
+    // Quadrado de 8 m com um vértice extra no meio de cada lado e o anel começando no meio de um lado, como a fatia do kernel.
+    const anel: Vec2[] = [
+      { x: 4, y: 0 }, { x: 8, y: 0 }, { x: 8, y: 4 }, { x: 8, y: 8 }, { x: 4, y: 8 }, { x: 0, y: 8 }, { x: 0, y: 4 }, { x: 0, y: 0 },
+    ];
+    const cadeia = cadeiaDeParedes(anel, TOLERANCIA_PAREDE_PADRAO, SEGMENTO_MINIMO_PADRAO);
+    expect(cadeia).toHaveLength(4);
+    expect(Math.abs(areaComSinal(cadeia))).toBeCloseTo(64, 9);
+  });
+
+  it('semColineares: tira só o vértice entre os vizinhos, mantém a quina e o anel de 3 vértices', () => {
+    const quadrado: Vec2[] = [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 8, y: 0 }, { x: 8, y: 8 }, { x: 0, y: 8 }];
+    expect(semColineares(quadrado)).toHaveLength(4);
+    const triangulo: Vec2[] = [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 0, y: 4 }];
+    expect(semColineares(triangulo)).toEqual(triangulo);
+    // Um vértice a 1 cm da reta (acima de eps = 0,1 mm) é quina de verdade e fica.
+    const quase: Vec2[] = [{ x: 0, y: 0 }, { x: 4, y: 0.01 }, { x: 8, y: 0 }, { x: 8, y: 8 }, { x: 0, y: 8 }];
+    expect(semColineares(quase)).toHaveLength(5);
   });
 });

@@ -95,7 +95,7 @@ Nenhum item `[ ]` está pendente: o que ficou de fora está em `[-]`, com o moti
 - [x] U6 Tabela "Massas por pavimento" com CSV (área e perímetro somados por cópia; rodapé com volume e áreas) — `packages/engine/src/massaSchedule.test.ts`, `apps/web/src/ui/dialogs/MassScheduleDialog.test.ts`, `tests/kernel-massa-tabela.wasm.test.ts`
 - [x] U7 Avisos no painel de avisos com "Ir para": `massa-sem-kernel`, `massa-invalida` e os quatro do kernel — `packages/engine/src/massaIssues.test.ts`, `apps/web/src/ui/MassaAvisosGeometria.test.ts`
 - [x] U8 Textos em pt e en (e os demais idiomas da faixa) pelo sistema de i18n; números por `formatQuantity` — `apps/web/src/editor/i18n/areas/massa*.ts`; `npm run check:ribbon-i18n`
-- [-] U9 `npm run test:i18n` (interface em todos os idiomas, no navegador): não roda neste ambiente (o Playwright espera o Chromium 1248; só existe o 1243); ver o relatório da ficha Q1
+- [x] U9 `npm run test:i18n` (interface em todos os idiomas, no navegador): roda neste ambiente com `PLAYWRIGHT_BROWSERS_PATH=/tmp/pw-massa` (links simbólicos `chromium-1248` e `chromium_headless_shell-1248` para os 1243, fora do repositório e de `/opt`): 31 OK, 0 avisos, 0 falhas (ficha Q1, relatório de 2026-11-14)
 - [-] U10 Barra de estado pressionado de "Mostrar massa" reativa à troca entre cortes sem mudança no projeto: limitação aceita (E13)
 
 ## Derivação (massa vira projeto)

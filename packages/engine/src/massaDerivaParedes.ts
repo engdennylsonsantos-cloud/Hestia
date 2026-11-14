@@ -73,10 +73,39 @@ export function fundirSegmentosCurtos(anel: readonly Vec2[], minimo: number): Ve
   return out.length >= 3 ? out : [];
 }
 
-/** Cadeia de paredes de um contorno externo: tira repetidos, simplifica (Douglas-Peucker), põe em sentido horário e funde os curtos. */
+/**
+ * Tira vértices colineares com os vizinhos (a no máximo `eps` m da reta anterior→seguinte e entre os dois). O anel da fatia começa onde a
+ * semirreta +x local cruza o contorno, que pode ser no meio de um lado reto: sem isso uma parede reta sairia dividida em duas.
+ */
+export function semColineares(anel: readonly Vec2[], eps = 1e-4): Vec2[] {
+  const out = anel.map((p) => ({ x: p.x, y: p.y }));
+  let mudou = true;
+  while (mudou && out.length > 3) {
+    mudou = false;
+    for (let i = 0; i < out.length && out.length > 3; i++) {
+      const a = out[(i - 1 + out.length) % out.length]!;
+      const c = out[i]!;
+      const b = out[(i + 1) % out.length]!;
+      const abx = b.x - a.x;
+      const aby = b.y - a.y;
+      const l2 = abx * abx + aby * aby;
+      if (l2 < 1e-18) continue;
+      const t = ((c.x - a.x) * abx + (c.y - a.y) * aby) / l2;
+      const d = Math.abs(abx * (c.y - a.y) - aby * (c.x - a.x)) / Math.sqrt(l2);
+      if (t > 0 && t < 1 && d <= eps) {
+        out.splice(i, 1);
+        mudou = true;
+        i--;
+      }
+    }
+  }
+  return out;
+}
+
+/** Cadeia de paredes de um contorno externo: tira repetidos, simplifica (Douglas-Peucker), põe em sentido horário, tira colineares e funde os curtos. */
 export function cadeiaDeParedes(anel: readonly Vec2[], tolerancia: number, segmentoMinimo: number): CadeiaParede {
   const simples = simplificarAnel(semRepetidos(anel), tolerancia);
-  return fundirSegmentosCurtos(emSentidoHorario(simples), segmentoMinimo);
+  return fundirSegmentosCurtos(semColineares(emSentidoHorario(simples)), segmentoMinimo);
 }
 
 /**

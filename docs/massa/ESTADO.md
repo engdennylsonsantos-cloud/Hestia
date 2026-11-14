@@ -27,7 +27,7 @@ Modelo dos subagentes: R1 e R2 rodaram com fable (consumiu o limite do dono). **
 | D1 | mesclada | merge de massa/d1 | 0 | haiku high; interrompida pelo limite de uso e retomada; conferida na árvore combinada: typecheck ✔, lint ✔, test:rapido 1007/11649, test:wasm 61/1365, check:ribbon-i18n 0 faltando; emenda E16 |
 | D2 | mesclada | merge de massa/d2 | 0 | haiku high; conferida na árvore combinada: typecheck ✔, lint ✔, test:rapido 1011/11697, test:wasm 62/1369, check:ribbon-i18n 0 faltando; emenda E17. **Fase 4 concluída** |
 | X1 | mesclada | merge de massa/x1 | 0 | sonnet medium; conferida na árvore combinada: typecheck ✔, lint ✔, test:rapido 1015/11723, test:wasm 63/1378, test:ifc-export 22 arq/170 testes, check:ribbon-i18n 0 faltando; emenda E18 |
-| Q1 | pendente | | 0 | |
+| Q1 | mesclada | merge de massa/q1 | 0 | sonnet medium; conferida: typecheck ✔, lint ✔, test:rapido 1015/11724, test:wasm 63/1378, perf ✔; E2E massa.mjs 75 verificações 0 erros; o fiscal corrigiu planFrame (contador) e o defeito das paredes colineares da D2 (E19) |
 
 ## Lições de processo
 - O worktree de `isolation: "worktree"` nasce do `main` local, não da branch de trabalho. Todo prompt de ficha deve mandar o agente rodar `git merge --ff-only claude/youthful-dirac-l4egd1` antes de qualquer coisa e conferir `SCHEMA_VERSION` (esperado 25 antes da M1).
@@ -41,6 +41,7 @@ Modelo dos subagentes: R1 e R2 rodaram com fable (consumiu o limite do dono). **
 - **Limite de uso:** o modelo forte (R1) bateu o limite de 5 h; o agente deixa commit `wip` e é retomado por SendMessage. Em R2 e R3 pedir `wip` antes de cada comando longo.
 - Pendência de limpeza (fiscal, no fim): `/tmp/hestia-target-massa` e worktrees `/home/user/hestia-wt/*`.
 
+- **Fase 5 e fechamento em 2026-11-14:** X1 e Q1 mescladas; `massas` registrado em ORDEM.json; correções do fiscal na E19.
 - **Fase 1 (kernel) concluída em 2026-11-14.** Portão da fase: valores de A.10 batem nos testes Rust (R1/R2/R3) e o fuzz de 200 massas passa em malha, fatias/planta/quantidades/avisos e corte.
 
 - O fiscal apagou `crates/geom-wasm/target` do checkout principal (criado por `npm run build:wasm` rodado no passo 0 sem `CARGO_TARGET_DIR`). Rode SEMPRE `CARGO_TARGET_DIR=/tmp/hestia-target-massa` com build:wasm; `check-lixo` pega.
@@ -53,8 +54,16 @@ Modelo dos subagentes: R1 e R2 rodaram com fable (consumiu o limite do dono). **
 ## Decisões do dono durante a execução
 - 2026-11-13: "sempre que possível seguir sem esperar nada" (o fiscal só para para perguntar se uma decisão de projeto bloquear).
 
-## Pendências conhecidas
-(nenhuma)
+## Pendências conhecidas (nenhuma bloqueia a massa; ver também docs/paridade/massas.md)
+- Revelar (Reveal) elemento oculto para a massa: o guarda-corpo não tem mecanismo genérico por kind.
+- Furos nas paredes derivadas (só o anel externo vira parede).
+- O importador IFC não reconhece `mass` (volta como `Generic` sem seções e arranjo).
+- Chave de i18n própria para "tipo de parede inexistente" nos 7 idiomas (hoje `md_cmd_element_missing_id`; `packages/model/src/i18n.ts`).
+- Dívida de tamanho anterior à massa: `sectionEditTools.ts` (655 linhas, com `eslint-disable max-lines`) e `alignFeatures.ts` (478).
+- Contraste do 3D (opacidade 0,35, decisão A.3): subir para 0,5 se a leitura for ruim (decisão do dono).
+- 'Mostrar massa': o estado pressionado não é reativo à troca entre cortes sem mudança no projeto (`useCtx.ts`).
+- Fora da massa, relatados ao dono: botão "Enquadrar tudo" da barra de navegação não recebe o clique na planta (hipótese: `setPointerCapture` em `ViewportCanvas.tsx` ~linha 780); app sem favicon; kernel não sobe pelo `dist` aberto por `file://` (CORS ao buscar o wasm).
+- `npm run test:i18n` precisa de `PLAYWRIGHT_BROWSERS_PATH=/tmp/pw-massa` com links simbólicos para o Chromium 1243 (E19).
 
-## Tempos medidos (A.8 item 5)
-- Consulta 143 em M5 (flor, 12 pétalas), WASM release: 8,2 ms na 1ª chamada, 1,7 a 2,6 ms nas seguintes (alvo 50 ms). Demais tempos (massa_malha lod 1, massa_planta) a medir em Q1.
+## Tempos medidos (A.8 item 5; WASM real, flor de 12 pétalas)
+- `massa_malha` lod 1: 0,9 a 1,5 ms (alvo 50 ms; 22156 triângulos). `massa_corte`: 1,5 a 2,8 ms (alvo 50 ms; 63 linhas). `massa_planta`: 0,6 a 0,8 ms (alvo 10 ms; 66 linhas). Teste: `packages/engine/src/massaDesempenho.perf.test.ts`.

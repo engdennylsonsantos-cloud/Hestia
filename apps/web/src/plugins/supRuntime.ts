@@ -22,6 +22,7 @@ import { IoBridge, type IoOutcome } from './ioBridge.ts';
 import { Installer, type InstallResult, type PackageStore } from './installer.ts';
 import { PluginLoader, type SupState } from './loader.ts';
 import { PluginLog } from './pluginLog.ts';
+import { dataSpaceInfo, type DataSpaceInfo } from './supManage.ts'; // SUPLEMENTOS: fase J
 import type { ContentOffer } from '@hestia/model'; // SUPLEMENTOS: fase G
 import { contentOffers } from './contentBridge.ts'; // SUPLEMENTOS: fase G
 import { setPluginActionExecutor, type PluginActionExecutor } from './registry.ts';
@@ -46,6 +47,10 @@ export interface SupplementRow {
   source: 'package' | 'folder';
   state: SupState;
   detail?: string;
+  /** Fase J: autor, versão do formato dos dados e instante da instalação (ms desde 1970, UTC). */
+  author?: string;
+  dataSchema: number;
+  installedAt: number;
 }
 
 /** Resultado que um handler devolveu para mostrar ao usuário. */
@@ -111,6 +116,17 @@ export function formatHandlerResult(v: unknown): { title?: PluginText; message: 
   } catch {
     return { message: String(v).slice(0, 4000) };
   }
+}
+
+/** Recusa a concessão de algo que o manifesto não pede, ou sem as permissões que ela exige (spec 08 §3 regra 2). */
+function checkGrants(requested: readonly string[], set: ReadonlySet<string>): Extract<ApproveResult, { ok: false }> | null {
+  for (const g of set) {
+    if (!requested.includes(g)) return { ok: false, code: 'not_requested', detail: g };
+    for (const dep of CAPABILITY_REQUIRES_V2[g as keyof typeof CAPABILITY_REQUIRES_V2] ?? []) {
+      if (!set.has(dep)) return { ok: false, code: 'missing_dependency', detail: `${g} -> ${dep}` };
+    }
+  }
+  return null;
 }
 
 export class SupplementRuntime {
@@ -183,7 +199,9 @@ export class SupplementRuntime {
           const m = p.manifest;
           const desc = typeof m.raw.description === 'string' ? m.raw.description.slice(0, 400) : undefined;
           const detail = this.details.get(m.id);
+          const author = typeof m.raw.author === 'string' ? m.raw.author.slice(0, 120) : undefined;
           return {
+            dataSchema: typeof m.raw.dataSchema === 'number' ? m.raw.dataSchema : 1, installedAt: p.installedAt, ...(author ? { author } : {}),
             id: m.id, name: m.name, version: m.version, runtime: m.runtime, requested: [...m.capabilities], grants: [...p.grants],
             enabled: p.enabled, source: p.source, state: this.loader.state(m.id) ?? (p.enabled ? 'installed' : 'disabled'),
             ...(desc ? { description: desc } : {}), ...(detail ? { detail } : {}),
@@ -228,12 +246,8 @@ export class SupplementRuntime {
       const pkg = await this.o.store.get(id);
       if (!pkg) return { ok: false, code: 'unknown' };
       const set = new Set(grants);
-      for (const g of set) {
-        if (!pkg.manifest.capabilities.includes(g)) return { ok: false, code: 'not_requested', detail: g };
-        for (const dep of CAPABILITY_REQUIRES_V2[g as keyof typeof CAPABILITY_REQUIRES_V2] ?? []) {
-          if (!set.has(dep)) return { ok: false, code: 'missing_dependency', detail: `${g} -> ${dep}` };
-        }
-      }
+      const bad = checkGrants(pkg.manifest.capabilities, set);
+      if (bad) return bad;
       await this.loader.setGrants(id, [...set]);
       const state = this.loader.state(id) === 'active' ? 'active' : await this.loader.activate(id);
       await this.refresh();
@@ -241,6 +255,46 @@ export class SupplementRuntime {
     } catch (e) {
       return { ok: false, code: 'activation_failed', detail: e instanceof Error ? e.message : String(e) };
     }
+  }
+
+  /**
+   * Fase J: concede ou revoga permissões DEPOIS da instalação (substitui o conjunto). Mesmas regras de `approve`, mas
+   * não ativa um suplemento desativado; um suplemento ativo reinicia com o novo conjunto (spec 08 §3 regra 3).
+   */
+  async setGrants(id: string, grants: readonly string[]): Promise<ApproveResult> {
+    try {
+      const pkg = await this.o.store.get(id);
+      if (!pkg) return { ok: false, code: 'unknown' };
+      const set = new Set(grants);
+      const bad = checkGrants(pkg.manifest.capabilities, set);
+      if (bad) return bad;
+      const state = await this.loader.setGrants(id, [...set]);
+      await this.refresh();
+      this.log.append(id, 'info', `permissões atualizadas: ${[...set].join(', ') || 'nenhuma'}`);
+      return state === 'failed' ? { ok: false, code: 'activation_failed', detail: this.details.get(id) } : { ok: true, state: state ?? 'disabled' };
+    } catch (e) {
+      return { ok: false, code: 'activation_failed', detail: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  /**
+   * Fase J: instala uma nova versão DO MESMO suplemento (recusa pacote de outro `id`). Concessões já dadas continuam;
+   * só as permissões novas aguardam decisão (`needsGrant`). Se o suplemento estava habilitado, reinicia com o código novo.
+   */
+  async update(id: string, src: InstallSource): Promise<InstallResult> {
+    const was = (await this.o.store.get(id))?.enabled ?? false;
+    const r = src.kind === 'package' ? await this.installer.installBytes(src.bytes, id) : await this.installer.installFolder(src.files, id);
+    if (r.ok) {
+      this.log.append(id, 'info', `atualizado de ${r.previousVersion ?? '?'} para ${(await this.o.store.get(id))?.manifest.version ?? '?'}`);
+      if (was) await this.loader.activate(id);
+    }
+    await this.refresh();
+    return r;
+  }
+
+  /** Fase J: espaço de dados do suplemento no projeto (somente leitura: tamanho, chaves e prévia). */
+  dataSpace(id: string): DataSpaceInfo {
+    return dataSpaceInfo(this.o.data, id);
   }
 
   /** Conteúdo (famílias e materiais) que os suplementos ativos oferecem (fase G); só é carregado por ação do usuário. */

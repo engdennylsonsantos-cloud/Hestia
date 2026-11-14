@@ -26,7 +26,7 @@ Modelo dos subagentes: R1 e R2 rodaram com fable (consumiu o limite do dono). **
 | G3 (teste de interface no navegador) | mesclada | merge de massa/g3 | 0 | haiku high; roteiro passa (0 erros de console), 2 falhas = defeito do app fora da massa (Enquadrar tudo); capturas olhadas pelo fiscal; emenda E15 |
 | D1 | mesclada | merge de massa/d1 | 0 | haiku high; interrompida pelo limite de uso e retomada; conferida na árvore combinada: typecheck ✔, lint ✔, test:rapido 1007/11649, test:wasm 61/1365, check:ribbon-i18n 0 faltando; emenda E16 |
 | D2 | mesclada | merge de massa/d2 | 0 | haiku high; conferida na árvore combinada: typecheck ✔, lint ✔, test:rapido 1011/11697, test:wasm 62/1369, check:ribbon-i18n 0 faltando; emenda E17. **Fase 4 concluída** |
-| X1 | pendente | | 0 | |
+| X1 | mesclada | merge de massa/x1 | 0 | sonnet medium; conferida na árvore combinada: typecheck ✔, lint ✔, test:rapido 1015/11723, test:wasm 63/1378, test:ifc-export 22 arq/170 testes, check:ribbon-i18n 0 faltando; emenda E18 |
 | Q1 | pendente | | 0 | |
 
 ## Lições de processo

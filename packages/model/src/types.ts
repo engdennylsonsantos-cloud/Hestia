@@ -406,6 +406,16 @@ export interface OutlineSource {
 }
 
 /**
+ * Origem de piso ou laje gerado pela massa (ficha D1, plano de massa A.7): a massa e o nível cuja fatia deu o contorno.
+ * Opcional: arquivo antigo e elemento desenhado à mão não têm o campo. Não há vínculo automático: é a chave para que
+ * rodar a derivação de novo substitua os gerados antes pela mesma massa e nível.
+ */
+export interface OrigemMassa {
+  massaId: Id;
+  nivelId: Id;
+}
+
+/**
  * Piso (Revit: Floor). Contorno fechado em planta (sentido qualquer) com furos. O topo do piso fica na cota do
  * nível mais `heightOffset`; as camadas descem a partir dele (a primeira camada é a de cima).
  */
@@ -418,6 +428,8 @@ export interface Floor {
   holes: Vec2[][];
   /** Origem do contorno quando criado por paredes/perímetro; ausente = estático (arquivo antigo). */
   outlineSource?: OutlineSource;
+  /** Massa e nível de que veio o contorno (ficha D1); ausente em piso comum. */
+  origemMassa?: OrigemMassa;
   heightOffset: number;
   mark: string;
   comments: string;
@@ -456,6 +468,8 @@ export interface Slab {
   holes: Vec2[][];
   /** Origem do contorno quando criado por paredes/perímetro; ausente = estático (arquivo antigo). */
   outlineSource?: OutlineSource;
+  /** Massa e nível de que veio o contorno (ficha D1); ausente em laje comum. */
+  origemMassa?: OrigemMassa;
   heightOffset: number;
   slope: SlabSlope | null;
   mark: string;

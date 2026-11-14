@@ -49,6 +49,7 @@ export * from './validateRamps.ts';
 export * from './massTypes.ts';
 export * from './mass.ts';
 export * from './validateMass.ts';
+export * from './massDerivaCommands.ts';
 export * from './guardaCorpoTypes.ts';
 export * from './guardaCorpo.ts';
 export * from './guardaCorpoTransform.ts';

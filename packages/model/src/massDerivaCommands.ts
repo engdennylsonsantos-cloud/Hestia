@@ -1,10 +1,12 @@
 import type { Vec2 } from '@hestia/geom';
 import type { Command } from './commands.ts';
+import { newId } from './ids.ts';
 import { makeFloor } from './floor.ts';
 import { t, type Lang } from './i18n.ts';
 import { makeSlab } from './slab.ts';
 import { isMass } from './mass.ts';
-import { isFloor, isSlab, type Floor, type Id, type Project, type Slab } from './types.ts';
+import { makeWall } from './wall.ts';
+import { isFloor, isSlab, isWall, type Floor, type Id, type Project, type Slab, type Wall } from './types.ts';
 
 /** Piso ou laje: o que a derivação cria (ficha D1, plano de massa A.7). */
 export type TipoDerivado = 'piso' | 'laje';
@@ -54,5 +56,69 @@ export function comandoDerivarPisos(p: Project, a: DerivaPisosArgs, lang: Lang =
     criar.push(a.tipo === 'piso' ? { type: 'addFloor', floor: makeFloor(base) } : { type: 'addSlab', slab: makeSlab(base) });
   }
   const apagar: Command[] = remover.length > 0 ? [{ type: 'deleteElements', ids: [...new Set(remover)] }] : [];
+  return { type: 'batch', commands: [...apagar, ...criar] };
+}
+
+/** Uma cadeia fechada de paredes a criar (ficha D2): o nível, os vértices em sentido horário (o último liga ao primeiro) e a altura. */
+export interface CadeiaDerivadaParedes {
+  nivelId: Id;
+  pontos: Vec2[];
+  /** Nível de cima dentro da massa, ou null: a parede vai até `altura` acima da cota do nível (topo da massa). */
+  topoNivelId: Id | null;
+  altura: number;
+}
+
+export interface DerivaParedesArgs {
+  massaId: Id;
+  /** Tipo de parede (`wallTypes`) escolhido no diálogo. */
+  typeId: Id;
+  /** Níveis escolhidos: as paredes geradas antes pela mesma massa neles saem, mesmo que a nova geração não tenha cadeia ali. */
+  niveis: Id[];
+  cadeias: CadeiaDerivadaParedes[];
+}
+
+/** As paredes que uma derivação anterior gerou pela MESMA massa nos níveis escolhidos (`origemMassa` e `levelId` iguais). */
+function paredesAnteriores(p: Project, massaId: Id, niveis: readonly Id[]): Id[] {
+  return Object.values(p.elements)
+    .filter((e): e is Wall => isWall(e) && e.origemMassa?.massaId === massaId && e.origemMassa.nivelId === e.levelId && niveis.includes(e.levelId))
+    .map((e) => e.id);
+}
+
+/**
+ * Comando da derivação de paredes da massa (ficha D2, plano de massa A.7). Devolve UM comando `batch`: apaga as paredes geradas antes
+ * pela mesma massa nos níveis escolhidos e cria uma parede por segmento de cada cadeia, com `origemMassa`. As junções ficam por conta do
+ * motor (não se calculam aqui). Como é um só `batch`, um Ctrl+Z desfaz tudo e rodar de novo substitui (não duplica). Valida antes e
+ * lança sem tocar no projeto se a massa, o tipo, um nível, a altura ou uma cadeia estiverem errados. `novoId` existe para os testes.
+ */
+export function comandoDerivarParedes(p: Project, a: DerivaParedesArgs, lang: Lang = 'pt', novoId: (prefixo: string) => Id = newId): Command {
+  if (!isMass(p.elements[a.massaId])) throw new Error(t(lang, 'md_cmd_mass_missing'));
+  // Sem chave própria de tipo de parede no i18n do modelo: usa-se a de elemento inexistente, com o id.
+  if (!p.wallTypes[a.typeId]) throw new Error(t(lang, 'md_cmd_element_missing_id', { id: a.typeId }));
+  for (const nivelId of a.niveis) if (!p.levels.some((l) => l.id === nivelId)) throw new Error(t(lang, 'md_cmd_level_missing_id', { id: nivelId }));
+  const criar: Command[] = [];
+  for (const c of a.cadeias) {
+    if (!p.levels.some((l) => l.id === c.nivelId)) throw new Error(t(lang, 'md_cmd_level_missing_id', { id: c.nivelId }));
+    if (c.topoNivelId !== null && !p.levels.some((l) => l.id === c.topoNivelId)) throw new Error(t(lang, 'md_cmd_level_missing_id', { id: c.topoNivelId }));
+    // O motor já entrega cadeias com ao menos 3 vértices e altura positiva; uma que não atenda não gera parede (sem texto novo de erro).
+    if (c.pontos.length < 3 || !(c.altura > 0) || !Number.isFinite(c.altura)) continue;
+    const origemMassa = { massaId: a.massaId, nivelId: c.nivelId };
+    const n = c.pontos.length;
+    for (let i = 0; i < n; i++) {
+      const wall: Omit<Wall, 'order'> = makeWall({
+        id: novoId('wm'),
+        typeId: a.typeId,
+        levelId: c.nivelId,
+        a: c.pontos[i]!,
+        b: c.pontos[(i + 1) % n]!,
+        topLevelId: c.topoNivelId,
+        topOffset: 0,
+        height: c.altura,
+        origemMassa,
+      });
+      criar.push({ type: 'addWall', wall });
+    }
+  }
+  const remover = [...new Set(paredesAnteriores(p, a.massaId, a.niveis))];
+  const apagar: Command[] = remover.length > 0 ? [{ type: 'deleteElements', ids: remover }] : [];
   return { type: 'batch', commands: [...apagar, ...criar] };
 }

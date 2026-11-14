@@ -1,7 +1,8 @@
 // Auxiliares comuns dos E2E da massa conceitual (massa-visual.mjs, massa-ui.mjs e massa.mjs): servidor http local do build, relatório
 // de verificações, captura estável e atalhos de interface. Só funções puras de teste; nenhum código de produto.
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
+import { createServer as servidorTcp } from 'node:net';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -175,4 +176,20 @@ export function kernelEmNode(arquivoJson) {
   const linha = saida.split('\n').find((l) => l.startsWith('RES '));
   if (!linha) throw new Error('kernel em Node sem saída');
   return JSON.parse(linha.slice(4));
+}
+
+/**
+ * Sobe o servidor de desenvolvimento do app (vite) numa porta livre. É o único jeito de ter o app SEM kernel: o build de produção exige o
+ * kernel Rust (sem ele o app recusa abrir qualquer projeto), e só o modo de desenvolvimento aceita `?kernel=ts` (ver `configDoDespacho`).
+ * Devolve `{ url, parar }`.
+ */
+export async function iniciarServidorDev() {
+  const porta = await new Promise((ok) => { const t = servidorTcp().listen(0, '127.0.0.1', () => { const n = t.address().port; t.close(() => ok(n)); }); });
+  const filho = spawn('npx', ['vite', '--port', String(porta), '--strictPort', '--host', '127.0.0.1'], { cwd: path.resolve('apps/web'), stdio: ['ignore', 'pipe', 'pipe'] });
+  await new Promise((ok, falha) => {
+    const t = setTimeout(() => falha(new Error('vite dev não subiu em 60 s')), 60000);
+    filho.stdout.on('data', (d) => { if (String(d).includes('Local:')) { clearTimeout(t); ok(); } });
+    filho.on('exit', (c) => { clearTimeout(t); falha(new Error(`vite dev saiu com código ${c}`)); });
+  });
+  return { url: `http://127.0.0.1:${porta}`, parar: () => filho.kill('SIGTERM') };
 }

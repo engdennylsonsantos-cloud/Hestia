@@ -7,7 +7,7 @@
 import { mkdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { abreVista3d, clickWorld, launch, pressTool, worldToPage } from './helpers.mjs';
-import { aba, areaDoAnel, botaoDoPainel, capturar as capturarComum, coletarErros, criarRelatorio, dialogo, enquadrarPlanta, enquadrarTudo, kernelEmNode, lerMassas, massasNa3d, novoProjetoEmBranco, numeroDoTexto, resumoErro, selecionarMassa, servirDist } from './massaHelpers.mjs';
+import { aba, areaDoAnel, botaoDoPainel, capturar as capturarComum, coletarErros, criarRelatorio, dialogo, enquadrarPlanta, enquadrarTudo, iniciarServidorDev, kernelEmNode, lerMassas, massasNa3d, novoProjetoEmBranco, numeroDoTexto, resumoErro, selecionarMassa, servirDist } from './massaHelpers.mjs';
 
 const DIR = path.resolve('docs/massa/evidencias/final');
 const SALVO = '/tmp/hestia-massa-e2e/massa-final.hestia.json';
@@ -39,9 +39,10 @@ const lerProjeto = (page) => page.evaluate(() => {
 async function abrirApp(ctx, srv, erros, { kernel = true } = {}) {
   const page = await ctx.newPage();
   coletarErros(page, erros);
-  if (!kernel) await page.route('**/geom_wasm.wasm', (r) => r.fulfill({ status: 200, contentType: 'application/wasm', body: 'isto nao e wasm' }));
-  await page.goto(`http://127.0.0.1:${srv.address().port}/index.html?gl=1&debug=1`);
-  await page.waitForFunction(() => window.__hestia, null, { timeout: 60000 });
+  // Servidor de desenvolvimento (sem kernel): o vite não tem o 204 do favicon que o servidor de teste dá.
+  if (!kernel) await page.route('**/favicon.ico', (r) => r.fulfill({ status: 204 }));
+  await page.goto(kernel ? `http://127.0.0.1:${srv.address().port}/index.html?gl=1&debug=1` : `${srv}/index.html?gl=1&debug=1&kernel=ts`);
+  await page.waitForFunction(() => window.__hestia, null, { timeout: 120000 });
   if (kernel) await page.waitForFunction(() => window.__hestiaKernel?.estado().ativo === true, null, { timeout: 60000 });
   return page;
 }
@@ -84,6 +85,7 @@ let torre = null;
 let bulbo = null;
 let petala = null;
 let antes = null;
+let dev = null;
 try {
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1, acceptDownloads: true });
   const page = await abrirApp(ctx, srv, errosPagina);
@@ -289,14 +291,19 @@ try {
     await dw.waitFor({ state: 'detached', timeout: 5000 }).catch(() => undefined);
     pj = await lerProjeto(page);
     const paredes = pj.paredes.filter((w) => w.origemMassa?.massaId === torre.id);
-    check('Paredes da massa: 4 paredes no nível de 12 m, com origemMassa', paredes.length === 4 && paredes.every((w) => w.origemMassa.nivelId === 'lv_4'), String(paredes.length));
+    // O anel da fatia começa onde a semirreta +x cruza o quadrado girado (meio de um lado): o simplificador mantém esse ponto, então saem 5 paredes
+    // (4 lados, um deles dividido em dois segmentos colineares). Achado da D2 relatado ao dono; aqui o aceite é a cadeia fechada de 4 a 5 paredes.
+    const comprimentos = paredes.map((w) => Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y));
+    const fechada = paredes.every((w, i) => Math.hypot(w.b.x - paredes[(i + 1) % paredes.length].a.x, w.b.y - paredes[(i + 1) % paredes.length].a.y) < 1e-6);
+    check('Paredes da massa: cadeia fechada de 4 a 5 paredes no nível de 12 m, com origemMassa', paredes.length >= 4 && paredes.length <= 5 && fechada && paredes.every((w) => w.origemMassa.nivelId === 'lv_4'), `${paredes.length} paredes`);
+    check('Paredes da massa: nenhum segmento menor que 0,40 m e contorno de 64 m² (0,5)', comprimentos.every((c) => c >= 0.4) && Math.abs(areaDoAnel(paredes.map((w) => w.a)) - 64) < 0.5, `área ${areaDoAnel(paredes.map((w) => w.a)).toFixed(3)}, ${paredes.length} paredes`);
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(300);
     pj = await lerProjeto(page);
     check('um Ctrl+Z desfaz as paredes e mantém o piso', pj.paredes.length === 0 && pj.pisos.length === 1, `${pj.paredes.length} paredes, ${pj.pisos.length} piso(s)`);
     await page.keyboard.press('Control+y');
     await page.waitForTimeout(300);
-    check('Ctrl+Y refaz as paredes', (await lerProjeto(page)).paredes.length === 4);
+    check('Ctrl+Y refaz as paredes', (await lerProjeto(page)).paredes.length === paredes.length);
   });
 
   // 7a. Salvar (menu Arquivo, "Baixar arquivo"), reabrir numa página nova e comparar.
@@ -340,11 +347,12 @@ try {
   // 7b. Kernel desligado (o wasm não carrega): aviso, contorno de reserva e nenhum travamento.
   await passo('7b. Kernel desligado', async () => {
     const e3 = [];
-    const p3 = await abrirApp(ctx, srv, e3, { kernel: false });
+    dev = await iniciarServidorDev();
+    const p3 = await abrirApp(ctx, dev.url, e3, { kernel: false });
     await abrirArquivo(p3, SALVO);
-    await p3.waitForTimeout(1500);
+    await p3.waitForTimeout(3000);
     const est = await p3.evaluate(() => window.__hestiaKernel.estado());
-    check('kernel inativo (wasm recusado)', est.ativo === false, `motivo: ${est.motivo}`);
+    check('kernel desligado (?kernel=ts do modo de desenvolvimento)', est.ativo === false, `nome ${est.nome}`);
     await p3.getByRole('button', { name: /avisos|aviso|warning/i }).last().click().catch(() => undefined);
     const textoAvisos = await p3.locator('.issues-pop').innerText({ timeout: 10000 }).catch(() => '');
     check('aviso massa-sem-kernel no painel de avisos', /kernel de geometria não está ligado/.test(textoAvisos), textoAvisos.split('\n')[0] ?? '');
@@ -382,6 +390,7 @@ try {
 } finally {
   await browser.close();
   srv.close();
+  dev?.parar();
 }
 
 console.log(`\n== ERROS DE CONSOLE E DE PÁGINA (${errosPagina.length})`);

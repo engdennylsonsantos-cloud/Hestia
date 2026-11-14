@@ -121,6 +121,6 @@ export function dataSpaceInfo(port: PluginDataPort, pluginId: string): DataSpace
 /** Tamanho legível: bytes até 1024, depois KiB e MiB com uma casa decimal. */
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KiB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MiB`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KiB`; // units-ok: tamanho de arquivo em KiB, não é medida do projeto
+  return `${(n / (1024 * 1024)).toFixed(1)} MiB`; // units-ok: tamanho de arquivo em MiB, não é medida do projeto
 }

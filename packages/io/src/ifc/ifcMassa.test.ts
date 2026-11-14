@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ProjectStore, createEmptyProject, makeMass, type Mass, type Project } from '@hestia/model';
 import { exportIfc } from './ifcExport.ts';
+import { importIfc } from '../ifcImport/index.ts';
 import type { IfcGeometry, IfcMassaGeo } from './ifcTypes.ts';
 
 const TS = '2026-01-01T00:00:00';
@@ -109,5 +110,15 @@ describe('exportIfc: massa conceitual (ficha X1)', () => {
     expect(exportIfc(p, geo, { timestamp: TS })).toBe(a);
     const definidos = new Set([...a.matchAll(/^#(\d+)=/gm)].map((m) => Number(m[1])));
     expect([...a.matchAll(/#(\d+)/g)].map((m) => Number(m[1])).filter((id) => !definidos.has(id))).toEqual([]);
+  });
+
+  it('ida e volta: o arquivo com a massa reimporta sem erro e a massa volta como objeto genérico com a malha (o importador não conhece o kind `mass`)', () => {
+    const p = projetoCom(massa('ma', 'Torre A'));
+    const text = exportIfc(p, { ...VAZIA, masses: [{ massaId: 'ma', mesh: caixa(2, 3, 9), copias: 1 }] }, { timestamp: TS });
+    const { project } = importIfc(text);
+    const volta = Object.values(project.elements).filter((e) => e.kind === 'generic' || e.kind === 'mass');
+    expect(volta).toHaveLength(1);
+    expect(volta[0]!.kind).toBe('generic');
+    expect((volta[0] as { mesh: { positions: number[] } }).mesh.positions.length).toBeGreaterThanOrEqual(24);
   });
 });

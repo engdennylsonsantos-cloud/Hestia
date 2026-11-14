@@ -29,6 +29,7 @@ struct Args {
     allow_no_origin: bool,
     require_token: bool,
     token_file: Option<PathBuf>,
+    lock_seconds: u64,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -40,6 +41,7 @@ fn parse_args() -> Result<Args, String> {
         allow_no_origin: false,
         require_token: true,
         token_file: None,
+        lock_seconds: auth::LOCK_SECONDS,
     };
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -51,6 +53,7 @@ fn parse_args() -> Result<Args, String> {
             "--allow-no-origin" => a.allow_no_origin = true,
             "--require-token" => a.require_token = true,
             "--no-require-token" => a.require_token = false,
+            "--lock-seconds" => a.lock_seconds = it.next().and_then(|v| v.parse().ok()).ok_or("--lock-seconds precisa de um número")?,
             "--token-file" => a.token_file = Some(it.next().ok_or("--token-file precisa de um caminho")?.into()),
             "--help" | "-h" => {
                 println!("hestia-renderer [--port N] [--state-file F] [--control-stdin] [--allow-origin O]... [--require-token | --no-require-token] [--token-file F] [--allow-no-origin]");
@@ -140,7 +143,7 @@ fn main() {
     if args.allow_no_origin {
         eprintln!("AVISO: --allow-no-origin aceita clientes sem Origin; o Hestia (navegador ou Tauri) sempre envia Origin. Só para desenvolvimento e testes.");
     }
-    let mut lockout = Lockout::default();
+    let mut lockout = Lockout::new(args.lock_seconds);
 
     // Loopback IPv4 fixo: nunca 0.0.0.0.
     let listener = match TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, args.port))) {

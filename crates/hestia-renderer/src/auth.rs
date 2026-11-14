@@ -53,13 +53,24 @@ pub fn confere(token: &str, rotulo: &str, nonce_plugin: &str, nonce_host: &str, 
 }
 
 /// Bloqueio por falhas seguidas: depois de `MAX_FAILURES`, recusa novas tentativas por `LOCK_SECONDS`.
-#[derive(Default)]
 pub struct Lockout {
     failures: u32,
     locked_until: Option<Instant>,
+    lock: Duration,
+}
+
+impl Default for Lockout {
+    fn default() -> Self {
+        Self::new(LOCK_SECONDS)
+    }
 }
 
 impl Lockout {
+    /// `lock_seconds` é a duração do bloqueio (o padrão é `LOCK_SECONDS`; `--lock-seconds` existe para os testes).
+    pub fn new(lock_seconds: u64) -> Self {
+        Self { failures: 0, locked_until: None, lock: Duration::from_secs(lock_seconds) }
+    }
+
     pub fn is_locked(&self, now: Instant) -> bool {
         self.locked_until.is_some_and(|t| now < t)
     }
@@ -67,7 +78,7 @@ impl Lockout {
     pub fn record_failure(&mut self, now: Instant) {
         self.failures += 1;
         if self.failures >= MAX_FAILURES {
-            self.locked_until = Some(now + Duration::from_secs(LOCK_SECONDS));
+            self.locked_until = Some(now + self.lock);
             self.failures = 0;
         }
     }

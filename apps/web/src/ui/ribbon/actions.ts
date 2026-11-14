@@ -339,6 +339,12 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     run: openDialog('massPisos'),
     disabled: (c) => (massaUnicaSelecionada(c.p, c.selection) ? false : t('Selecione uma massa.', 'Select a mass.')),
   },
+  paredesDaMassa: {
+    label: t('Paredes da massa', 'Walls from Mass'),
+    icon: 'wall',
+    run: openDialog('massParedes'),
+    disabled: (c) => (massaUnicaSelecionada(c.p, c.selection) ? false : t('Selecione uma massa.', 'Select a mass.')),
+  },
   graphicsVisibility: {
     label: t('Visibilidade/Gráficos', 'Visibility/Graphics'),
     icon: 'layers',

@@ -124,3 +124,4 @@ export * from './massaVista.ts';
 export * from './massaPlanta.ts';
 export * from './massaSchedule.ts';
 export * from './massaDerivaPisos.ts';
+export * from './massaDerivaParedes.ts';

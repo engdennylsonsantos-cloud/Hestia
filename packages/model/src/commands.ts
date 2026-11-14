@@ -47,7 +47,7 @@ import { changesWallEnds, clampOffset, rehostOpenings, wallEndsPatchOf, type Wal
 import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLevel.ts';
 import { transformStair } from './stairTransform.ts';
 import { transformRamp } from './rampTransform.ts';
-import { transformCad, transformCeiling, transformFloor, transformRoof, transformSlab } from './transformPlanar.ts';
+import { semOrigemMassa, transformCad, transformCeiling, transformFloor, transformRoof, transformSlab } from './transformPlanar.ts';
 import { isCad, type CadDrawing } from './cad.ts';
 import { stairTypeIssue } from './stair.ts';
 import { rampTypeIssue } from './ramp.ts';
@@ -232,12 +232,14 @@ export type Command =
   | { type: 'upsertColorScheme'; scheme: ColorScheme }
   | { type: 'removeColorScheme'; id: Id }
   | ({ type: 'setElementLevel' } & SetElementLevel);
-function transformWall(w: Wall, t: Transform): Wall {
+function transformWall(w: Wall, t: Transform, copy = false): Wall {
   const a = applyTransform(t, w.a);
   const b = applyTransform(t, w.b);
   // Espelhar inverte o lado externo: sem trocar `flipped` a pilha de camadas sairia do lado errado.
   // Espelhar também inverte o lado para o qual o arco abaulava.
-  return { ...w, a, b, flipped: t.kind === 'mirror' ? !w.flipped : w.flipped, sag: t.kind === 'mirror' ? -w.sag : w.sag };
+  const movida = { ...w, a, b, flipped: t.kind === 'mirror' ? !w.flipped : w.flipped, sag: t.kind === 'mirror' ? -w.sag : w.sag };
+  // Cópia de parede gerada pela massa não carrega `origemMassa` (ficha D2, emenda E16 item 3).
+  return copy ? semOrigemMassa(movida) : movida;
 }
 
 function removeIds(p: Project, ids: Id[]): void {
@@ -299,7 +301,7 @@ function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }
   const walls = c.ids.map((id) => p.elements[id]).filter(isWall);
   const wallIds = new Set(walls.map((w) => w.id));
   for (const w of walls) {
-    const next = transformWall(w, c.transform);
+    const next = transformWall(w, c.transform, !!idMap);
     if (idMap) {
       const nid = idMap[w.id];
       if (!nid) continue;

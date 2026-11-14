@@ -367,6 +367,8 @@ export interface Wall {
   topProfile: ProfilePoint[] | null;
   /** Instância da parede cortina (decisão 0056, §4.3): só intenções (sobrescritas), nunca geometria. Ausente = parede comum. */
   curtain?: CurtainInstance;
+  /** Massa e nível de que veio a parede (ficha D2); ausente em parede comum. Some ao copiar (a cópia é parede comum). */
+  origemMassa?: OrigemMassa;
   mark: string;
   comments: string;
   /** Ordem de criação: desempata junções (docs/05 §1, ordem de junção). */

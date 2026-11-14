@@ -76,7 +76,7 @@ export const TABS_SOON: RibbonTab[] = [
       soon(t('Massa no local', 'In-Place Mass')),
       soon(t('Colocar massa', 'Place Mass')),
     ),
-    panel('mas-por-massa', t('Modelo por massa', 'Model by Face'), act('pisosDaMassa'), soon(t('Telhado por face', 'Roof by Face'), 'roof'), soon(t('Parede por face', 'Wall by Face'), 'wall'), soon(t('Forro por face', 'Ceiling by Face'), 'ceiling'), soon(t('Piso por face', 'Floor by Face'), 'floor')),
+    panel('mas-por-massa', t('Modelo por massa', 'Model by Face'), act('pisosDaMassa'), act('paredesDaMassa'), soon(t('Telhado por face', 'Roof by Face'), 'roof'), soon(t('Parede por face', 'Wall by Face'), 'wall'), soon(t('Forro por face', 'Ceiling by Face'), 'ceiling'), soon(t('Piso por face', 'Floor by Face'), 'floor')),
     p('mas-terreno', t('Terreno', 'Site Modeling'), [t('Topografia', 'Toposurface')], [t('Subdivisão', 'Subregion')], [t('Plataforma', 'Building Pad')], [t('Componente de terreno', 'Site Component')], [t('Linhas de propriedade', 'Property Line')]),
   ),
   tab('colaborar', t('Colaborar', 'Collaborate'),

@@ -1,7 +1,8 @@
 // Auxiliares comuns dos E2E da massa conceitual (massa-visual.mjs, massa-ui.mjs e massa.mjs): servidor http local do build, relatório
 // de verificações, captura estável e atalhos de interface. Só funções puras de teste; nenhum código de produto.
+import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -125,4 +126,53 @@ export async function novoProjetoEmBranco(page) {
   await dialogo(page, 'Menu Arquivo').getByRole('button', { name: 'Novo', exact: true }).click();
   await page.getByRole('button', { name: /Em branco/ }).click();
   await page.waitForTimeout(400);
+}
+
+/**
+ * Seleciona uma massa pelo clique na planta; se o clique não a pegar, grava a seleção direto no estado da interface (e devolve false,
+ * para o roteiro registrar que o clique falhou).
+ */
+export async function selecionarMassa(page, id, clique, worldToPage) {
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  const p = await worldToPage(page, clique.x, clique.y);
+  await page.mouse.move(p.x, p.y);
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(200);
+  const ok = await page.evaluate((i) => window.__hestia.useUi.getState().selection.includes(i), id);
+  if (!ok) await page.evaluate((i) => window.__hestia.useUi.setState({ selection: [i] }), id);
+  return ok;
+}
+
+/** Texto de uma célula numérica da tabela ("64,00", "1.234,50") como número. */
+export const numeroDoTexto = (s) => parseFloat(s.replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.'));
+
+/** Área pela fórmula do cadarço de um anel [{x, y}]. */
+export const areaDoAnel = (pts) => Math.abs(pts.reduce((s, a, i) => { const b = pts[(i + 1) % pts.length]; return s + (a.x * b.y - b.x * a.y); }, 0)) / 2;
+
+const SCRIPT_KERNEL = `
+import { readFileSync } from 'node:fs';
+import { buildMassSchedule, iniciarDespachoKernel, servicoMassa } from '${path.resolve('packages/engine/src/index.ts')}';
+import { caminhoDoWasm } from '${path.resolve('packages/geom/src/kernel/caminhoWasm.ts')}';
+const p = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const caminho = caminhoDoWasm();
+await iniciarDespachoKernel({ fatiaA: true, fatiaB: true, sombra: false }, async () => readFileSync(caminho));
+for (let i = 0; i < 100 && !servicoMassa().pronto(); i++) await new Promise((r) => setTimeout(r, 100));
+const sch = buildMassSchedule(p);
+const fatias = servicoMassa().fatias(p);
+console.log('RES ' + JSON.stringify({ pronto: servicoMassa().pronto(), linhas: sch ? sch.rows : null, fatias }));
+`;
+
+/**
+ * Números EXATOS do kernel Rust (o mesmo wasm do app) para um projeto salvo: tabela por pavimento e fatias. A tabela do app mostra 2 casas,
+ * então a tolerância de 1e-6 se confere aqui. O script vai para /tmp (fora do repositório) e importa os módulos do repositório por caminho absoluto.
+ */
+export function kernelEmNode(arquivoJson) {
+  mkdirSync('/tmp/hestia-massa-e2e', { recursive: true });
+  const script = '/tmp/hestia-massa-e2e/kernel.mts';
+  writeFileSync(script, SCRIPT_KERNEL);
+  const saida = execFileSync('npx', ['vite-node', script, arquivoJson], { encoding: 'utf8', timeout: 180000 });
+  const linha = saida.split('\n').find((l) => l.startsWith('RES '));
+  if (!linha) throw new Error('kernel em Node sem saída');
+  return JSON.parse(linha.slice(4));
 }

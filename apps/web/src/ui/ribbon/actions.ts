@@ -17,6 +17,7 @@ import { setSnap, toggleRoofProjection, useUi, type DialogKind, type UiState } f
 import { transfer } from '../../editor/transfer.ts';
 import { alternarMassaNaVista, massaVisivelNaVista } from '../../editor/viewVisibility.ts';
 import { activateView } from '../../editor/viewTabActions.ts';
+import { massaUnicaSelecionada } from '../dialogs/massPisosForm.ts';
 import { applyDrop } from '../dockDrag.ts';
 import { gridToolOf } from '../gridUi.ts';
 import { idPerimetroEditavel } from '../perimeter/perimeterEditavel.ts';
@@ -331,6 +332,12 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     run: alternarMassaNaVista,
     pressed: (c) => massaVisivelNaVista(c.p),
     disabled: (c) => (c.view === 'sheet' ? t('Não vale para pranchas.', 'Does not apply to sheets.') : false),
+  },
+  pisosDaMassa: {
+    label: t('Pisos da massa', 'Floors from Mass'),
+    icon: 'floor',
+    run: openDialog('massPisos'),
+    disabled: (c) => (massaUnicaSelecionada(c.p, c.selection) ? false : t('Selecione uma massa.', 'Select a mass.')),
   },
   graphicsVisibility: {
     label: t('Visibilidade/Gráficos', 'Visibility/Graphics'),

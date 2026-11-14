@@ -3,7 +3,7 @@ import type { Transform } from '@hestia/geom';
 import { makeFloor } from './floor.ts';
 import { makeSlab } from './slab.ts';
 import { semOrigemMassa, transformFloor, transformSlab } from './transformPlanar.ts';
-import type { Floor, Slab } from './types.ts';
+import type { Floor, OrigemMassa, Slab } from './types.ts';
 
 const quadrado: Array<{ x: number; y: number }> = [
   { x: 0, y: 0 },
@@ -50,12 +50,12 @@ describe('transformações planares: origemMassa (ficha D2, emenda E16 item 3)',
   });
 
   it('piso ou laje sem origemMassa continua igual em cópia (sem campo novo)', () => {
-    const comum = makeFloor({ id: 'c', typeId: 'ft_x', levelId: 'lv_a', boundary: quadrado });
+    const comum: Floor = { ...makeFloor({ id: 'c', typeId: 'ft_x', levelId: 'lv_a', boundary: quadrado }), order: 0 };
     expect('origemMassa' in transformFloor(comum, { kind: 'translate', d: { x: 1, y: 0 } }, true)).toBe(false);
   });
 
   it('semOrigemMassa devolve o próprio objeto quando não há o campo e tira o campo quando há', () => {
-    const comum = { id: 'x', levelId: 'lv_a' };
+    const comum: { id: string; origemMassa?: OrigemMassa } = { id: 'x' };
     expect(semOrigemMassa(comum)).toBe(comum);
     const com = { id: 'y', origemMassa: origem };
     expect(semOrigemMassa(com)).toEqual({ id: 'y' });
